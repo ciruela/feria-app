@@ -1,17 +1,29 @@
-# app_feria
+# feria-app
 
-A new Flutter project.
+App Flutter para catálogo de precios en feria de armas, caza y pesca (uso interno).
 
-## Getting Started
+## Ejecutar (modo local, sin nube)
 
-This project is a starting point for a Flutter application.
+```bash
+flutter pub get
+flutter run -d chrome
+```
 
-A few resources to get you started if this is your first Flutter project:
+## Supabase
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+1. Creá un proyecto en [supabase.com](https://supabase.com)
+2. Ejecutá `supabase/schema.sql` y `supabase/seed.sql` en el SQL Editor
+3. Creá bucket público `feria-fotos` en Storage para las fotos
+4. Corré la app con tus credenciales:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter run -d chrome \
+  --dart-define=SUPABASE_URL=https://TU_PROYECTO.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=eyJ...
+```
+
+Desde **Administración** podés **Publicar catálogo a Supabase** la primera vez para subir los productos locales.
+
+## PIN admin por defecto
+
+`2580`
