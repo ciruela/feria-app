@@ -20,3 +20,8 @@ String formatDateTime(DateTime dateTime) {
   final formatter = DateFormat('dd/MM/yyyy - HH:mm');
   return formatter.format(dateTime);
 }
+
+String formatDate(DateTime date) {
+  final formatter = DateFormat('dd/MM/yyyy');
+  return formatter.format(date);
+}

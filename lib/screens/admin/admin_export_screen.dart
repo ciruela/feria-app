@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_config.dart';
+import '../../widgets/feria_shell.dart';
 import '../../services/catalog_service.dart';
 
 class AdminExportScreen extends StatelessWidget {
@@ -12,8 +13,8 @@ class AdminExportScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final json = context.watch<CatalogService>().exportJson();
 
-    return Scaffold(
-      appBar: AppBar(
+    return FeriaScaffold(
+      appBar: FeriaAppBar(
         title: const Text('Exportar catálogo'),
         actions: [
           IconButton(

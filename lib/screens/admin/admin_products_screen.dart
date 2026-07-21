@@ -6,6 +6,7 @@ import '../../services/catalog_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/filter_buttons.dart';
+import '../../widgets/feria_shell.dart';
 import 'admin_product_edit_screen.dart';
 
 class AdminProductsScreen extends StatefulWidget {
@@ -73,8 +74,8 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
     final products = _filteredProducts(catalog);
     final brands = _brandsForFilter(catalog);
 
-    return Scaffold(
-      appBar: AppBar(
+    return FeriaScaffold(
+      appBar: FeriaAppBar(
         title: const Text('Productos y stock'),
         actions: [
           if (_marcaFilter != null || _typeFilter != null)

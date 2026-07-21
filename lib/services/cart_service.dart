@@ -1,15 +1,20 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/product.dart';
+import '../models/product_prices.dart';
 
 class CartItem {
   CartItem({
     required this.product,
     this.quantity = 1,
+    this.paymentMethod = PaymentMethod.lista,
   });
 
   final Product product;
   int quantity;
+  PaymentMethod paymentMethod;
+
+  String get lineKey => '${product.id}_${paymentMethod.key}';
 }
 
 class CartService extends ChangeNotifier {
@@ -19,31 +24,66 @@ class CartService extends ChangeNotifier {
   int get itemCount => _items.fold(0, (sum, item) => sum + item.quantity);
   bool get isEmpty => _items.isEmpty;
 
-  void addProduct(Product product) {
-    final existing =
-        _items.where((item) => item.product.id == product.id).firstOrNull;
+  void addProduct(
+    Product product, {
+    PaymentMethod paymentMethod = PaymentMethod.lista,
+  }) {
+    final existing = _items
+        .where((item) => item.lineKey == '${product.id}_${paymentMethod.key}')
+        .firstOrNull;
 
     if (existing != null) {
       existing.quantity++;
     } else {
-      _items.add(CartItem(product: product));
+      _items.add(
+        CartItem(
+          product: product,
+          paymentMethod: paymentMethod,
+        ),
+      );
     }
     notifyListeners();
   }
 
-  void removeProduct(String productId) {
-    _items.removeWhere((item) => item.product.id == productId);
+  void updatePaymentMethod(String lineKey, PaymentMethod paymentMethod) {
+    final index = _items.indexWhere((item) => item.lineKey == lineKey);
+    if (index == -1) return;
+
+    final item = _items[index];
+    final updated = CartItem(
+      product: item.product,
+      quantity: item.quantity,
+      paymentMethod: paymentMethod,
+    );
+
+    final duplicate = _items
+        .where(
+          (element) =>
+              element.lineKey == updated.lineKey && element.lineKey != lineKey,
+        )
+        .firstOrNull;
+
+    if (duplicate != null) {
+      duplicate.quantity += updated.quantity;
+      _items.removeAt(index);
+    } else {
+      _items[index] = updated;
+    }
     notifyListeners();
   }
 
-  void changeQuantity(String productId, int quantity) {
+  void removeLine(String lineKey) {
+    _items.removeWhere((item) => item.lineKey == lineKey);
+    notifyListeners();
+  }
+
+  void changeQuantity(String lineKey, int quantity) {
     if (quantity <= 0) {
-      removeProduct(productId);
+      removeLine(lineKey);
       return;
     }
 
-    final item =
-        _items.where((element) => element.product.id == productId).firstOrNull;
+    final item = _items.where((element) => element.lineKey == lineKey).firstOrNull;
     if (item != null) {
       item.quantity = quantity;
       notifyListeners();

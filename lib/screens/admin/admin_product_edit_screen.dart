@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/product.dart';
 import '../../services/catalog_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/feria_shell.dart';
 
 class AdminProductEditScreen extends StatefulWidget {
   const AdminProductEditScreen({
@@ -56,14 +57,14 @@ class _AdminProductEditScreenState extends State<AdminProductEditScreen> {
     final product = _product;
 
     if (product == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Producto')),
+      return FeriaScaffold(
+        appBar: const FeriaAppBar(title: Text('Producto')),
         body: const Center(child: Text('Producto no encontrado')),
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
+    return FeriaScaffold(
+      appBar: FeriaAppBar(
         title: Text(product.isArma ? product.modeloDisplay : product.codigo),
       ),
       body: ListView(

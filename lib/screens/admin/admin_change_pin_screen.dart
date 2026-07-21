@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../widgets/feria_shell.dart';
 import '../../services/auth_service.dart';
 
 class AdminChangePinScreen extends StatefulWidget {
@@ -23,9 +24,9 @@ class _AdminChangePinScreenState extends State<AdminChangePinScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cambiar PIN'),
+    return FeriaScaffold(
+      appBar: const FeriaAppBar(
+        title: Text('Cambiar PIN'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),

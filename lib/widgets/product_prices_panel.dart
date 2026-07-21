@@ -16,41 +16,53 @@ class ProductPricesPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _PriceLine(
-          label: 'USD',
-          value: formatUsd(prices.usd),
-          bold: true,
-        ),
-        _PriceLine(
-          label: 'LISTA',
-          value: formatArs(prices.lista),
-          bold: !compact,
-          large: !compact,
-        ),
-        _PriceLine(
-          label: 'EFECTIVO',
-          value: formatArs(prices.efectivo),
-          color: AppColors.accent,
-        ),
-        _PriceLine(
-          label: 'TARJETA 3x',
-          value:
-              '${formatArs(prices.tarjeta3)} (${formatArs(prices.cuota3)}/cuota)',
-        ),
-        _PriceLine(
-          label: 'TARJETA 6x',
-          value:
-              '${formatArs(prices.tarjeta6)} (${formatArs(prices.cuota6)}/cuota)',
-        ),
-        _PriceLine(
-          label: 'TARJETA 12x',
-          value:
-              '${formatArs(prices.tarjeta12)} (${formatArs(prices.cuota12)}/cuota)',
-        ),
-      ],
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(compact ? 14 : 16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: AppDecorations.radiusSm,
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _PriceLine(
+            label: 'USD',
+            value: formatUsd(prices.usd),
+            bold: true,
+            highlight: true,
+          ),
+          const Divider(height: 18),
+          _PriceLine(
+            label: 'LISTA',
+            value: formatArs(prices.lista),
+            bold: !compact,
+            large: !compact,
+          ),
+          _PriceLine(
+            label: 'EFECTIVO',
+            value: formatArs(prices.efectivo),
+            color: AppColors.accent,
+            bold: true,
+          ),
+          _PriceLine(
+            label: 'TARJETA 3x',
+            value:
+                '${formatArs(prices.tarjeta3)} (${formatArs(prices.cuota3)}/cuota)',
+          ),
+          _PriceLine(
+            label: 'TARJETA 6x',
+            value:
+                '${formatArs(prices.tarjeta6)} (${formatArs(prices.cuota6)}/cuota)',
+          ),
+          _PriceLine(
+            label: 'TARJETA 12x',
+            value:
+                '${formatArs(prices.tarjeta12)} (${formatArs(prices.cuota12)}/cuota)',
+          ),
+        ],
+      ),
     );
   }
 }
@@ -62,6 +74,7 @@ class _PriceLine extends StatelessWidget {
     this.bold = false,
     this.large = false,
     this.color,
+    this.highlight = false,
   });
 
   final String label;
@@ -69,26 +82,38 @@ class _PriceLine extends StatelessWidget {
   final bool bold;
   final bool large;
   final Color? color;
+  final bool highlight;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
-      child: RichText(
-        text: TextSpan(
-          style: TextStyle(
-            fontSize: large ? 20 : 16,
-            fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
-            color: color ?? AppColors.textPrimary,
-          ),
-          children: [
-            TextSpan(
-              text: '$label: ',
-              style: const TextStyle(fontWeight: FontWeight.w800),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 96,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: large ? 18 : 14,
+                fontWeight: FontWeight.w800,
+                color: highlight ? AppColors.goldDark : AppColors.textSecondary,
+                letterSpacing: 0.4,
+              ),
             ),
-            TextSpan(text: value),
-          ],
-        ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: large ? 22 : 16,
+                fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+                color: color ?? AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

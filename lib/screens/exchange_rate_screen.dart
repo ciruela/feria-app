@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../services/exchange_rate_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/formatters.dart';
+import '../widgets/feria_shell.dart';
+import '../widgets/section_header.dart';
 
 class ExchangeRateScreen extends StatefulWidget {
   const ExchangeRateScreen({super.key});
@@ -34,31 +36,28 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
   Widget build(BuildContext context) {
     final exchangeRate = context.watch<ExchangeRateService>();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Tipo de cambio'),
+    return FeriaScaffold(
+      appBar: const FeriaAppBar(
+        title: Text('Tipo de cambio'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'Tipo de cambio de hoy',
-              style: Theme.of(context).textTheme.headlineMedium,
+            const SectionHeader(
+              title: 'Tipo de cambio de hoy',
+              subtitle:
+                  'Actualizalo una vez por día. Todos los precios en pesos se recalculan solos.',
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Actualizalo una vez por día. Todos los precios en pesos se recalculan solos.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 24),
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
                 color: AppColors.surface,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: AppDecorations.radiusLg,
                 border: Border.all(color: AppColors.border),
+                boxShadow: [AppDecorations.cardShadow],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -95,8 +94,20 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () async {
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: AppDecorations.goldGradient,
+                borderRadius: AppDecorations.radiusMd,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.gold.withValues(alpha: 0.35),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: ElevatedButton(
+                onPressed: () async {
                 final parsed = double.tryParse(
                   _controller.text.replaceAll(',', '.'),
                 );
@@ -120,7 +131,13 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
                   ),
                 );
               },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                foregroundColor: AppColors.primaryDark,
+              ),
               child: const Text('GUARDAR'),
+            ),
             ),
             const SizedBox(height: 16),
             if (exchangeRate.updatedAt != null)

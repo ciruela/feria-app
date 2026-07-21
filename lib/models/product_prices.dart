@@ -21,6 +21,8 @@ class ProductPrices {
 }
 
 enum PaymentMethod {
+  dolarBillete('Dólar billete', 'dolar_billete'),
+  transferencia('Transferencia', 'transferencia'),
   lista('Lista', 'lista'),
   efectivo('Efectivo', 'efectivo'),
   tarjeta3('Tarjeta 3 cuotas', 'tarjeta3'),
@@ -32,8 +34,13 @@ enum PaymentMethod {
   final String label;
   final String key;
 
-  double totalFor(ProductPrices prices) {
+  bool get isUsdPayment => this == PaymentMethod.dolarBillete;
+
+  /// Monto en pesos según la forma de pago elegida.
+  double totalArsFor(ProductPrices prices) {
     return switch (this) {
+      PaymentMethod.dolarBillete => prices.lista,
+      PaymentMethod.transferencia => prices.lista,
       PaymentMethod.lista => prices.lista,
       PaymentMethod.efectivo => prices.efectivo,
       PaymentMethod.tarjeta3 => prices.tarjeta3,
@@ -41,4 +48,18 @@ enum PaymentMethod {
       PaymentMethod.tarjeta12 => prices.tarjeta12,
     };
   }
+
+  /// Monto en dólares del producto (siempre el precio catálogo).
+  double totalUsdFor(ProductPrices prices) => prices.usd;
 }
+
+/// Formas de pago que se preguntan al agregar un arma al carrito.
+const weaponPaymentMethods = [
+  PaymentMethod.dolarBillete,
+  PaymentMethod.transferencia,
+  PaymentMethod.efectivo,
+  PaymentMethod.lista,
+  PaymentMethod.tarjeta3,
+  PaymentMethod.tarjeta6,
+  PaymentMethod.tarjeta12,
+];

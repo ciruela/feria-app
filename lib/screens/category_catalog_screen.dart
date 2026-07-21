@@ -5,9 +5,11 @@ import '../models/product.dart';
 import '../services/catalog_service.dart';
 import '../services/cart_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/feria_shell.dart';
 import '../widgets/filter_buttons.dart';
 import '../widgets/product_card.dart';
 import '../widgets/quick_nav_bar.dart';
+import '../widgets/section_header.dart';
 import 'cart_screen.dart';
 
 class CategoryCatalogScreen extends StatefulWidget {
@@ -77,8 +79,8 @@ class _CategoryCatalogScreenState extends State<CategoryCatalogScreen> {
     );
     final cartCount = context.watch<CartService>().itemCount;
 
-    return Scaffold(
-      appBar: AppBar(
+    return FeriaScaffold(
+      appBar: FeriaAppBar(
         title: Text(widget.type.label),
         actions: [
           if (_hasFilters)
@@ -89,7 +91,7 @@ class _CategoryCatalogScreenState extends State<CategoryCatalogScreen> {
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w800,
-                  fontSize: 16,
+                  fontSize: 15,
                 ),
               ),
             ),
@@ -116,15 +118,10 @@ class _CategoryCatalogScreenState extends State<CategoryCatalogScreen> {
           ),
           Expanded(
             child: products.isEmpty
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text(
-                        'Ningún producto con esos filtros.\nTocá VER TODOS para volver.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 20),
-                      ),
-                    ),
+                ? EmptyState(
+                    icon: Icons.search_off_rounded,
+                    title: 'Ningún producto con esos filtros',
+                    subtitle: 'Tocá VER TODOS para volver al catálogo completo',
                   )
                 : LayoutBuilder(
                     builder: (context, constraints) {
@@ -197,26 +194,44 @@ class _FilterPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.surface,
         border: Border(
-          bottom: BorderSide(color: AppColors.border, width: 2),
+          bottom: BorderSide(color: AppColors.border.withValues(alpha: 0.8)),
         ),
+        boxShadow: [AppDecorations.softShadow],
       ),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '$productCount producto${productCount == 1 ? '' : 's'}',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppColors.primary,
-              ),
+            Row(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    gradient: AppDecorations.goldGradient,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text(
+                    '$productCount producto${productCount == 1 ? '' : 's'}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primaryDark,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Filtrá tocando los botones',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             _FilterRow(
               label: 'MARCA',
               child: _HorizontalChips(
@@ -278,13 +293,14 @@ class _FilterRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         SizedBox(
-          width: 110,
+          width: 118,
           child: Text(
             label,
             style: const TextStyle(
-              fontSize: 14,
+              fontSize: 12,
               fontWeight: FontWeight.w800,
               color: AppColors.textSecondary,
+              letterSpacing: 0.8,
             ),
           ),
         ),

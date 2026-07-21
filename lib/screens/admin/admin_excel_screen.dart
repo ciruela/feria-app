@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/catalog_service.dart';
+import '../../widgets/feria_shell.dart';
 
 class AdminExcelScreen extends StatefulWidget {
   const AdminExcelScreen({super.key});
@@ -82,9 +83,9 @@ class _AdminExcelScreenState extends State<AdminExcelScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Excel'),
+    return FeriaScaffold(
+      appBar: const FeriaAppBar(
+        title: Text('Excel'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),

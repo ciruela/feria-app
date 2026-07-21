@@ -9,65 +9,108 @@ class BigActionButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.subtitle,
+    this.accentColor,
   });
 
   final String label;
   final String? subtitle;
   final IconData icon;
   final VoidCallback onTap;
+  final Color? accentColor;
 
   @override
   Widget build(BuildContext context) {
+    final accent = accentColor ?? AppColors.primary;
+
     return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(20),
-      elevation: 2,
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+        borderRadius: AppDecorations.radiusLg,
+        child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            color: AppColors.surface,
+            borderRadius: AppDecorations.radiusLg,
             border: Border.all(color: AppColors.border),
+            boxShadow: [AppDecorations.cardShadow],
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(icon, size: 34, color: AppColors.primary),
-              ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: Theme.of(context).textTheme.headlineMedium,
+          child: ClipRRect(
+            borderRadius: AppDecorations.radiusLg,
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 6,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [accent, accent.withValues(alpha: 0.55)],
+                      ),
                     ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        subtitle!,
-                        style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 24, 20, 24),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 68,
+                        height: 68,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              accent.withValues(alpha: 0.18),
+                              accent.withValues(alpha: 0.06),
+                            ],
+                          ),
+                          borderRadius: AppDecorations.radiusMd,
+                          border: Border.all(color: accent.withValues(alpha: 0.22)),
+                        ),
+                        child: Icon(icon, size: 34, color: accent),
+                      ),
+                      const SizedBox(width: 18),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              label,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            if (subtitle != null) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                subtitle!,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.10),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.arrow_forward_rounded,
+                          color: accent,
+                          size: 24,
+                        ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              const Icon(
-                Icons.chevron_right,
-                size: 36,
-                color: AppColors.primary,
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

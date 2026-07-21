@@ -19,28 +19,41 @@ class FilterChipButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? AppColors.primary : AppColors.surface,
-      borderRadius: BorderRadius.circular(compact ? 12 : 14),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(compact ? 12 : 14),
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
           padding: EdgeInsets.symmetric(
             horizontal: compact ? 14 : 18,
             vertical: compact ? 10 : 16,
           ),
           decoration: BoxDecoration(
+            gradient: selected
+                ? AppDecorations.appBarGradient
+                : null,
+            color: selected ? null : AppColors.surfaceMuted,
             borderRadius: BorderRadius.circular(compact ? 12 : 14),
             border: Border.all(
               color: selected ? AppColors.primary : AppColors.border,
-              width: 2,
+              width: selected ? 1.5 : 1,
             ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.18),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
           ),
           child: Text(
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: compact ? 16 : 18,
+              fontSize: compact ? 15 : 17,
               fontWeight: FontWeight.w700,
               color: selected ? Colors.white : AppColors.textPrimary,
             ),
@@ -71,37 +84,39 @@ class LetterChip extends StatelessWidget {
       width: 44,
       height: 44,
       child: Material(
-        color: !enabled
-            ? AppColors.background
-            : selected
-                ? AppColors.primary
-                : AppColors.surface,
-        borderRadius: BorderRadius.circular(10),
+        color: Colors.transparent,
         child: InkWell(
           onTap: enabled ? onTap : null,
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
+          borderRadius: BorderRadius.circular(12),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
+              gradient: selected ? AppDecorations.goldGradient : null,
+              color: !enabled
+                  ? AppColors.backgroundDark
+                  : selected
+                      ? null
+                      : AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: selected
-                    ? AppColors.primary
+                    ? AppColors.goldDark
                     : enabled
                         ? AppColors.border
-                        : AppColors.border.withValues(alpha: 0.4),
+                        : AppColors.border.withValues(alpha: 0.35),
                 width: 1.5,
               ),
             ),
             child: Text(
               letter,
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 17,
                 fontWeight: FontWeight.w800,
                 color: !enabled
-                    ? AppColors.textSecondary.withValues(alpha: 0.4)
+                    ? AppColors.textSecondary.withValues(alpha: 0.35)
                     : selected
-                        ? Colors.white
+                        ? AppColors.primaryDark
                         : AppColors.textPrimary,
               ),
             ),
@@ -140,7 +155,8 @@ class LetterGrid extends StatelessWidget {
             onPressed: enabled ? () => onLetterTap(letter) : null,
             style: OutlinedButton.styleFrom(
               padding: EdgeInsets.zero,
-              backgroundColor: enabled ? AppColors.surface : AppColors.background,
+              backgroundColor:
+                  enabled ? AppColors.surface : AppColors.backgroundDark,
             ),
             child: Text(letter),
           ),

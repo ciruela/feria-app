@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/pricing_settings_service.dart';
+import '../../widgets/feria_shell.dart';
 
 class AdminPricingScreen extends StatefulWidget {
   const AdminPricingScreen({super.key});
@@ -39,8 +40,8 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Precios y cuotas')),
+    return FeriaScaffold(
+      appBar: const FeriaAppBar(title: Text('Precios y cuotas')),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [

@@ -5,8 +5,11 @@ import '../../config/app_config.dart';
 import '../../models/app_role.dart';
 import '../../services/catalog_service.dart';
 import '../../services/seller_service.dart';
+import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/big_action_button.dart';
+import '../../widgets/feria_shell.dart';
+import '../../widgets/section_header.dart';
 import '../employee/employee_home_screen.dart';
 import '../exchange_rate_screen.dart';
 import '../role_gate_screen.dart';
@@ -23,8 +26,8 @@ class AdminHomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final catalog = context.watch<CatalogService>();
 
-    return Scaffold(
-      appBar: AppBar(
+    return FeriaScaffold(
+      appBar: FeriaAppBar(
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -36,36 +39,34 @@ class AdminHomeScreen extends StatelessWidget {
         actions: [
           IconButton(
             tooltip: 'Salir',
-            iconSize: 30,
             onPressed: () => exitToRoleGate(context),
             icon: const Icon(Icons.logout),
           ),
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
         children: [
-          Text(
-            'Panel de administración',
-            style: Theme.of(context).textTheme.headlineMedium,
+          StatCard(
+            icon: Icons.inventory_2_rounded,
+            label: 'Catálogo cargado',
+            value: '${catalog.products.length} productos',
+            subtitle: catalog.lastSync == null
+                ? 'Sin sincronizar con la nube'
+                : 'Última sync: ${formatDateTime(catalog.lastSync!)}',
+            accentColor: AppColors.goldDark,
           ),
-          const SizedBox(height: 8),
-          Text(
-            '${catalog.products.length} productos cargados',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          if (catalog.lastSync != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              'Última sync: ${formatDateTime(catalog.lastSync!)}',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ],
           const SizedBox(height: 24),
+          const SectionHeader(
+            title: 'Panel de administración',
+            subtitle: 'Gestioná precios, stock y configuración',
+          ),
+          const SizedBox(height: 18),
           BigActionButton(
             label: 'Productos y stock',
             subtitle: 'Editar precios, stock y fotos',
             icon: Icons.inventory_2_outlined,
+            accentColor: AppColors.primary,
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -74,11 +75,12 @@ class AdminHomeScreen extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           BigActionButton(
             label: 'Tipo de cambio',
             subtitle: 'Actualizar dólar del día',
-            icon: Icons.currency_exchange,
+            icon: Icons.currency_exchange_rounded,
+            accentColor: AppColors.goldDark,
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -87,11 +89,12 @@ class AdminHomeScreen extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           BigActionButton(
             label: 'Precios y cuotas',
             subtitle: 'Efectivo, tarjeta 3/6/12 cuotas',
-            icon: Icons.payments_outlined,
+            icon: Icons.payments_rounded,
+            accentColor: AppColors.accent,
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -101,33 +104,36 @@ class AdminHomeScreen extends StatelessWidget {
             },
           ),
           if (AppConfig.usesRemoteSellers) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             BigActionButton(
               label: 'Sincronizar vendedores',
               subtitle: AppConfig.useSupabase
                   ? 'Bajar lista desde Supabase'
                   : 'Bajar lista desde la nube',
               icon: Icons.people_outline,
+              accentColor: AppColors.armaCorta,
               onTap: () => context.read<SellerService>().syncFromCloud(),
             ),
           ],
           if (AppConfig.usesRemoteCatalog) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             BigActionButton(
               label: AppConfig.useSupabase
                   ? 'Bajar catálogo de Supabase'
                   : 'Bajar catálogo de la nube',
               subtitle: 'Traer última versión publicada',
               icon: Icons.cloud_download_outlined,
+              accentColor: AppColors.armaCorta,
               onTap: catalog.isSyncing ? () {} : () => catalog.syncFromCloud(),
             ),
           ],
           if (AppConfig.useSupabase) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             BigActionButton(
               label: 'Publicar catálogo a Supabase',
               subtitle: 'Subir todos los productos locales',
               icon: Icons.cloud_upload_outlined,
+              accentColor: AppColors.municion,
               onTap: catalog.isSyncing
                   ? () {}
                   : () async {
@@ -152,11 +158,12 @@ class AdminHomeScreen extends StatelessWidget {
                     },
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           BigActionButton(
             label: 'Importar / Exportar Excel',
             subtitle: 'Stock, precios, marca, calibre, modelo',
             icon: Icons.table_chart_outlined,
+            accentColor: AppColors.armaLarga,
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -165,11 +172,12 @@ class AdminHomeScreen extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           BigActionButton(
             label: 'Exportar catálogo JSON',
-            subtitle: 'Copiar JSON para subir a la nube',
+            subtitle: 'Copiar JSON para respaldo',
             icon: Icons.upload_file_outlined,
+            accentColor: AppColors.primaryLight,
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -178,11 +186,12 @@ class AdminHomeScreen extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           BigActionButton(
             label: 'Ver como empleado',
             subtitle: 'Previsualizar la app del vendedor',
             icon: Icons.visibility_outlined,
+            accentColor: AppColors.accent,
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -191,11 +200,12 @@ class AdminHomeScreen extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           BigActionButton(
             label: 'Cambiar PIN admin',
             subtitle: 'PIN por defecto: 2580',
             icon: Icons.lock_outline,
+            accentColor: AppColors.goldDark,
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
