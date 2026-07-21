@@ -1,0 +1,166 @@
+{
+  "products": [
+    {
+      "id": "mun-001",
+      "type": "municion",
+      "marca": "Magtech",
+      "calibre": "9mm Luger",
+      "codigo": "BS0311 L-214",
+      "precioUsd": 12.50,
+      "stock": 48,
+      "foto": "assets/images/magtech-9mm.jpg",
+      "fotoUrl": ""
+    },
+    {
+      "id": "mun-002",
+      "type": "municion",
+      "marca": "Magtech",
+      "calibre": "9mm Luger",
+      "codigo": "9MM-FMJ-124",
+      "precioUsd": 11.80,
+      "stock": 120,
+      "foto": "",
+      "fotoUrl": ""
+    },
+    {
+      "id": "mun-003",
+      "type": "municion",
+      "marca": "Magtech",
+      "calibre": ".38 Special",
+      "codigo": "38SPL-158",
+      "precioUsd": 14.20,
+      "stock": 36,
+      "foto": "",
+      "fotoUrl": ""
+    },
+    {
+      "id": "mun-004",
+      "type": "municion",
+      "marca": "CBC",
+      "calibre": "9mm Luger",
+      "codigo": "CBC-9MM-115",
+      "precioUsd": 9.90,
+      "stock": 200,
+      "foto": "",
+      "fotoUrl": ""
+    },
+    {
+      "id": "mun-005",
+      "type": "municion",
+      "marca": "CBC",
+      "calibre": ".22 LR",
+      "codigo": "CBC-22-40",
+      "precioUsd": 4.50,
+      "stock": 0,
+      "foto": "",
+      "fotoUrl": ""
+    },
+    {
+      "id": "mun-006",
+      "type": "municion",
+      "marca": "Remington",
+      "calibre": ".223 Rem",
+      "codigo": "RM-223-55",
+      "precioUsd": 18.00,
+      "stock": 24,
+      "foto": "",
+      "fotoUrl": ""
+    },
+    {
+      "id": "ac-001",
+      "type": "arma_corta",
+      "marca": "Bersa",
+      "modelo": "Thunder 9",
+      "calibre": "9mm",
+      "codigo": "TH9-001",
+      "precioUsd": 280.00,
+      "stock": 3,
+      "foto": "",
+      "fotoUrl": ""
+    },
+    {
+      "id": "ac-002",
+      "type": "arma_corta",
+      "marca": "Bersa",
+      "modelo": "Thunder 380",
+      "calibre": ".380 ACP",
+      "codigo": "BP9-002",
+      "precioUsd": 320.00,
+      "stock": 2,
+      "foto": "",
+      "fotoUrl": ""
+    },
+    {
+      "id": "ac-003",
+      "type": "arma_corta",
+      "marca": "Glock",
+      "modelo": "G19 Gen 5",
+      "calibre": "9mm",
+      "codigo": "G19-G5",
+      "precioUsd": 650.00,
+      "stock": 1,
+      "foto": "",
+      "fotoUrl": ""
+    },
+    {
+      "id": "ac-004",
+      "type": "arma_corta",
+      "marca": "Taurus",
+      "modelo": "856",
+      "calibre": ".38 Special",
+      "codigo": "TA-856",
+      "precioUsd": 450.00,
+      "stock": 4,
+      "foto": "",
+      "fotoUrl": ""
+    },
+    {
+      "id": "al-001",
+      "type": "arma_larga",
+      "marca": "Remington",
+      "modelo": "700 .308",
+      "calibre": ".308 Win",
+      "codigo": "R700-308",
+      "precioUsd": 890.00,
+      "stock": 2,
+      "foto": "",
+      "fotoUrl": ""
+    },
+    {
+      "id": "al-002",
+      "type": "arma_larga",
+      "marca": "Remington",
+      "modelo": "700 .223",
+      "calibre": ".223 Rem",
+      "codigo": "R700-223",
+      "precioUsd": 820.00,
+      "stock": 1,
+      "foto": "",
+      "fotoUrl": ""
+    },
+    {
+      "id": "al-003",
+      "type": "arma_larga",
+      "marca": "Browning",
+      "modelo": "A5",
+      "calibre": "12 GA",
+      "codigo": "A5-12",
+      "precioUsd": 1200.00,
+      "stock": 1,
+      "foto": "",
+      "fotoUrl": ""
+    },
+    {
+      "id": "al-004",
+      "type": "arma_larga",
+      "marca": "Rossi",
+      "modelo": "RB22",
+      "calibre": ".22 LR",
+      "codigo": "RB22-001",
+      "precioUsd": 180.00,
+      "stock": 5,
+      "foto": "",
+      "fotoUrl": ""
+    }
+  ]
+}

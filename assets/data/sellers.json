@@ -1,0 +1,19 @@
+{
+  "sellers": [
+    { "id": "v1", "nombre": "Agustín", "activo": true },
+    { "id": "v2", "nombre": "Carlos", "activo": true },
+    { "id": "v3", "nombre": "Diego", "activo": true },
+    { "id": "v4", "nombre": "Eduardo", "activo": true },
+    { "id": "v5", "nombre": "Fernando", "activo": true },
+    { "id": "v6", "nombre": "Gabriel", "activo": true },
+    { "id": "v7", "nombre": "Hernán", "activo": true },
+    { "id": "v8", "nombre": "Jorge", "activo": true },
+    { "id": "v9", "nombre": "Lucas", "activo": true },
+    { "id": "v10", "nombre": "Marcos", "activo": true },
+    { "id": "v11", "nombre": "Martín", "activo": true },
+    { "id": "v12", "nombre": "Pablo", "activo": true },
+    { "id": "v13", "nombre": "Ricardo", "activo": true },
+    { "id": "v14", "nombre": "Roberto", "activo": true },
+    { "id": "v15", "nombre": "Sebastián", "activo": true }
+  ]
+}
