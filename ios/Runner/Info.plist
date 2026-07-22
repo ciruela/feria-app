@@ -51,6 +51,8 @@
 	<string>Necesitamos la cámara para fotos de productos y escanear el DNI del cliente.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Necesitamos acceder a fotos para productos y leer el DNI del cliente.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Alguna librería del sistema puede solicitar ubicación al elegir fotos; la app no rastrea tu ubicación.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>La app usa la red local para depuración durante el desarrollo.</string>
 	<key>NSBonjourServices</key>

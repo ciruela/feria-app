@@ -118,23 +118,23 @@ class _CategoryCatalogScreenState extends State<CategoryCatalogScreen> {
           ),
           Expanded(
             child: products.isEmpty
-                ? EmptyState(
+                ? const EmptyState(
                     icon: Icons.search_off_rounded,
                     title: 'Ningún producto con esos filtros',
                     subtitle: 'Tocá VER TODOS para volver al catálogo completo',
                   )
                 : LayoutBuilder(
                     builder: (context, constraints) {
-                      final isWide = constraints.maxWidth >= 700;
-                      final crossAxisCount = isWide ? 3 : 1;
-
+                      // Altura fija por tarjeta para que el panel de precios/cuotas
+                      // no quede recortado en tablet (GridView con aspect ratio bajo).
                       return GridView.builder(
                         padding: const EdgeInsets.all(16),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
+                        gridDelegate:
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 500,
                           crossAxisSpacing: 14,
                           mainAxisSpacing: 14,
-                          childAspectRatio: isWide ? 0.52 : 0.42,
+                          mainAxisExtent: 920,
                         ),
                         itemCount: products.length,
                         itemBuilder: (context, index) {
