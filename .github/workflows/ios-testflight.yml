@@ -6,7 +6,7 @@
 #   APP_STORE_CONNECT_ISSUER_ID
 #   APP_STORE_CONNECT_KEY_ID
 #   APP_STORE_CONNECT_PRIVATE_KEY   (contenido completo del .p8)
-#   APP_STORE_CERTIFICATE_KEY       (contraseña para certificado; ya configurada en CI)
+#   APP_STORE_CERTIFICATE_KEY       (clave privada RSA 2048 PEM para certificado de distribución)
 #
 # API Key: App Store Connect → Users and Access → Integrations → App Store Connect API
 # El certificado de distribución se crea/descarga solo en el runner (Codemagic CLI).
@@ -88,16 +88,18 @@ jobs:
           if [[ -n "$SUPABASE_URL" && -n "$SUPABASE_ANON_KEY" ]]; then
             DART_DEFINES="--dart-define=SUPABASE_URL=${SUPABASE_URL} --dart-define=SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}"
           fi
+          # Usar el export_options.plist generado por Codemagic (firma manual + profile).
           # shellcheck disable=SC2086
           flutter build ipa \
-            --export-options-plist=ios/ExportOptions-appstore.plist \
+            --export-options-plist="$HOME/export_options.plist" \
             $DART_DEFINES
+          ls -la build/ios/ipa/
+          test -n "$(ls build/ios/ipa/*.ipa 2>/dev/null)"
 
       - name: Upload to TestFlight
-        uses: apple-actions/upload-testflight-build@v3
+        uses: apple-actions/upload-testflight-build@v4
         with:
           app-path: build/ios/ipa/app_feria.ipa
           issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           api-private-key: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
-          uses-non-exempt-encryption: 'false'
