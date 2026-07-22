@@ -11,7 +11,6 @@ import '../services/product_photo_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/added_to_cart_sheet.dart';
 import '../widgets/feria_shell.dart';
-import '../widgets/payment_method_dialog.dart';
 import '../widgets/product_prices_panel.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -79,38 +78,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       return;
     }
 
-    if (product.isArma) {
-      final selection = await showWeaponPaymentDialog(
-        context,
-        product: product,
-      );
-      if (selection == null || !mounted) return;
-
-      final result = cart.addWeaponPayment(product, selection);
-      if (!mounted) return;
-
-      if (result == CartAddResult.stockLimitReached) {
-        showStockLimitMessage(context, product);
-        return;
-      }
-
-      final label = product.modeloDisplay;
-      final action = await showAddedToCartSheet(
-        context,
-        productLabel: label,
-      );
-      if (!mounted) return;
-      await handleAddedToCartNavigation(context, action);
-      return;
-    }
-
-    final method = await showSinglePaymentDialog(
-      context,
-      product: product,
-    );
-    if (method == null || !mounted) return;
-
-    final result = cart.addProduct(product, paymentMethod: method);
+    final result = cart.addProduct(product);
     if (!mounted) return;
 
     if (result == CartAddResult.stockLimitReached) {
@@ -118,9 +86,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       return;
     }
 
+    final label = product.isArma ? product.modeloDisplay : product.codigo;
     final action = await showAddedToCartSheet(
       context,
-      productLabel: product.codigo,
+      productLabel: label,
     );
     if (!mounted) return;
     await handleAddedToCartNavigation(context, action);
@@ -132,7 +101,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final pricingSettings = context.watch<PricingSettingsService>();
     final cart = context.watch<CartService>();
     final canAdd = cart.canAddMore(product);
-    final prices = PricingService().pricesFor(
+    final prices = context.read<PricingService>().pricesFor(
       product,
       exchangeRate,
       pricingSettings,

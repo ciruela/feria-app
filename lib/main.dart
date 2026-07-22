@@ -4,10 +4,14 @@ import 'package:provider/provider.dart';
 import 'screens/role_gate_screen.dart';
 import 'config/app_config.dart';
 import 'services/auth_service.dart';
+import 'services/budget_service.dart';
 import 'services/cart_service.dart';
+import 'services/cart_totals_service.dart';
 import 'services/catalog_service.dart';
 import 'services/data_sync_service.dart';
 import 'services/exchange_rate_service.dart';
+import 'services/invoice_service.dart';
+import 'services/pricing_service.dart';
 import 'services/pricing_settings_service.dart';
 import 'services/seller_service.dart';
 import 'services/supabase_service.dart';
@@ -26,6 +30,13 @@ Future<void> main() async {
   final sellerService = SellerService();
   final cartService = CartService();
   final pricingSettingsService = PricingSettingsService();
+  final pricingService = PricingService();
+  final cartTotalsService = CartTotalsService(pricing: pricingService);
+  final budgetService = BudgetService(
+    pricing: pricingService,
+    cartTotals: cartTotalsService,
+  );
+  final invoiceService = InvoiceService(pricing: pricingService);
 
   await catalogService.load();
   await exchangeRateService.load();
@@ -53,6 +64,10 @@ Future<void> main() async {
         ChangeNotifierProvider<PricingSettingsService>.value(
           value: pricingSettingsService,
         ),
+        Provider<PricingService>.value(value: pricingService),
+        Provider<CartTotalsService>.value(value: cartTotalsService),
+        Provider<BudgetService>.value(value: budgetService),
+        Provider<InvoiceService>.value(value: invoiceService),
       ],
       child: const FeriaApp(),
     ),
