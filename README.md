@@ -139,8 +139,12 @@ Para cargar los secrets de Apple en GitHub:
 ### Flujo
 
 1. Editás código y hacés `git push` a `main`
-2. GitHub Actions compila el IPA y lo sube a TestFlight
+2. GitHub Actions compila el IPA con **Xcode 26 / iOS SDK 26** (`macos-26` runner) y lo sube a TestFlight
 3. Los testers reciben la update (con **actualizaciones automáticas** activadas en TestFlight)
+
+Apple exige compilar con el SDK más reciente (desde 2026: **iOS 26 SDK**). El CI ya usa `macos-26` + Xcode 26.6.
+
+**Build local:** necesitás **Xcode 26** instalado en la Mac (`xcodebuild -version` debe mostrar 26.x). Si tenés Xcode 16 (SDK 18), App Store Connect rechazará el IPA.
 
 Los cambios de **catálogo / TC / vendedores** en Supabase **no** pasan por CI — se sincronizan solos en la app.
 
