@@ -109,11 +109,9 @@ class SupabaseSalesRepository {
 
     for (final line in budget.lines) {
       if (line.productId.isEmpty) continue;
-      if (line.isSplitPart && line.splitPart != 1) continue;
       if (!processed.add(line.productId)) continue;
 
-      final quantity = line.isSplitPart ? 1 : line.quantity;
-      await _catalog.decrementStock(line.productId, quantity);
+      await _catalog.decrementStock(line.productId, line.quantity);
     }
   }
 }

@@ -1,11 +1,25 @@
+import '../config/payment_config.dart';
 import '../models/budget.dart';
+import '../models/cart_checkout_payment.dart';
+import '../models/product_prices.dart';
 import 'cart_service.dart';
+import 'cart_totals_service.dart';
 import 'exchange_rate_service.dart';
 import 'pricing_service.dart';
 import 'pricing_settings_service.dart';
 import 'seller_service.dart';
 
 class BudgetService {
+  BudgetService({
+    PricingService? pricing,
+    CartTotalsService? cartTotals,
+  })  : _pricing = pricing ?? PricingService(),
+        _cartTotals = cartTotals ??
+            CartTotalsService(pricing: pricing ?? PricingService());
+
+  final PricingService _pricing;
+  final CartTotalsService _cartTotals;
+
   Budget buildFromCart({
     required CartService cart,
     required ExchangeRateService exchangeRate,
@@ -13,31 +27,25 @@ class BudgetService {
     BudgetCustomer customer = const BudgetCustomer(),
     SellerService? sellerService,
   }) {
-    final pricing = PricingService();
+    final checkout = cart.checkoutPayment;
+    final method = checkout?.pricingMethod ?? defaultPaymentMethod;
     final lines = <BudgetLine>[];
     var totalUsd = 0.0;
     var totalArs = 0.0;
 
     for (final item in cart.items) {
-      final prices = pricing.pricesFor(
+      final prices = _pricing.pricesFor(
         item.product,
         exchangeRate,
         pricingSettings,
       );
-      final share = item.paymentShare;
-      final unitUsd = prices.usd * share;
-      final unitArs = item.paymentMethod.totalArsFor(prices) * share;
+      final unitUsd = prices.usd;
+      final unitArs = method.totalArsFor(prices);
       final lineUsd = unitUsd * item.quantity;
       final lineArs = unitArs * item.quantity;
 
       totalUsd += lineUsd;
       totalArs += lineArs;
-
-      var detail = item.product.budgetDetail();
-      if (item.isSplitPart) {
-        detail =
-            '$detail · Pago ${item.splitPart}/2 (${item.paymentMethod.shortLabel})';
-      }
 
       lines.add(
         BudgetLine(
@@ -45,19 +53,30 @@ class BudgetService {
           productId: item.product.id,
           code: item.product.budgetCode,
           quantity: item.quantity,
-          detail: detail,
+          detail: item.product.budgetDetail(),
           unitArs: unitArs,
           lineArs: lineArs,
           unitUsd: unitUsd,
           lineUsd: lineUsd,
-          paymentMethod: item.paymentMethod,
+          paymentMethod: method,
           isArma: item.product.isArma,
           serialNumber: item.serialNumber,
-          splitPart: item.splitPart,
           productType: item.product.type.key,
         ),
       );
     }
+
+    final allocations = checkout == null
+        ? const <PaymentAllocation>[]
+        : _cartTotals.allocationsFor(
+            checkout: checkout,
+            total: _cartTotals.cartTotalAtMethod(
+              cart: cart,
+              method: method,
+              exchangeRate: exchangeRate,
+              pricingSettings: pricingSettings,
+            ),
+          );
 
     return Budget(
       date: DateTime.now(),
@@ -66,6 +85,7 @@ class BudgetService {
       lines: lines,
       totalUsd: totalUsd,
       totalArs: totalArs,
+      paymentAllocations: allocations,
     );
   }
 }

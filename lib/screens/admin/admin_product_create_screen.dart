@@ -5,6 +5,7 @@ import '../../models/product.dart';
 import '../../services/catalog_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/uppercase_input.dart';
+import '../../widgets/calibre_field.dart';
 import '../../widgets/feria_shell.dart';
 
 class AdminProductCreateScreen extends StatefulWidget {
@@ -90,6 +91,13 @@ class _AdminProductCreateScreenState extends State<AdminProductCreateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final catalog = context.watch<CatalogService>();
+    final marca = _marcaController.text.trim();
+    final calibers = catalog.calibersFor(
+      _type,
+      marca.isEmpty ? null : marca,
+    );
+
     return FeriaScaffold(
       appBar: const FeriaAppBar(title: Text('Nuevo producto')),
       body: ListView(
@@ -110,7 +118,10 @@ class _AdminProductCreateScreenState extends State<AdminProductCreateScreen> {
                 selected: selected,
                 onSelected: _saving
                     ? null
-                    : (_) => setState(() => _type = type),
+                    : (_) => setState(() {
+                          _type = type;
+                          _calibreController.clear();
+                        }),
                 selectedColor: AppColors.primary,
                 labelStyle: TextStyle(
                   fontWeight: FontWeight.w700,
@@ -125,21 +136,17 @@ class _AdminProductCreateScreenState extends State<AdminProductCreateScreen> {
             textCapitalization: TextCapitalization.characters,
             inputFormatters: UpperCaseTextFormatter.formatters,
             enabled: !_saving,
+            onChanged: (_) => setState(() => _calibreController.clear()),
             decoration: const InputDecoration(
               labelText: 'Marca',
               border: OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
-          TextField(
+          CalibreField(
             controller: _calibreController,
-            textCapitalization: TextCapitalization.characters,
-            inputFormatters: UpperCaseTextFormatter.formatters,
+            calibers: calibers,
             enabled: !_saving,
-            decoration: const InputDecoration(
-              labelText: 'Calibre',
-              border: OutlineInputBorder(),
-            ),
           ),
           const SizedBox(height: 12),
           if (_isArma) ...[

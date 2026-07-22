@@ -51,7 +51,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
       );
 
   Budget _buildBudget(CartService cart) {
-    return BudgetService().buildFromCart(
+    return context.read<BudgetService>().buildFromCart(
       cart: cart,
       exchangeRate: context.read<ExchangeRateService>(),
       pricingSettings: context.read<PricingSettingsService>(),
@@ -247,6 +247,22 @@ class _BudgetScreenState extends State<BudgetScreen> {
   }
 
   Future<void> _finalizeComprobante(Budget budget) async {
+    final cart = context.read<CartService>();
+
+    if (!cart.hasCheckoutPayment) {
+      _showMessage('Configurá cómo abona el cliente antes de generar el comprobante.');
+      return;
+    }
+
+    final missingSerial = cart.weaponsMissingSerial;
+    if (missingSerial.isNotEmpty) {
+      final labels = missingSerial
+          .map((item) => item.product.modeloDisplay)
+          .join(', ');
+      _showMessage('Completá el N° de serie para: $labels');
+      return;
+    }
+
     if (_controllers.fullName.text.trim().length < 3) {
       _showMessage('Completá el nombre del cliente en SEÑOR/A.');
       return;
@@ -291,6 +307,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
   Widget build(BuildContext context) {
     final cart = context.watch<CartService>();
     final budget = _buildBudget(cart);
+    final checkoutConfigured = cart.hasCheckoutPayment;
 
     return FeriaScaffold(
       appBar: const FeriaAppBar(
@@ -326,6 +343,17 @@ class _BudgetScreenState extends State<BudgetScreen> {
                 ),
                 const SizedBox(height: 12),
                 const BudgetPaymentPanel(),
+                if (!checkoutConfigured) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Configurá cómo abona el cliente para habilitar el comprobante.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.goldDark,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 PresupuestoPaper(
                   budget: budget,
@@ -337,7 +365,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton.icon(
-                  onPressed: () => _finalizeComprobante(budget),
+                  onPressed: checkoutConfigured
+                      ? () => _finalizeComprobante(budget)
+                      : null,
                   icon: const Icon(Icons.receipt_long_rounded),
                   label: const Text('GENERAR COMPROBANTE'),
                 ),

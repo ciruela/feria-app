@@ -1,5 +1,6 @@
 import 'product.dart';
 import 'product_prices.dart';
+import 'cart_checkout_payment.dart';
 import '../utils/formatters.dart';
 
 class BudgetLine {
@@ -112,6 +113,7 @@ class Budget {
     required this.totalUsd,
     required this.totalArs,
     this.sellerName,
+    this.paymentAllocations = const [],
   });
 
   final DateTime date;
@@ -120,9 +122,14 @@ class Budget {
   final List<BudgetLine> lines;
   final double totalUsd;
   final double totalArs;
+  final List<PaymentAllocation> paymentAllocations;
 
-  Set<PaymentMethod> get paymentMethods =>
-      lines.map((line) => line.paymentMethod).toSet();
+  Set<PaymentMethod> get paymentMethods {
+    if (paymentAllocations.isNotEmpty) {
+      return paymentAllocations.map((allocation) => allocation.method).toSet();
+    }
+    return lines.map((line) => line.paymentMethod).toSet();
+  }
 
   Budget copyWithCustomer(BudgetCustomer customer) {
     return Budget(
@@ -132,20 +139,41 @@ class Budget {
       totalUsd: totalUsd,
       totalArs: totalArs,
       sellerName: sellerName,
+      paymentAllocations: paymentAllocations,
     );
   }
 
-  bool get hasUsdPayments => lines.any((line) => line.paysInUsd);
+  bool get hasUsdPayments {
+    if (paymentAllocations.isNotEmpty) {
+      return paymentAllocations.any((allocation) => allocation.paysInUsd);
+    }
+    return lines.any((line) => line.paysInUsd);
+  }
 
-  bool get hasArsPayments => lines.any((line) => !line.paysInUsd);
+  bool get hasArsPayments {
+    if (paymentAllocations.isNotEmpty) {
+      return paymentAllocations.any((allocation) => !allocation.paysInUsd);
+    }
+    return lines.any((line) => !line.paysInUsd);
+  }
 
-  double get totalUsdLines => lines
-      .where((line) => line.paysInUsd)
-      .fold(0.0, (sum, line) => sum + line.lineUsd);
+  double get totalUsdLines {
+    if (paymentAllocations.isNotEmpty) {
+      return paymentAllocations.fold(0.0, (sum, allocation) => sum + allocation.amountUsd);
+    }
+    return lines
+        .where((line) => line.paysInUsd)
+        .fold(0.0, (sum, line) => sum + line.lineUsd);
+  }
 
-  double get totalArsLines => lines
-      .where((line) => !line.paysInUsd)
-      .fold(0.0, (sum, line) => sum + line.lineArs);
+  double get totalArsLines {
+    if (paymentAllocations.isNotEmpty) {
+      return paymentAllocations.fold(0.0, (sum, allocation) => sum + allocation.amountArs);
+    }
+    return lines
+        .where((line) => !line.paysInUsd)
+        .fold(0.0, (sum, line) => sum + line.lineArs);
+  }
 }
 
 extension ProductBudgetX on Product {
