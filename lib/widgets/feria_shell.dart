@@ -127,6 +127,8 @@ class FeriaAppBar extends StatelessWidget implements PreferredSizeWidget {
               ? const _FeriaBackButton()
               : null),
       automaticallyImplyLeading: false,
+      centerTitle: false,
+      titleSpacing: canPop ? 0 : NavigationToolbar.kMiddleSpacing,
       title: title,
       actions: actions,
       bottom: bottom,
@@ -139,40 +141,61 @@ class FeriaAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
+class FeriaAppBarTitle extends StatelessWidget {
+  const FeriaAppBarTitle(
+    this.text, {
+    super.key,
+    this.badge,
+  });
+
+  final String text;
+  final Widget? badge;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final showBadge = badge != null && constraints.maxWidth > 180;
+
+        return Row(
+          children: [
+            Expanded(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (showBadge) ...[
+              const SizedBox(width: 8),
+              badge!,
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
 class _FeriaBackButton extends StatelessWidget {
   const _FeriaBackButton();
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: Material(
-        color: Colors.white.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          onTap: () => Navigator.maybePop(context),
-          borderRadius: BorderRadius.circular(14),
-          child: const SizedBox(
-            width: 88,
-            height: 44,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.arrow_back_rounded, color: Colors.white, size: 22),
-                SizedBox(width: 4),
-                Text(
-                  'VOLVER',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                    letterSpacing: 0.4,
-                  ),
-                ),
-              ],
-            ),
+      padding: const EdgeInsets.only(left: 8),
+      child: IconButton(
+        onPressed: () => Navigator.maybePop(context),
+        tooltip: 'Volver',
+        style: IconButton.styleFrom(
+          backgroundColor: Colors.white.withValues(alpha: 0.14),
+          foregroundColor: Colors.white,
+          fixedSize: const Size(44, 44),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
           ),
         ),
+        icon: const Icon(Icons.arrow_back_rounded, size: 24),
       ),
     );
   }

@@ -26,19 +26,13 @@ class EmployeeHomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final exchangeRate = context.watch<ExchangeRateService>();
     final catalog = context.watch<CatalogService>();
-    final seller = context.watch<SellerService>().selected;
+    final sellerService = context.watch<SellerService>();
+    final seller = sellerService.selected;
     final cartCount = context.watch<CartService>().itemCount;
 
     return FeriaScaffold(
       appBar: FeriaAppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Catálogo Feria'),
-            const SizedBox(width: 10),
-            roleBadge(AppRole.employee),
-          ],
-        ),
+        title: const FeriaAppBarTitle('Catálogo Feria'),
         actions: [
           if (AppConfig.usesRemoteCatalog)
             IconButton(
@@ -56,25 +50,54 @@ class EmployeeHomeScreen extends StatelessWidget {
                     )
                   : const Icon(Icons.cloud_download_outlined),
             ),
-          IconButton(
-            tooltip: 'Cambiar vendedor',
-            onPressed: () {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const SellerSelectScreen()),
-              );
+          PopupMenuButton<String>(
+            tooltip: 'Más opciones',
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              switch (value) {
+                case 'seller':
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (_) => const SellerSelectScreen(),
+                    ),
+                  );
+                case 'logout':
+                  exitToRoleGate(context);
+              }
             },
-            icon: const Icon(Icons.person_outline),
-          ),
-          IconButton(
-            tooltip: 'Salir',
-            onPressed: () => exitToRoleGate(context),
-            icon: const Icon(Icons.logout),
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: 'seller',
+                child: Row(
+                  children: [
+                    Icon(Icons.person_outline, size: 20),
+                    SizedBox(width: 12),
+                    Text('Cambiar vendedor'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, size: 20),
+                    SizedBox(width: 12),
+                    Text('Salir'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
         children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: roleBadge(AppRole.employee),
+          ),
+          const SizedBox(height: 12),
           if (seller != null) ...[
             InfoBanner(
               text: 'Atiende: ${seller.nombre}',
@@ -94,6 +117,10 @@ class EmployeeHomeScreen extends StatelessWidget {
           if (AppConfig.usesRemoteCatalog) ...[
             const SizedBox(height: 16),
             _SyncStatusCard(catalog: catalog),
+          ],
+          if (AppConfig.usesRemoteSellers) ...[
+            const SizedBox(height: 16),
+            _SellerSyncStatusCard(seller: sellerService),
           ],
           const SizedBox(height: 28),
           const SectionHeader(
@@ -163,6 +190,25 @@ class _SyncStatusCard extends StatelessWidget {
           : formatDateTime(catalog.lastSync!),
       subtitle: hasError ? 'Usando datos guardados sin conexión' : null,
       accentColor: hasError ? AppColors.danger : AppColors.accent,
+    );
+  }
+}
+
+class _SellerSyncStatusCard extends StatelessWidget {
+  const _SellerSyncStatusCard({required this.seller});
+
+  final SellerService seller;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasError = seller.lastError != null;
+
+    return StatCard(
+      icon: hasError ? Icons.cloud_off_rounded : Icons.people_alt_rounded,
+      label: 'Vendedores en la nube',
+      value: hasError ? 'Error al sincronizar' : '${seller.sellers.length} activos',
+      subtitle: hasError ? 'Usando lista guardada sin conexión' : null,
+      accentColor: hasError ? AppColors.danger : AppColors.armaCorta,
     );
   }
 }

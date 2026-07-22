@@ -48,7 +48,7 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
             const SectionHeader(
               title: 'Tipo de cambio de hoy',
               subtitle:
-                  'Actualizalo una vez por día. Todos los precios en pesos se recalculan solos.',
+                  'Se sincroniza en tiempo real con todos los celulares conectados a Supabase.',
             ),
             const SizedBox(height: 24),
             Container(

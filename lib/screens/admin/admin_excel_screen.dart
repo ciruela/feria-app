@@ -23,7 +23,7 @@ class _AdminExcelScreenState extends State<AdminExcelScreen> {
       final fileName =
           'catalogo_feria_${DateTime.now().millisecondsSinceEpoch}.xlsx';
 
-      await FilePicker.platform.saveFile(
+      await FilePicker.saveFile(
         fileName: fileName,
         bytes: bytes,
         type: FileType.custom,
@@ -48,7 +48,7 @@ class _AdminExcelScreenState extends State<AdminExcelScreen> {
     setState(() => _busy = true);
     try {
       final catalog = context.read<CatalogService>();
-      final picked = await FilePicker.platform.pickFiles(
+      final picked = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['xlsx'],
         withData: true,

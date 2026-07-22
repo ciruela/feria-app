@@ -6,6 +6,7 @@ import 'config/app_config.dart';
 import 'services/auth_service.dart';
 import 'services/cart_service.dart';
 import 'services/catalog_service.dart';
+import 'services/data_sync_service.dart';
 import 'services/exchange_rate_service.dart';
 import 'services/pricing_settings_service.dart';
 import 'services/seller_service.dart';
@@ -31,6 +32,13 @@ Future<void> main() async {
   await authService.load();
   await sellerService.load();
   await pricingSettingsService.load();
+
+  final dataSyncService = DataSyncService(
+    catalog: catalogService,
+    sellers: sellerService,
+    exchangeRate: exchangeRateService,
+  );
+  dataSyncService.start();
 
   runApp(
     MultiProvider(

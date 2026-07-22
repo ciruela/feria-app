@@ -47,6 +47,16 @@
 			</array>
 		</dict>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Necesitamos la cámara para fotos de productos y escanear el DNI del cliente.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Necesitamos acceder a fotos para productos y leer el DNI del cliente.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>La app usa la red local para depuración durante el desarrollo.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_dartVmService._tcp</string>
+	</array>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

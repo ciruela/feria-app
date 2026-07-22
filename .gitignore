@@ -49,3 +49,6 @@ app.*.map.json
 
 # Android local config
 /android/local.properties
+
+# Local env (Supabase credentials)
+.env

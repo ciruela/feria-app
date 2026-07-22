@@ -24,4 +24,16 @@ class Seller {
       'activo': activo,
     };
   }
+
+  Seller copyWith({
+    String? id,
+    String? nombre,
+    bool? activo,
+  }) {
+    return Seller(
+      id: id ?? this.id,
+      nombre: nombre ?? this.nombre,
+      activo: activo ?? this.activo,
+    );
+  }
 }

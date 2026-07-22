@@ -43,23 +43,43 @@ class ProductPricesPanel extends StatelessWidget {
           _PriceLine(
             label: 'EFECTIVO',
             value: formatArs(prices.efectivo),
-            color: AppColors.accent,
-            bold: true,
           ),
           _PriceLine(
-            label: 'TARJETA 3x',
+            label: 'TRANSFER.',
+            value: formatArs(prices.lista),
+          ),
+          _PriceLine(
+            label: 'DÉBITO',
+            value: formatArs(prices.debito),
+          ),
+          _PriceLine(
+            label: '1 CUOTA',
+            value: formatArs(prices.tarjeta1),
+          ),
+          _PriceLine(
+            label: '3 CUOTAS',
             value:
                 '${formatArs(prices.tarjeta3)} (${formatArs(prices.cuota3)}/cuota)',
           ),
           _PriceLine(
-            label: 'TARJETA 6x',
+            label: '6 CUOTAS',
             value:
                 '${formatArs(prices.tarjeta6)} (${formatArs(prices.cuota6)}/cuota)',
           ),
           _PriceLine(
-            label: 'TARJETA 12x',
+            label: '9 CUOTAS',
+            value:
+                '${formatArs(prices.tarjeta9)} (${formatArs(prices.cuota9)}/cuota)',
+          ),
+          _PriceLine(
+            label: '12 CUOTAS',
             value:
                 '${formatArs(prices.tarjeta12)} (${formatArs(prices.cuota12)}/cuota)',
+          ),
+          _PriceLine(
+            label: '18 CUOTAS',
+            value:
+                '${formatArs(prices.tarjeta18)} (${formatArs(prices.cuota18)}/cuota)',
           ),
         ],
       ),

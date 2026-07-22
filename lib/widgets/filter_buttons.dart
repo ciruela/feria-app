@@ -26,8 +26,8 @@ class FilterChipButton extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           padding: EdgeInsets.symmetric(
-            horizontal: compact ? 14 : 18,
-            vertical: compact ? 10 : 16,
+            horizontal: compact ? 12 : 18,
+            vertical: compact ? 8 : 16,
           ),
           decoration: BoxDecoration(
             gradient: selected
@@ -52,8 +52,10 @@ class FilterChipButton extends StatelessWidget {
           child: Text(
             label,
             textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: compact ? 15 : 17,
+              fontSize: compact ? 14 : 17,
               fontWeight: FontWeight.w700,
               color: selected ? Colors.white : AppColors.textPrimary,
             ),

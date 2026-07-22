@@ -16,8 +16,10 @@ import '../role_gate_screen.dart';
 import 'admin_change_pin_screen.dart';
 import 'admin_excel_screen.dart';
 import 'admin_export_screen.dart';
+import 'admin_metrics_screen.dart';
 import 'admin_pricing_screen.dart';
 import 'admin_products_screen.dart';
+import 'admin_sellers_screen.dart';
 
 class AdminHomeScreen extends StatelessWidget {
   const AdminHomeScreen({super.key});
@@ -25,17 +27,11 @@ class AdminHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final catalog = context.watch<CatalogService>();
+    final sellers = context.watch<SellerService>();
 
     return FeriaScaffold(
       appBar: FeriaAppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Administración'),
-            const SizedBox(width: 10),
-            roleBadge(AppRole.admin),
-          ],
-        ),
+        title: const FeriaAppBarTitle('Administración'),
         actions: [
           IconButton(
             tooltip: 'Salir',
@@ -47,6 +43,11 @@ class AdminHomeScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
         children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: roleBadge(AppRole.admin),
+          ),
+          const SizedBox(height: 12),
           StatCard(
             icon: Icons.inventory_2_rounded,
             label: 'Catálogo cargado',
@@ -64,7 +65,7 @@ class AdminHomeScreen extends StatelessWidget {
           const SizedBox(height: 18),
           BigActionButton(
             label: 'Productos y stock',
-            subtitle: 'Editar precios, stock y fotos',
+            subtitle: 'Crear, editar, importar y exportar',
             icon: Icons.inventory_2_outlined,
             accentColor: AppColors.primary,
             onTap: () {
@@ -92,7 +93,7 @@ class AdminHomeScreen extends StatelessWidget {
           const SizedBox(height: 14),
           BigActionButton(
             label: 'Precios y cuotas',
-            subtitle: 'Efectivo, tarjeta 3/6/12 cuotas',
+            subtitle: 'Débito y cuotas 1/3/6/9/12/18',
             icon: Icons.payments_rounded,
             accentColor: AppColors.accent,
             onTap: () {
@@ -103,16 +104,43 @@ class AdminHomeScreen extends StatelessWidget {
               );
             },
           ),
-          if (AppConfig.usesRemoteSellers) ...[
+          const SizedBox(height: 14),
+          BigActionButton(
+            label: 'Vendedores',
+            subtitle: sellers.lastError != null
+                ? 'Error de sync — tocá para gestionar'
+                : '${sellers.activeCount} activos · agregar o desactivar',
+            icon: Icons.groups_rounded,
+            accentColor: sellers.lastError != null
+                ? AppColors.danger
+                : AppColors.armaCorta,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const AdminSellersScreen(),
+                ),
+              );
+            },
+          ),
+          if (AppConfig.usesRemoteSellers && !AppConfig.useSupabase) ...[
             const SizedBox(height: 14),
             BigActionButton(
               label: 'Sincronizar vendedores',
-              subtitle: AppConfig.useSupabase
-                  ? 'Bajar lista desde Supabase'
-                  : 'Bajar lista desde la nube',
-              icon: Icons.people_outline,
+              subtitle: 'Bajar lista desde la nube',
+              icon: Icons.cloud_download_outlined,
               accentColor: AppColors.armaCorta,
-              onTap: () => context.read<SellerService>().syncFromCloud(),
+              onTap: sellers.isSyncing
+                  ? () {}
+                  : () async {
+                      await context.read<SellerService>().syncFromCloud();
+                      if (!context.mounted) return;
+                      final error = context.read<SellerService>().lastError;
+                      if (error != null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(error)),
+                        );
+                      }
+                    },
             ),
           ],
           if (AppConfig.usesRemoteCatalog) ...[
@@ -158,6 +186,22 @@ class AdminHomeScreen extends StatelessWidget {
                     },
             ),
           ],
+          const SizedBox(height: 14),
+          BigActionButton(
+            label: 'Métricas del día',
+            subtitle: AppConfig.useSupabase
+                ? 'Ventas, categorías, pagos y vendedores'
+                : 'Requiere Supabase configurado',
+            icon: Icons.insights_rounded,
+            accentColor: AppColors.success,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const AdminMetricsScreen(),
+                ),
+              );
+            },
+          ),
           const SizedBox(height: 14),
           BigActionButton(
             label: 'Importar / Exportar Excel',

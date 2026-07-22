@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -7,6 +8,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/filter_buttons.dart';
 import '../../widgets/feria_shell.dart';
+import 'admin_product_create_screen.dart';
 import 'admin_product_edit_screen.dart';
 
 class AdminProductsScreen extends StatefulWidget {
@@ -19,6 +21,96 @@ class AdminProductsScreen extends StatefulWidget {
 class _AdminProductsScreenState extends State<AdminProductsScreen> {
   ProductType? _typeFilter;
   String? _marcaFilter;
+  bool _ioBusy = false;
+
+  Future<void> _exportExcel() async {
+    setState(() => _ioBusy = true);
+    try {
+      final catalog = context.read<CatalogService>();
+      final bytes = catalog.exportToExcel();
+      final fileName =
+          'catalogo_feria_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+
+      await FilePicker.saveFile(
+        fileName: fileName,
+        bytes: bytes,
+        type: FileType.custom,
+        allowedExtensions: ['xlsx'],
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Excel exportado')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al exportar: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _ioBusy = false);
+    }
+  }
+
+  Future<void> _importExcel() async {
+    setState(() => _ioBusy = true);
+    try {
+      final catalog = context.read<CatalogService>();
+      final picked = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx'],
+        withData: true,
+      );
+
+      if (picked == null || picked.files.single.bytes == null) {
+        return;
+      }
+
+      final result = await catalog.importFromExcel(
+        picked.files.single.bytes!,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Importado: ${result.updated} actualizados, '
+            '${result.added} nuevos, ${result.skipped} omitidos',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al importar: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _ioBusy = false);
+    }
+  }
+
+  Future<void> _createProduct() async {
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => const AdminProductCreateScreen(),
+      ),
+    );
+
+    if (created == true && mounted) {
+      setState(() {});
+    }
+  }
+
+  void _onMenuSelected(String value) {
+    switch (value) {
+      case 'create':
+        _createProduct();
+      case 'import':
+        if (!_ioBusy) _importExcel();
+      case 'export':
+        if (!_ioBusy) _exportExcel();
+    }
+  }
 
   List<Product> _filteredProducts(CatalogService catalog) {
     final source = _typeFilter == null
@@ -78,6 +170,54 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
       appBar: FeriaAppBar(
         title: const Text('Productos y stock'),
         actions: [
+          if (_ioBusy)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            )
+          else
+            PopupMenuButton<String>(
+              tooltip: 'Opciones',
+              icon: const Icon(Icons.more_vert),
+              onSelected: _onMenuSelected,
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'create',
+                  child: ListTile(
+                    leading: Icon(Icons.add_circle_outline),
+                    title: Text('Nuevo producto'),
+                    subtitle: Text('Cargar stock manualmente'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                PopupMenuDivider(),
+                PopupMenuItem(
+                  value: 'import',
+                  child: ListTile(
+                    leading: Icon(Icons.upload_file_outlined),
+                    title: Text('Importar Excel'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'export',
+                  child: ListTile(
+                    leading: Icon(Icons.download_outlined),
+                    title: Text('Exportar Excel'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ],
+            ),
           if (_marcaFilter != null || _typeFilter != null)
             TextButton(
               onPressed: () => setState(() {
@@ -93,6 +233,11 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
               ),
             ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _ioBusy ? null : _createProduct,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('NUEVO'),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -164,7 +309,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                     ),
                   )
                 : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
                     itemCount: products.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (context, index) {

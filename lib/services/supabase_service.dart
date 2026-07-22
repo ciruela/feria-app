@@ -24,4 +24,10 @@ class SupabaseService {
 
     return client.storage.from(AppConfig.productPhotosBucket).getPublicUrl(path);
   }
+
+  static String? publicComprobanteUrl(String path) {
+    if (path.isEmpty || !isConfigured) return null;
+
+    return client.storage.from(AppConfig.comprobantesBucket).getPublicUrl(path);
+  }
 }

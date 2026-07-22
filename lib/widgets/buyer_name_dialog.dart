@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../utils/uppercase_input.dart';
 
 Future<String?> showBuyerNameDialog(BuildContext context) {
   return showDialog<String>(
@@ -50,11 +51,12 @@ class _BuyerNameDialogState extends State<_BuyerNameDialog> {
         child: TextFormField(
           controller: _controller,
           autofocus: true,
-          textCapitalization: TextCapitalization.words,
+          textCapitalization: TextCapitalization.characters,
+          inputFormatters: UpperCaseTextFormatter.formatters,
           style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
           decoration: const InputDecoration(
             labelText: 'Nombre y apellido',
-            hintText: 'Ej: Juan Pérez',
+            hintText: 'Ej: JUAN PÉREZ',
           ),
           validator: (value) {
             if (value == null || value.trim().length < 3) {

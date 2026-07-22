@@ -23,7 +23,7 @@ class Product {
     required this.precioUsd,
     this.modelo = '',
     this.foto = '',
-    this.fotoUrl = '',
+    this.fotoUrls = const [],
     this.stock,
   });
 
@@ -35,7 +35,8 @@ class Product {
   final String modelo;
   final double precioUsd;
   final String foto;
-  final String fotoUrl;
+  /// Rutas en Storage, ej. `arma_corta/ac-001/1734567890.jpg`
+  final List<String> fotoUrls;
   final int? stock;
 
   String get marcaUpper => marca.toUpperCase();
@@ -47,7 +48,7 @@ class Product {
 
   String get modeloDisplay => modelo.isNotEmpty ? modelo : codigo;
 
-  bool get hasNetworkPhoto => fotoUrl.isNotEmpty;
+  bool get hasNetworkPhoto => fotoUrls.isNotEmpty;
 
   bool get hasLocalPhoto => foto.isNotEmpty;
 
@@ -62,7 +63,7 @@ class Product {
     String? modelo,
     double? precioUsd,
     String? foto,
-    String? fotoUrl,
+    List<String>? fotoUrls,
     int? stock,
   }) {
     return Product(
@@ -74,12 +75,14 @@ class Product {
       modelo: modelo ?? this.modelo,
       precioUsd: precioUsd ?? this.precioUsd,
       foto: foto ?? this.foto,
-      fotoUrl: fotoUrl ?? this.fotoUrl,
+      fotoUrls: fotoUrls ?? this.fotoUrls,
       stock: stock ?? this.stock,
     );
   }
 
   factory Product.fromJson(Map<String, dynamic> json) {
+    final fotoUrls = _fotoUrlsFromJson(json);
+
     return Product(
       id: json['id'] as String,
       type: ProductType.fromKey(json['type'] as String),
@@ -89,9 +92,28 @@ class Product {
       modelo: json['modelo'] as String? ?? '',
       precioUsd: (json['precioUsd'] as num).toDouble(),
       foto: json['foto'] as String? ?? '',
-      fotoUrl: json['fotoUrl'] as String? ?? '',
+      fotoUrls: fotoUrls,
       stock: json['stock'] as int?,
     );
+  }
+
+  static List<String> _fotoUrlsFromJson(Map<String, dynamic> json) {
+    final list = <String>[];
+    final rawList = json['fotoUrls'];
+    if (rawList is List) {
+      for (final item in rawList) {
+        if (item is String && item.trim().isNotEmpty) {
+          list.add(item.trim());
+        }
+      }
+    }
+
+    final legacy = json['fotoUrl'] as String? ?? '';
+    if (legacy.trim().isNotEmpty && !list.contains(legacy.trim())) {
+      list.insert(0, legacy.trim());
+    }
+
+    return list;
   }
 
   Map<String, dynamic> toJson() {
@@ -104,7 +126,7 @@ class Product {
       if (modelo.isNotEmpty) 'modelo': modelo,
       'precioUsd': precioUsd,
       if (foto.isNotEmpty) 'foto': foto,
-      if (fotoUrl.isNotEmpty) 'fotoUrl': fotoUrl,
+      if (fotoUrls.isNotEmpty) 'fotoUrls': fotoUrls,
       if (stock != null) 'stock': stock,
     };
   }

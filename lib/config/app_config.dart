@@ -41,4 +41,5 @@ class AppConfig {
   static bool get usesRemoteSellers => useSupabase || useCloudSellers;
 
   static const productPhotosBucket = 'feria-fotos';
+  static const comprobantesBucket = 'feria-comprobantes';
 }

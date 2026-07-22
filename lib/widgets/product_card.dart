@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/product.dart';
-import '../models/product_prices.dart';
 import '../services/cart_service.dart';
 import '../services/exchange_rate_service.dart';
 import '../services/pricing_service.dart';
 import '../services/pricing_settings_service.dart';
+import '../services/product_photo_service.dart';
 import '../theme/app_theme.dart';
+import '../screens/product_detail_screen.dart';
+import 'added_to_cart_sheet.dart';
 import 'payment_method_dialog.dart';
 import 'product_prices_panel.dart';
 
@@ -37,6 +39,8 @@ class ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final exchangeRate = context.watch<ExchangeRateService>();
     final pricingSettings = context.watch<PricingSettingsService>();
+    final cart = context.watch<CartService>();
+    final canAdd = cart.canAddMore(product);
     final prices = PricingService().pricesFor(
       product,
       exchangeRate,
@@ -54,73 +58,119 @@ class ProductCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [_accent, _accent.withValues(alpha: 0.78)],
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ProductDetailScreen(product: product),
+                  ),
+                );
+              },
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [_accent, _accent.withValues(alpha: 0.78)],
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            product.marcaUpper,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Text(
+                            product.type.label.toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _ProductPhoto(
+                    foto: product.foto,
+                    fotoUrls: ProductPhotoService.displayUrls(product.fotoUrls),
+                    marca: product.marca,
+                    accent: _accent,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (product.isArma) ...[
+                          _InfoRow(label: 'MODELO', value: product.modeloDisplay),
+                          const SizedBox(height: 10),
+                          _InfoRow(label: 'CALIBRE', value: product.calibre),
+                        ] else ...[
+                          _InfoRow(label: 'CÓDIGO', value: product.codigo),
+                          const SizedBox(height: 10),
+                          _InfoRow(label: 'CALIBRE', value: product.calibre),
+                        ],
+                        if (product.stock != null) ...[
+                          const SizedBox(height: 12),
+                          _StockBadge(stock: product.stock!),
+                        ],
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.open_in_new_rounded,
+                              size: 16,
+                              color: _accent.withValues(alpha: 0.85),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'VER DETALLE Y FOTOS',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: _accent.withValues(alpha: 0.85),
+                                letterSpacing: 0.6,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    product.marcaUpper,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.1,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                  child: Text(
-                    product.type.label.toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _ProductPhoto(
-            foto: product.foto,
-            fotoUrl: product.fotoUrl,
-            marca: product.marca,
-            accent: _accent,
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (product.isArma) ...[
-                  _InfoRow(label: 'MODELO', value: product.modeloDisplay),
-                  const SizedBox(height: 10),
-                  _InfoRow(label: 'CALIBRE', value: product.calibre),
-                ] else ...[
-                  _InfoRow(label: 'CÓDIGO', value: product.codigo),
-                  const SizedBox(height: 10),
-                  _InfoRow(label: 'CALIBRE', value: product.calibre),
-                ],
-                if (product.stock != null) ...[
-                  const SizedBox(height: 12),
-                  _StockBadge(stock: product.stock!),
-                ],
-                const SizedBox(height: 14),
                 ProductPricesPanel(prices: prices, compact: true),
                 if (showAddButton) ...[
                   const SizedBox(height: 14),
@@ -128,12 +178,12 @@ class ProductCard extends StatelessWidget {
                     width: double.infinity,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        gradient: product.inStock
+                        gradient: canAdd
                             ? AppDecorations.accentGradient
                             : null,
-                        color: product.inStock ? null : AppColors.border,
+                        color: canAdd ? null : AppColors.border,
                         borderRadius: AppDecorations.radiusMd,
-                        boxShadow: product.inStock
+                        boxShadow: canAdd
                             ? [
                                 BoxShadow(
                                   color: AppColors.accent.withValues(alpha: 0.28),
@@ -144,7 +194,7 @@ class ProductCard extends StatelessWidget {
                             : null,
                       ),
                       child: ElevatedButton.icon(
-                        onPressed: product.inStock
+                        onPressed: canAdd
                             ? () => _handleAddToCart(context, product)
                             : null,
                         style: ElevatedButton.styleFrom(
@@ -153,7 +203,13 @@ class ProductCard extends StatelessWidget {
                           minimumSize: const Size.fromHeight(56),
                         ),
                         icon: const Icon(Icons.add_shopping_cart_rounded),
-                        label: Text(product.inStock ? 'AGREGAR' : 'SIN STOCK'),
+                        label: Text(
+                          !product.inStock
+                              ? 'SIN STOCK'
+                              : canAdd
+                                  ? 'AGREGAR'
+                                  : 'MÁX. EN CARRITO',
+                        ),
                       ),
                     ),
                   ),
@@ -167,23 +223,54 @@ class ProductCard extends StatelessWidget {
   }
 
   Future<void> _handleAddToCart(BuildContext context, Product product) async {
-    var paymentMethod = PaymentMethod.lista;
+    final cart = context.read<CartService>();
 
     if (product.isArma) {
-      final selected = await showPaymentMethodDialog(
+      final selection = await showWeaponPaymentDialog(
         context,
         product: product,
       );
-      if (selected == null || !context.mounted) return;
-      paymentMethod = selected;
+      if (selection == null || !context.mounted) return;
+
+      final result = cart.addWeaponPayment(product, selection);
+      if (!context.mounted) return;
+
+      if (result == CartAddResult.stockLimitReached) {
+        showStockLimitMessage(context, product);
+        return;
+      }
+
+      final message = selection.isDual
+          ? '${product.modeloDisplay} · ${selection.first.shortLabel} + ${selection.second!.shortLabel}'
+          : '${product.modeloDisplay} · ${selection.first.label}';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_outline, color: Colors.white),
+              const SizedBox(width: 10),
+              Expanded(child: Text(message)),
+            ],
+          ),
+        ),
+      );
+      return;
     }
 
-    context.read<CartService>().addProduct(
-          product,
-          paymentMethod: paymentMethod,
-        );
+    final method = await showSinglePaymentDialog(
+      context,
+      product: product,
+    );
+    if (method == null || !context.mounted) return;
 
+    final result = cart.addProduct(product, paymentMethod: method);
     if (!context.mounted) return;
+
+    if (result == CartAddResult.stockLimitReached) {
+      showStockLimitMessage(context, product);
+      return;
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -192,11 +279,7 @@ class ProductCard extends StatelessWidget {
             const Icon(Icons.check_circle_outline, color: Colors.white),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                product.isArma
-                    ? '${product.modeloDisplay} · ${paymentMethod.label}'
-                    : '${product.codigo} agregado',
-              ),
+              child: Text('${product.codigo} agregado · ${method.shortLabel}'),
             ),
           ],
         ),
@@ -289,18 +372,38 @@ class _StockBadge extends StatelessWidget {
   }
 }
 
-class _ProductPhoto extends StatelessWidget {
+class _ProductPhoto extends StatefulWidget {
   const _ProductPhoto({
     required this.foto,
-    required this.fotoUrl,
+    required this.fotoUrls,
     required this.marca,
     required this.accent,
   });
 
   final String foto;
-  final String fotoUrl;
+  final List<String> fotoUrls;
   final String marca;
   final Color accent;
+
+  @override
+  State<_ProductPhoto> createState() => _ProductPhotoState();
+}
+
+class _ProductPhotoState extends State<_ProductPhoto> {
+  late final PageController _pageController;
+  int _page = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -312,39 +415,81 @@ class _ProductPhoto extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              accent.withValues(alpha: 0.05),
+              widget.accent.withValues(alpha: 0.05),
               AppColors.surfaceMuted,
             ],
           ),
         ),
-        child: _buildImage(),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _buildImage(),
+            if (widget.fotoUrls.length > 1)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 10,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(widget.fotoUrls.length, (index) {
+                    final active = index == _page;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: active ? 18 : 8,
+                      height: 8,
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      decoration: BoxDecoration(
+                        color: active
+                            ? widget.accent
+                            : widget.accent.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildImage() {
-    if (fotoUrl.isNotEmpty) {
-      return CachedNetworkImage(
-        imageUrl: fotoUrl,
-        fit: BoxFit.contain,
-        placeholder: (_, __) => _Placeholder(marca: marca, loading: true),
-        errorWidget: (_, __, ___) => _buildLocalOrPlaceholder(),
+    if (widget.fotoUrls.isNotEmpty) {
+      if (widget.fotoUrls.length == 1) {
+        return _networkImage(widget.fotoUrls.first);
+      }
+
+      return PageView.builder(
+        controller: _pageController,
+        itemCount: widget.fotoUrls.length,
+        onPageChanged: (index) => setState(() => _page = index),
+        itemBuilder: (_, index) => _networkImage(widget.fotoUrls[index]),
       );
     }
 
     return _buildLocalOrPlaceholder();
   }
 
+  Widget _networkImage(String url) {
+    return CachedNetworkImage(
+      imageUrl: url,
+      fit: BoxFit.contain,
+      placeholder: (_, __) => _Placeholder(marca: widget.marca, loading: true),
+      errorWidget: (_, __, ___) => _buildLocalOrPlaceholder(),
+    );
+  }
+
   Widget _buildLocalOrPlaceholder() {
-    if (foto.isNotEmpty) {
+    if (widget.foto.isNotEmpty) {
       return Image.asset(
-        foto,
+        widget.foto,
         fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => _Placeholder(marca: marca),
+        errorBuilder: (_, __, ___) => _Placeholder(marca: widget.marca),
       );
     }
 
-    return _Placeholder(marca: marca);
+    return _Placeholder(marca: widget.marca);
   }
 }
 
