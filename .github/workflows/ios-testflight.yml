@@ -6,13 +6,10 @@
 #   APP_STORE_CONNECT_ISSUER_ID
 #   APP_STORE_CONNECT_KEY_ID
 #   APP_STORE_CONNECT_PRIVATE_KEY   (contenido completo del .p8)
-#   IOS_DISTRIBUTION_CERTIFICATE_P12 (certificado .p12 en base64)
-#   IOS_DISTRIBUTION_CERTIFICATE_PASSWORD
-#
-# Generar el .p12: Keychain Access → certificado "Apple Distribution" → Export.
-# Base64: base64 -i certificado.p12 | pbcopy
+#   APP_STORE_CERTIFICATE_KEY       (contraseña para certificado; ya configurada en CI)
 #
 # API Key: App Store Connect → Users and Access → Integrations → App Store Connect API
+# El certificado de distribución se crea/descarga solo en el runner (Codemagic CLI).
 
 name: iOS TestFlight
 
@@ -37,6 +34,12 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 60
 
+    env:
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      APP_STORE_CERTIFICATE_KEY: ${{ secrets.APP_STORE_CERTIFICATE_KEY }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,7 +52,6 @@ jobs:
 
       - name: Build number
         run: |
-          # +10 para no chocar con builds locales (ej. 2) en las primeras corridas.
           BUILD=$(( ${{ github.run_number }} + 10 ))
           perl -pi -e "s/^version: .*/version: 1.0.0+${BUILD}/" pubspec.yaml
           echo "Build number: ${BUILD}"
@@ -63,20 +65,19 @@ jobs:
           cd ios
           pod install --repo-update
 
-      - name: Import signing certificate
-        uses: apple-actions/import-codesign-certs@v3
-        with:
-          p12-file-base64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_P12 }}
-          p12-password: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+      - name: Install Codemagic CLI
+        run: pipx install codemagic-cli-tools
 
-      - name: Download App Store provisioning profile
-        uses: apple-actions/download-provisioning-profiles@v4
-        with:
-          issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          api-private-key: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
-          bundle-id: com.armeria.feria.appFeria
-          profile-type: IOS_APP_STORE
+      - name: Fetch signing files
+        run: |
+          keychain initialize
+          app-store-connect fetch-signing-files com.armeria.feria.appFeria \
+            --platform IOS \
+            --type IOS_APP_STORE \
+            --certificate-key=@env:APP_STORE_CERTIFICATE_KEY \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles --project ios/Runner.xcodeproj
 
       - name: Build IPA
         env:

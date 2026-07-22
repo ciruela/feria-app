@@ -52,3 +52,6 @@ app.*.map.json
 
 # Local env (Supabase credentials)
 .env
+
+# CI local (API keys Apple — no commitear)
+.secrets/

@@ -123,13 +123,17 @@ En GitHub → **feria-app** → **Settings** → **Secrets and variables** → *
 | `APP_STORE_CONNECT_ISSUER_ID` | Issuer ID ([Integrations → API](https://appstoreconnect.apple.com/access/integrations/api)) |
 | `APP_STORE_CONNECT_KEY_ID` | Key ID de la API key |
 | `APP_STORE_CONNECT_PRIVATE_KEY` | Contenido completo del archivo `.p8` |
-| `IOS_DISTRIBUTION_CERTIFICATE_P12` | Certificado Apple Distribution en base64 |
-| `IOS_DISTRIBUTION_CERTIFICATE_PASSWORD` | Contraseña del `.p12` |
+| `APP_STORE_CERTIFICATE_KEY` | Contraseña interna del certificado (ya configurada en el repo) |
 
-Ayuda local para generar el base64 del certificado:
+Ya **no hace falta** exportar `.p12` manualmente: el CI crea/descarga el certificado con la API Key.
+
+Para cargar los secrets de Apple en GitHub:
 
 ```bash
-./scripts/prepare_ci_secrets.sh ruta/a/distribution.p12
+# 1. Crear API Key en App Store Connect → Integrations → API
+# 2. Guardar en .secrets/apple-api.env y .secrets/AuthKey_XXX.p8
+# 3. Ejecutar:
+./scripts/load_apple_secrets_to_github.sh
 ```
 
 ### Flujo
