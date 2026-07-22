@@ -1,0 +1,102 @@
+# Compila y sube a TestFlight en cada push a main (cambios de app).
+#
+# Secrets en GitHub → Settings → Secrets and variables → Actions:
+#   SUPABASE_URL
+#   SUPABASE_ANON_KEY
+#   APP_STORE_CONNECT_ISSUER_ID
+#   APP_STORE_CONNECT_KEY_ID
+#   APP_STORE_CONNECT_PRIVATE_KEY   (contenido completo del .p8)
+#   IOS_DISTRIBUTION_CERTIFICATE_P12 (certificado .p12 en base64)
+#   IOS_DISTRIBUTION_CERTIFICATE_PASSWORD
+#
+# Generar el .p12: Keychain Access → certificado "Apple Distribution" → Export.
+# Base64: base64 -i certificado.p12 | pbcopy
+#
+# API Key: App Store Connect → Users and Access → Integrations → App Store Connect API
+
+name: iOS TestFlight
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'lib/**'
+      - 'ios/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - 'assets/**'
+      - '.github/workflows/ios-testflight.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build number
+        run: |
+          # +10 para no chocar con builds locales (ej. 2) en las primeras corridas.
+          BUILD=$(( ${{ github.run_number }} + 10 ))
+          perl -pi -e "s/^version: .*/version: 1.0.0+${BUILD}/" pubspec.yaml
+          echo "Build number: ${BUILD}"
+          grep '^version:' pubspec.yaml
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install --repo-update
+
+      - name: Import signing certificate
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_P12 }}
+          p12-password: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+
+      - name: Download App Store provisioning profile
+        uses: apple-actions/download-provisioning-profiles@v4
+        with:
+          issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          api-private-key: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+          bundle-id: com.armeria.feria.appFeria
+          profile-type: IOS_APP_STORE
+
+      - name: Build IPA
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          DART_DEFINES=""
+          if [[ -n "$SUPABASE_URL" && -n "$SUPABASE_ANON_KEY" ]]; then
+            DART_DEFINES="--dart-define=SUPABASE_URL=${SUPABASE_URL} --dart-define=SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}"
+          fi
+          # shellcheck disable=SC2086
+          flutter build ipa \
+            --export-options-plist=ios/ExportOptions-appstore.plist \
+            $DART_DEFINES
+
+      - name: Upload to TestFlight
+        uses: apple-actions/upload-testflight-build@v3
+        with:
+          app-path: build/ios/ipa/app_feria.ipa
+          issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          api-private-key: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+          uses-non-exempt-encryption: 'false'

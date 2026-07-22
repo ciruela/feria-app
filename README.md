@@ -108,6 +108,38 @@ flutter run -d "iPhone 15 Pro" $(scripts/dart_defines.sh)
 
 En dispositivos reales el escaneo de DNI, PDF e impresión funcionan con normalidad.
 
+## CI — TestFlight automático (GitHub Actions)
+
+Cada push a `main` que toque `lib/`, `ios/` o `pubspec.yaml` compila y sube a **TestFlight**.
+
+### Configurar secrets (una sola vez)
+
+En GitHub → **feria-app** → **Settings** → **Secrets and variables** → **Actions**:
+
+| Secret | Qué es |
+|--------|--------|
+| `SUPABASE_URL` | URL del proyecto Supabase |
+| `SUPABASE_ANON_KEY` | anon key de Supabase |
+| `APP_STORE_CONNECT_ISSUER_ID` | Issuer ID ([Integrations → API](https://appstoreconnect.apple.com/access/integrations/api)) |
+| `APP_STORE_CONNECT_KEY_ID` | Key ID de la API key |
+| `APP_STORE_CONNECT_PRIVATE_KEY` | Contenido completo del archivo `.p8` |
+| `IOS_DISTRIBUTION_CERTIFICATE_P12` | Certificado Apple Distribution en base64 |
+| `IOS_DISTRIBUTION_CERTIFICATE_PASSWORD` | Contraseña del `.p12` |
+
+Ayuda local para generar el base64 del certificado:
+
+```bash
+./scripts/prepare_ci_secrets.sh ruta/a/distribution.p12
+```
+
+### Flujo
+
+1. Editás código y hacés `git push` a `main`
+2. GitHub Actions compila el IPA y lo sube a TestFlight
+3. Los testers reciben la update (con **actualizaciones automáticas** activadas en TestFlight)
+
+Los cambios de **catálogo / TC / vendedores** en Supabase **no** pasan por CI — se sincronizan solos en la app.
+
 ## Ejecutar (modo local, sin nube)
 
 Sin `.env` la app usa `assets/data/products.json` y `sellers.json` embebidos:
