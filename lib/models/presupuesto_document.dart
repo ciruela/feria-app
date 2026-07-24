@@ -1,6 +1,5 @@
 import 'budget.dart';
 import 'presupuesto_summary.dart';
-import 'product_prices.dart';
 
 /// Textos y constantes compartidos entre el comprobante en pantalla y el PDF.
 abstract final class PresupuestoBranding {

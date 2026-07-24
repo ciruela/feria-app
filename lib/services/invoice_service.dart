@@ -1,6 +1,5 @@
 import '../models/invoice.dart';
 import '../config/payment_config.dart';
-import '../models/product_prices.dart';
 import '../services/cart_service.dart';
 import '../services/exchange_rate_service.dart';
 import '../services/pricing_service.dart';

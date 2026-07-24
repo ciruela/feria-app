@@ -30,13 +30,12 @@ void main() {
   test('builds lines and payment allocations with checkout', () {
     cart.addProduct(testProduct(id: 'a', precioUsd: 100));
     cart.addProduct(testProduct(id: 'b', precioUsd: 50));
-    cart.setCheckoutPayment(
-      CartCheckoutPayment.dual(
-        pricingMethod: PaymentMethod.transferencia,
-        secondMethod: PaymentMethod.efectivo,
-        primaryShare: 0.6,
-      ),
+    const payment = CartCheckoutPayment.dual(
+      pricingMethod: PaymentMethod.transferencia,
+      secondMethod: PaymentMethod.efectivo,
+      primaryShare: 0.6,
     );
+    cart.setCheckoutPayment(payment);
 
     final budget = budgetService.buildFromCart(
       cart: cart,

@@ -1,7 +1,6 @@
 import '../config/payment_config.dart';
 import '../models/budget.dart';
 import '../models/cart_checkout_payment.dart';
-import '../models/product_prices.dart';
 import 'cart_service.dart';
 import 'cart_totals_service.dart';
 import 'exchange_rate_service.dart';

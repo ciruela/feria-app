@@ -14,12 +14,10 @@ class CartCheckoutPayment {
         primaryShare = 1.0;
 
   const CartCheckoutPayment.dual({
-    required PaymentMethod pricingMethod,
-    required PaymentMethod secondMethod,
-    required double primaryShare,
-  })  : pricingMethod = pricingMethod,
-        secondMethod = secondMethod,
-        primaryShare = primaryShare;
+    required this.pricingMethod,
+    required this.secondMethod,
+    required this.primaryShare,
+  });
 
   /// Método que define el precio de cada ítem en el comprobante.
   final PaymentMethod pricingMethod;

@@ -28,7 +28,7 @@ Budget _sampleBudget() {
     ],
     totalUsd: 200,
     totalArs: 300000,
-    paymentAllocations: [
+    paymentAllocations: const [
       PaymentAllocation(
         method: PaymentMethod.transferencia,
         amountUsd: 0,

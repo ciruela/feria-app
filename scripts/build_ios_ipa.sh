@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+"$ROOT_DIR/scripts/ensure_xcode26.sh"
+
 METHOD="${1:-appstore}"
 EXPORT_PLIST="$ROOT_DIR/ios/ExportOptions-${METHOD}.plist"
 DART_DEFINES="$("$ROOT_DIR/scripts/dart_defines.sh")"

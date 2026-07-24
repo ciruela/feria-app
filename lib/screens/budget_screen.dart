@@ -31,6 +31,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
   final _controllers = BudgetCustomerControllers();
   final _ocr = DniOcrService();
   bool _scanning = false;
+  bool _finalizing = false;
 
   @override
   void dispose() {
@@ -247,6 +248,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
   }
 
   Future<void> _finalizeComprobante(Budget budget) async {
+    if (_finalizing) return;
+
     final cart = context.read<CartService>();
 
     if (!cart.hasCheckoutPayment) {
@@ -268,33 +271,39 @@ class _BudgetScreenState extends State<BudgetScreen> {
       return;
     }
 
+    setState(() => _finalizing = true);
     final snapshot = budget.copyWithCustomer(_customer);
 
-    if (AppConfig.useSupabase) {
-      final seller = context.read<SellerService>().selected;
-      final exchangeRate = context.read<ExchangeRateService>().rate;
-      try {
-        await SupabaseSalesRepository().insert(
-          snapshot,
-          sellerId: seller?.id,
-          exchangeRate: exchangeRate,
-        );
-      } catch (_) {
-        if (!mounted) return;
-        _showMessage(
-          'Comprobante generado, no se pudo guardar en nube',
-        );
+    try {
+      if (AppConfig.useSupabase) {
+        try {
+          await SupabaseSalesRepository().insert(
+            snapshot,
+            sellerId: context.read<SellerService>().selected?.id,
+            exchangeRate: context.read<ExchangeRateService>().rate,
+          );
+        } catch (_) {
+          if (mounted) {
+            _showMessage(
+              'Comprobante generado, no se pudo guardar en nube',
+            );
+          }
+        }
       }
+
+      // Siempre vaciar el carrito al confirmar la venta, aunque el usuario
+      // haya salido de esta pantalla mientras se guardaba en la nube.
+      cart.clear();
+
+      if (!mounted) return;
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => ComprobanteScreen(budget: snapshot),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _finalizing = false);
     }
-
-    if (!mounted) return;
-    context.read<CartService>().clear();
-
-    await Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => ComprobanteScreen(budget: snapshot),
-      ),
-    );
   }
 
   void _showMessage(String message) {
@@ -365,11 +374,22 @@ class _BudgetScreenState extends State<BudgetScreen> {
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton.icon(
-                  onPressed: checkoutConfigured
+                  onPressed: checkoutConfigured && !_finalizing
                       ? () => _finalizeComprobante(budget)
                       : null,
-                  icon: const Icon(Icons.receipt_long_rounded),
-                  label: const Text('GENERAR COMPROBANTE'),
+                  icon: _finalizing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.receipt_long_rounded),
+                  label: Text(
+                    _finalizing ? 'GENERANDO...' : 'GENERAR COMPROBANTE',
+                  ),
                 ),
                 const SizedBox(height: 10),
                 Row(

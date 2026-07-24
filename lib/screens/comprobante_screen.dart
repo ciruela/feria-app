@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
 import '../models/budget.dart';
 import '../models/budget_customer_controllers.dart';
+import '../services/cart_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/presupuesto_exporter.dart';
 import '../utils/presupuesto_pdf.dart';
@@ -68,15 +70,26 @@ class _ComprobanteScreenState extends State<ComprobanteScreen> {
     );
   }
 
+  void _leaveComprobante() {
+    context.read<CartService>().clear();
+    Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return FeriaScaffold(
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          context.read<CartService>().clear();
+        }
+      },
+      child: FeriaScaffold(
       appBar: FeriaAppBar(
         title: const Text('Comprobante'),
         leading: IconButton(
           tooltip: 'Volver al carrito',
           icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: _leaveComprobante,
         ),
         actions: [
           IconButton(
@@ -104,13 +117,13 @@ class _ComprobanteScreenState extends State<ComprobanteScreen> {
             color: AppColors.success.withValues(alpha: 0.15),
             child: Row(
               children: [
-                Icon(Icons.check_circle_rounded, color: AppColors.success),
+                const Icon(Icons.check_circle_rounded, color: AppColors.success),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'Comprobante generado',
                         style: TextStyle(
                           fontSize: 16,
@@ -203,7 +216,7 @@ class _ComprobanteScreenState extends State<ComprobanteScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: _leaveComprobante,
                       icon: const Icon(Icons.shopping_cart_outlined),
                       label: const Text('NUEVA VENTA'),
                     ),
@@ -213,6 +226,7 @@ class _ComprobanteScreenState extends State<ComprobanteScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

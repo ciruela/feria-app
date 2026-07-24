@@ -109,7 +109,6 @@ class _PriceLine extends StatelessWidget {
     required this.value,
     this.bold = false,
     this.large = false,
-    this.color,
     this.highlight = false,
     this.compact = false,
     this.multiline = false,
@@ -119,7 +118,6 @@ class _PriceLine extends StatelessWidget {
   final String value;
   final bool bold;
   final bool large;
-  final Color? color;
   final bool highlight;
   final bool compact;
   final bool multiline;
@@ -157,7 +155,7 @@ class _PriceLine extends StatelessWidget {
               style: TextStyle(
                 fontSize: valueSize,
                 fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
-                color: color ?? AppColors.textPrimary,
+                color: AppColors.textPrimary,
                 height: 1.25,
               ),
             ),

@@ -38,10 +38,10 @@ class PresupuestoHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Expanded(
+        const Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
+            children: [
               Text(
                 PresupuestoBranding.companyName,
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),

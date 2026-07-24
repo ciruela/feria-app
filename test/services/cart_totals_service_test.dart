@@ -51,7 +51,7 @@ void main() {
       pricingSettings: settings,
     );
 
-    final checkout = CartCheckoutPayment.dual(
+    const checkout = CartCheckoutPayment.dual(
       pricingMethod: PaymentMethod.transferencia,
       secondMethod: PaymentMethod.efectivo,
       primaryShare: 0.6,
@@ -77,5 +77,17 @@ void main() {
 
     cart.updateSerialNumber('arma', 'ABC123');
     expect(cart.weaponsMissingSerial, isEmpty);
+  });
+
+  test('clear removes items and checkout payment', () {
+    cart.addProduct(testProduct());
+    cart.setCheckoutPayment(
+      const CartCheckoutPayment.single(PaymentMethod.transferencia),
+    );
+
+    cart.clear();
+
+    expect(cart.isEmpty, isTrue);
+    expect(cart.hasCheckoutPayment, isFalse);
   });
 }
