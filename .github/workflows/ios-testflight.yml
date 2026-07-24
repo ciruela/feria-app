@@ -114,3 +114,18 @@ jobs:
           api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           api-private-key: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
           wait-for-processing: 'false'
+
+      # Asigna el build a grupos de testers y lo envía a revisión beta externa.
+      # El link público funciona cuando Apple aprueba (suele ser horas, no instantáneo).
+      - name: Submit to beta groups and external review
+        run: |
+          app-store-connect publish \
+            --skip-package-upload \
+            --path "build/ios/ipa/*.ipa" \
+            --testflight \
+            --expire-build-submitted-for-review \
+            --max-find-build-wait 15 \
+            --max-build-processing-wait 45 \
+            --beta-group "Mundo escopeta ext" \
+            --beta-group "Mundo escopeta" \
+            --beta-build-localizations '[{"locale": "es-MX", "whats_new": "Build automático desde GitHub Actions (main)."}]'
