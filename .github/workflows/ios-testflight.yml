@@ -149,6 +149,8 @@ jobs:
       # Espera a que Apple procese el build y lo manda a grupos + revisión beta.
       # Corre en Linux (barato). max-build-processing-wait es un TOPE, no espera fija:
       # si Apple termina en 5 min, sigue en 5 min.
+      # Solo el grupo EXTERNO se asigna por API. El interno ("Mundo escopeta")
+      # recibe builds automáticamente para testers del equipo en App Store Connect.
       - name: Submit to beta groups and external review
         run: |
           app-store-connect publish \
@@ -159,5 +161,4 @@ jobs:
             --max-find-build-wait 15 \
             --max-build-processing-wait 25 \
             --beta-group "Mundo escopeta ext" \
-            --beta-group "Mundo escopeta" \
             --beta-build-localizations '[{"locale": "es-MX", "whats_new": "Build automático desde GitHub Actions (main)."}]'

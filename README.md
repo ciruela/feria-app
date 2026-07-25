@@ -140,7 +140,7 @@ Para cargar los secrets de Apple en GitHub:
 
 1. Editás código y hacés `git push` a `main`
 2. GitHub Actions compila el IPA con **Xcode 26 / iOS SDK 26** (`macos-26` runner) y lo sube a TestFlight
-3. El CI **asigna el build** a los grupos `Mundo escopeta` (interno) y `Mundo escopeta ext` (externo) y **envía a revisión beta**
+3. El CI asigna el build al grupo externo `Mundo escopeta ext` y **envía a revisión beta** (el grupo interno recibe builds solo para el equipo de App Store Connect, sin asignación por API)
 4. Cuando Apple aprueba la revisión beta, el **link público** de TestFlight empieza a funcionar
 5. Los testers reciben la update (con **actualizaciones automáticas** activadas en TestFlight)
 
