@@ -144,9 +144,11 @@ Para cargar los secrets de Apple en GitHub:
 4. Cuando Apple aprueba la revisión beta, el **link público** de TestFlight empieza a funcionar
 5. Los testers reciben la update (con **actualizaciones automáticas** activadas en TestFlight)
 
-**Billing GitHub Actions:** compilar usa `macos-26` (~8 min, minutos ×10). La espera a que Apple procese el build corre en un job aparte con `ubuntu-latest` (minutos ×1), para no dejar la Mac ocupada 45 minutos.
+**Billing GitHub Actions:** compilar usa `macos-26` (~8 min, minutos ×10). La espera a Apple corre en `ubuntu-latest` (minutos ×1).
 
-**Qué no se puede automatizar:** la aprobación de Apple (suele tardar horas la primera vez; las siguientes suelen ser más rápidas). Configuración **una sola vez** en App Store Connect → TestFlight → Información para revisión beta (email, teléfono, descripción de qué probar).
+**Verificar el pipeline:** GitHub → Actions → **iOS TestFlight**. Tres jobs: `build` (sube IPA), `distribute` (grupo externo + revisión beta), `pipeline-status` (resumen). Si `build` está verde, la app ya está en TestFlight aunque falle `distribute` — reintentá el workflow desde Actions.
+
+**Qué no se puede automatizar:** la aprobación de Apple (horas). Configuración **una sola vez** en App Store Connect → TestFlight → Información para revisión beta.
 
 Apple exige compilar con el SDK más reciente (desde 2026: **iOS 26 SDK**). El CI ya usa `macos-26` + Xcode 26.6.
 
