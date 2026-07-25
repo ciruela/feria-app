@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/audit_entry.dart';
+import 'audit_service.dart';
 import 'supabase_config_repository.dart';
 import 'supabase_service.dart';
 
@@ -33,12 +35,22 @@ class ExchangeRateService extends ChangeNotifier {
   Future<void> saveRate(double newRate) async {
     if (newRate <= 0) return;
 
+    final previous = _rate;
     _rate = newRate;
     _updatedAt = DateTime.now();
     await _persistCache();
 
     if (SupabaseService.isConfigured) {
       await _configRepo.upsertExchangeRate(newRate);
+    }
+
+    if ((previous - newRate).abs() > 0.0001) {
+      AuditService.instance.log(
+        accion: 'Actualizó tipo de cambio',
+        entidad: AuditEntidad.tipoCambio,
+        detalle: 'ARS ${previous.toStringAsFixed(0)} → '
+            '${newRate.toStringAsFixed(0)}',
+      );
     }
 
     notifyListeners();

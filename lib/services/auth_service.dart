@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_role.dart';
+import '../models/audit_entry.dart';
+import 'audit_service.dart';
 
 class AuthService extends ChangeNotifier {
   static const _pinKey = 'admin_pin';
@@ -38,6 +40,10 @@ class AuthService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _adminPin = newPin;
     await prefs.setString(_pinKey, newPin);
+    AuditService.instance.log(
+      accion: 'Cambió el PIN maestro',
+      entidad: AuditEntidad.acceso,
+    );
     notifyListeners();
   }
 }

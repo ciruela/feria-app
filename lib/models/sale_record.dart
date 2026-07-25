@@ -10,6 +10,10 @@ class SaleRecord {
     this.clienteNombre = '',
     this.clienteDni = '',
     this.pdfPath,
+    this.anulada = false,
+    this.anuladaMotivo = '',
+    this.anuladaPor = '',
+    this.anuladaAt,
   });
 
   final String id;
@@ -21,6 +25,10 @@ class SaleRecord {
   final String clienteNombre;
   final String clienteDni;
   final String? pdfPath;
+  final bool anulada;
+  final String anuladaMotivo;
+  final String anuladaPor;
+  final DateTime? anuladaAt;
   final List<SaleLineRecord> lines;
 
   double get collectedArs => lines
@@ -48,6 +56,12 @@ class SaleRecord {
       clienteNombre: row['cliente_nombre'] as String? ?? '',
       clienteDni: row['cliente_dni'] as String? ?? '',
       pdfPath: row['pdf_path'] as String?,
+      anulada: row['anulada'] as bool? ?? false,
+      anuladaMotivo: row['anulada_motivo'] as String? ?? '',
+      anuladaPor: row['anulada_por'] as String? ?? '',
+      anuladaAt: row['anulada_at'] == null
+          ? null
+          : DateTime.parse(row['anulada_at'] as String).toLocal(),
       lines: rawLines
           .map((line) => SaleLineRecord.fromJson(line as Map<String, dynamic>))
           .toList(),

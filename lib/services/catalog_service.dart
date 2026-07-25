@@ -8,7 +8,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';
+import '../models/audit_entry.dart';
 import '../models/product.dart';
+import '../models/stock_movimiento.dart';
+import 'audit_service.dart';
 import 'excel_catalog_service.dart';
 import 'supabase_catalog_repository.dart';
 import 'product_photo_service.dart';
@@ -158,10 +161,63 @@ class CatalogService extends ChangeNotifier {
     final index = _products.indexWhere((product) => product.id == updated.id);
     if (index == -1) return;
 
+    final previous = _products[index];
     _products[index] = updated;
     await _persistCache();
     await _pushToSupabase(updated);
+
+    if (SupabaseService.isConfigured &&
+        previous.stock != null &&
+        updated.stock != null &&
+        previous.stock != updated.stock) {
+      await _supabaseCatalog.logStockChange(
+        productId: updated.id,
+        delta: updated.stock! - previous.stock!,
+        motivo: StockMotivo.ajuste,
+        stockAntes: previous.stock,
+        stockDespues: updated.stock,
+        nota: 'Ajuste manual desde admin',
+      );
+    }
+
+    _auditProductUpdate(previous, updated);
+
     notifyListeners();
+  }
+
+  void _auditProductUpdate(Product previous, Product updated) {
+    final label = updated.isArma ? updated.modeloDisplay : updated.codigo;
+    final tag = '${updated.marca} $label';
+
+    if (previous.precioUsd != updated.precioUsd) {
+      AuditService.instance.log(
+        accion: 'Cambió precio',
+        entidad: AuditEntidad.precio,
+        entidadId: updated.id,
+        detalle: '$tag · USD ${previous.precioUsd} → ${updated.precioUsd}',
+      );
+    }
+
+    final changes = <String>[];
+    if (previous.stock != updated.stock) {
+      changes.add('stock ${previous.stock ?? '—'} → ${updated.stock ?? '—'}');
+    }
+    if (previous.calibre != updated.calibre) changes.add('calibre');
+    if (previous.codigo != updated.codigo) changes.add('código');
+    if (previous.modelo != updated.modelo) changes.add('modelo');
+    if (previous.descripcion != updated.descripcion) changes.add('descripción');
+    if (previous.roundsPerBox != updated.roundsPerBox) {
+      changes.add('balas/caja');
+    }
+
+    if (changes.isNotEmpty) {
+      AuditService.instance.log(
+        accion: 'Editó producto',
+        entidad: AuditEntidad.producto,
+        entidadId: updated.id,
+        detalle: '$tag · ${changes.join(', ')}',
+      );
+    }
   }
 
   Future<Product> uploadProductPhoto(String productId, File photoFile) async {
@@ -220,14 +276,18 @@ class CatalogService extends ChangeNotifier {
     required String calibre,
     required String codigo,
     String modelo = '',
+    String descripcion = '',
     required double precioUsd,
     int? stock,
+    int? roundsPerBox,
     List<String> fotoUrls = const [],
   }) async {
     final trimmedMarca = marca.trim();
     final trimmedCalibre = calibre.trim();
     final trimmedCodigo = codigo.trim();
     final trimmedModelo = modelo.trim();
+    final trimmedDescripcion = descripcion.trim();
+    final isMunicion = type == ProductType.municion;
 
     if (trimmedMarca.isEmpty) {
       throw ArgumentError('Completá la marca');
@@ -240,6 +300,9 @@ class CatalogService extends ChangeNotifier {
     }
     if (stock != null && stock < 0) {
       throw ArgumentError('Stock inválido');
+    }
+    if (isMunicion && (roundsPerBox == null || roundsPerBox <= 0)) {
+      throw ArgumentError('Completá las balas por caja');
     }
 
     final row = ExcelProductRow(
@@ -273,8 +336,11 @@ class CatalogService extends ChangeNotifier {
       calibre: trimmedCalibre,
       codigo: trimmedCodigo,
       modelo: isArma ? trimmedModelo : '',
+      descripcion: trimmedDescripcion,
       precioUsd: precioUsd,
       stock: stock,
+      stockInicial: stock,
+      roundsPerBox: isMunicion ? roundsPerBox : null,
       fotoUrls: fotoUrls
           .map(ProductPhotoService.normalizeForStorage)
           .where((path) => path.isNotEmpty)
@@ -284,8 +350,66 @@ class CatalogService extends ChangeNotifier {
     _products.add(product);
     await _persistCache();
     await _pushToSupabase(product);
+
+    if (SupabaseService.isConfigured && stock != null && stock > 0) {
+      await _supabaseCatalog.logStockChange(
+        productId: product.id,
+        delta: stock,
+        motivo: StockMotivo.carga,
+        stockAntes: 0,
+        stockDespues: stock,
+        nota: 'Alta de producto',
+      );
+    }
+
+    final label = isArma ? product.modeloDisplay : product.codigo;
+    AuditService.instance.log(
+      accion: 'Creó producto',
+      entidad: AuditEntidad.producto,
+      entidadId: product.id,
+      detalle: '${product.marca} $label · '
+          '${product.type.label} · stock ${stock ?? '—'}',
+    );
+
     notifyListeners();
     return product;
+  }
+
+  Future<void> deleteProduct(String productId) async {
+    final product = productById(productId);
+    if (product == null) {
+      throw ArgumentError('Producto no encontrado');
+    }
+
+    if (SupabaseService.isConfigured) {
+      for (final path in product.fotoUrls) {
+        try {
+          await _productPhotos.delete(path);
+        } catch (error) {
+          debugPrint('No se pudo borrar foto $path: $error');
+        }
+      }
+
+      try {
+        await _supabaseCatalog.delete(productId);
+      } catch (error) {
+        _lastError = error.toString();
+        rethrow;
+      }
+    }
+
+    _products.removeWhere((item) => item.id == productId);
+    await _persistCache();
+
+    final label = product.isArma ? product.modeloDisplay : product.codigo;
+    AuditService.instance.log(
+      accion: 'Eliminó producto',
+      entidad: AuditEntidad.producto,
+      entidadId: productId,
+      detalle: '${product.marca} $label · ${product.type.label}',
+    );
+
+    notifyListeners();
   }
 
   String _nextProductId(ProductType type) {
@@ -359,10 +483,18 @@ class CatalogService extends ChangeNotifier {
 
         if (existing != null) {
           final index = _products.indexWhere((product) => product.id == existing.id);
+          final newStock = row.stock ?? existing.stock;
           _products[index] = existing.copyWith(
             precioUsd: row.precioUsd > 0 ? row.precioUsd : existing.precioUsd,
-            stock: row.stock ?? existing.stock,
+            stock: newStock,
             modelo: row.modelo.isNotEmpty ? row.modelo : existing.modelo,
+            descripcion: row.descripcion.isNotEmpty
+                ? row.descripcion
+                : existing.descripcion,
+            roundsPerBox: existing.isMunicion
+                ? (row.roundsPerBox ?? existing.roundsPerBox)
+                : existing.roundsPerBox,
+            stockInicial: existing.stockInicial ?? newStock,
           );
           updated++;
         } else if (_canCreateFromRow(row)) {
@@ -380,6 +512,13 @@ class CatalogService extends ChangeNotifier {
     if (SupabaseService.isConfigured) {
       await _supabaseCatalog.upsertAll(_products);
     }
+
+    AuditService.instance.log(
+      accion: 'Importó Excel',
+      entidad: AuditEntidad.excel,
+      detalle: '$updated actualizados · $added nuevos · $skipped omitidos',
+    );
+
     notifyListeners();
     return ExcelImportResult(updated: updated, added: added, skipped: skipped);
   }

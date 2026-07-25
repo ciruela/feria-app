@@ -1,0 +1,54 @@
+import 'package:app_feria/models/sale_record.dart';
+import 'package:app_feria/models/sales_metrics.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+SaleRecord _sale({
+  required String id,
+  required double ars,
+  bool anulada = false,
+}) {
+  return SaleRecord(
+    id: id,
+    createdAt: DateTime(2026, 7, 25, 12, 0),
+    sellerName: 'Vendedor',
+    totalArs: ars,
+    clienteNombre: 'Cliente $id',
+    anulada: anulada,
+    lines: [
+      SaleLineRecord(
+        productId: 'municion_$id',
+        quantity: 2,
+        lineArs: ars,
+        lineUsd: 0,
+        paymentMethod: 'efectivo',
+        isArma: false,
+        productType: 'municion',
+      ),
+    ],
+  );
+}
+
+void main() {
+  final day = DateTime(2026, 7, 25);
+
+  test('ventas anuladas se excluyen de los totales', () {
+    final metrics = DaySalesMetrics.fromSales(day, [
+      _sale(id: 'a', ars: 1000),
+      _sale(id: 'b', ars: 500, anulada: true),
+    ]);
+
+    expect(metrics.saleCount, 1);
+    expect(metrics.totalArs, 1000);
+    expect(metrics.municion.units, 2);
+  });
+
+  test('ventas anuladas siguen visibles en la lista de comprobantes', () {
+    final metrics = DaySalesMetrics.fromSales(day, [
+      _sale(id: 'a', ars: 1000),
+      _sale(id: 'b', ars: 500, anulada: true),
+    ]);
+
+    expect(metrics.sales.length, 2);
+    expect(metrics.sales.any((s) => s.anulada), isTrue);
+  });
+}

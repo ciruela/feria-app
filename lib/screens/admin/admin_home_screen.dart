@@ -3,8 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../../config/app_config.dart';
 import '../../models/app_role.dart';
+import '../../models/sales_metrics.dart';
 import '../../services/catalog_service.dart';
+import '../../services/sales_metrics_service.dart';
 import '../../services/seller_service.dart';
+import '../../services/stock_cierre_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/big_action_button.dart';
@@ -13,13 +16,17 @@ import '../../widgets/section_header.dart';
 import '../employee/employee_home_screen.dart';
 import '../exchange_rate_screen.dart';
 import '../role_gate_screen.dart';
+import 'admin_activity_screen.dart';
+import 'admin_admins_screen.dart';
 import 'admin_change_pin_screen.dart';
+import 'admin_cierre_screen.dart';
 import 'admin_excel_screen.dart';
 import 'admin_export_screen.dart';
 import 'admin_metrics_screen.dart';
 import 'admin_pricing_screen.dart';
 import 'admin_products_screen.dart';
 import 'admin_sellers_screen.dart';
+import 'admin_stock_movimientos_screen.dart';
 
 class AdminHomeScreen extends StatelessWidget {
   const AdminHomeScreen({super.key});
@@ -48,6 +55,10 @@ class AdminHomeScreen extends StatelessWidget {
             child: roleBadge(AppRole.admin),
           ),
           const SizedBox(height: 12),
+          if (AppConfig.useSupabase) ...[
+            const _TodayDashboard(),
+            const SizedBox(height: 16),
+          ],
           StatCard(
             icon: Icons.inventory_2_rounded,
             label: 'Catálogo cargado',
@@ -204,6 +215,68 @@ class AdminHomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           BigActionButton(
+            label: 'Cierre de día',
+            subtitle: AppConfig.useSupabase
+                ? 'Apertura, vendido y cierre de stock'
+                : 'Requiere Supabase configurado',
+            icon: Icons.event_available_rounded,
+            accentColor: AppColors.armaCorta,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const AdminCierreScreen(),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          BigActionButton(
+            label: 'Movimientos de stock',
+            subtitle: AppConfig.useSupabase
+                ? 'Auditoría: cargas, ventas y ajustes'
+                : 'Requiere Supabase configurado',
+            icon: Icons.swap_vert_rounded,
+            accentColor: AppColors.municion,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const AdminStockMovimientosScreen(),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          BigActionButton(
+            label: 'Registro de actividad',
+            subtitle: AppConfig.useSupabase
+                ? 'Auditoría de acciones de administradores'
+                : 'Requiere Supabase configurado',
+            icon: Icons.fact_check_rounded,
+            accentColor: AppColors.goldDark,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const AdminActivityScreen(),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          BigActionButton(
+            label: 'Administradores',
+            subtitle: 'Gestionar accesos y PIN por admin',
+            icon: Icons.admin_panel_settings_rounded,
+            accentColor: AppColors.gold,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const AdminAdminsScreen(),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          BigActionButton(
             label: 'Importar / Exportar Excel',
             subtitle: 'Stock, precios, marca, calibre, modelo',
             icon: Icons.table_chart_outlined,
@@ -259,6 +332,229 @@ class AdminHomeScreen extends StatelessWidget {
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TodayDashboard extends StatefulWidget {
+  const _TodayDashboard();
+
+  @override
+  State<_TodayDashboard> createState() => _TodayDashboardState();
+}
+
+class _TodayDashboardState extends State<_TodayDashboard> {
+  final _metricsService = SalesMetricsService();
+  final _cierreService = StockCierreService();
+
+  DaySalesMetrics? _metrics;
+  int _balasVendidas = 0;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final today = DateTime.now();
+    final products = context.read<CatalogService>().products;
+    try {
+      final metrics = await _metricsService.metricsForDay(today);
+      var balas = 0;
+      try {
+        final cierre = await _cierreService.cierreForDay(today, products);
+        balas = cierre.totalBalasVendidas;
+      } catch (_) {}
+      if (!mounted) return;
+      setState(() {
+        _metrics = metrics;
+        _balasVendidas = balas;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  int get _lowStockCount {
+    final products = context.read<CatalogService>().products;
+    return products
+        .where((p) => p.stock != null && p.stock! <= 3)
+        .length;
+  }
+
+  void _go(Widget screen) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final metrics = _metrics;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: AppDecorations.cardGradient,
+        borderRadius: AppDecorations.radiusLg,
+        boxShadow: [AppDecorations.cardShadow],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.today_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'HOY · ${formatDate(DateTime.now())}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const Spacer(),
+              InkWell(
+                onTap: _loading ? null : _load,
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: _loading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.refresh_rounded,
+                          color: Colors.white, size: 18),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _DashTile(
+                label: 'Ventas',
+                value: '${metrics?.saleCount ?? 0}',
+                icon: Icons.receipt_long_rounded,
+                onTap: () => _go(const AdminMetricsScreen()),
+              ),
+              const SizedBox(width: 10),
+              _DashTile(
+                label: 'Cobrado',
+                value: metrics == null ? '—' : formatArs(metrics.totalArs),
+                icon: Icons.payments_rounded,
+                onTap: () => _go(const AdminMetricsScreen()),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _DashTile(
+                label: 'Balas vendidas',
+                value: '$_balasVendidas',
+                icon: Icons.adjust_rounded,
+                onTap: () => _go(const AdminCierreScreen()),
+              ),
+              const SizedBox(width: 10),
+              _DashTile(
+                label: 'Stock bajo',
+                value: '$_lowStockCount',
+                icon: Icons.warning_amber_rounded,
+                highlight: _lowStockCount > 0,
+                onTap: () => _go(const AdminProductsScreen()),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashTile extends StatelessWidget {
+  const _DashTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.onTap,
+    this.highlight = false,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: highlight
+                    ? AppColors.gold
+                    : Colors.white.withValues(alpha: 0.15),
+                width: highlight ? 1.5 : 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(icon,
+                        color: highlight ? AppColors.gold : Colors.white70,
+                        size: 16),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        label.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.8),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: highlight ? AppColors.gold : Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

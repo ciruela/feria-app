@@ -21,8 +21,32 @@ create table if not exists public.productos (
 
 alter table public.productos add column if not exists fotos jsonb not null default '[]'::jsonb;
 
+-- Munición: saldo inicial (cajas), balas por caja y descripción interna
+alter table public.productos add column if not exists stock_inicial integer;
+alter table public.productos add column if not exists rounds_per_box integer;
+alter table public.productos add column if not exists descripcion text not null default '';
+
 create index if not exists productos_type_idx on public.productos (type);
 create index if not exists productos_marca_idx on public.productos (marca);
+
+-- Movimientos de stock (auditoría / trazabilidad)
+create table if not exists public.stock_movimientos (
+  id uuid primary key default gen_random_uuid(),
+  producto_id text not null,
+  delta integer not null,               -- +carga / -venta / ±ajuste (en cajas o unidades)
+  motivo text not null,                 -- 'carga' | 'venta' | 'ajuste' | 'anulacion'
+  stock_antes integer,
+  stock_despues integer,
+  venta_id uuid,
+  vendedor_id text,
+  nota text not null default '',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists stock_mov_producto_idx
+  on public.stock_movimientos (producto_id, created_at);
+create index if not exists stock_mov_fecha_idx
+  on public.stock_movimientos (created_at);
 
 -- Vendedores
 create table if not exists public.vendedores (
@@ -31,6 +55,33 @@ create table if not exists public.vendedores (
   activo boolean not null default true,
   updated_at timestamptz not null default now()
 );
+
+-- Administradores (identidad para auditoría; PIN propio por admin)
+create table if not exists public.administradores (
+  id text primary key,
+  nombre text not null,
+  pin text not null,
+  activo boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+
+-- Registro de actividad (auditoría de acciones de administradores)
+create table if not exists public.audit_log (
+  id uuid primary key default gen_random_uuid(),
+  actor_id text,
+  actor_nombre text not null default '',
+  accion text not null,
+  entidad text not null default '',
+  entidad_id text not null default '',
+  detalle text not null default '',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists audit_log_fecha_idx on public.audit_log (created_at);
+create index if not exists audit_log_actor_idx
+  on public.audit_log (actor_id, created_at);
+create index if not exists audit_log_entidad_idx
+  on public.audit_log (entidad, created_at);
 
 -- Ventas (historial de comprobantes)
 create table if not exists public.ventas (
@@ -52,6 +103,12 @@ alter table public.ventas add column if not exists pdf_path text not null defaul
 -- Migración: columnas de cliente en proyectos ya creados
 alter table public.ventas add column if not exists cliente_nombre text not null default '';
 alter table public.ventas add column if not exists cliente_dni text not null default '';
+
+-- Anulación de ventas (soft-delete: la fila se conserva para auditoría)
+alter table public.ventas add column if not exists anulada boolean not null default false;
+alter table public.ventas add column if not exists anulada_motivo text not null default '';
+alter table public.ventas add column if not exists anulada_por text not null default '';
+alter table public.ventas add column if not exists anulada_at timestamptz;
 
 -- Configuración global (tipo de cambio, etc.)
 create table if not exists public.app_config (
@@ -96,6 +153,14 @@ exception
   when duplicate_object then null;
 end $$;
 
+do $$
+begin
+  alter publication supabase_realtime add table public.administradores;
+exception
+  when duplicate_object then null;
+end $$;
+
+alter table public.administradores replica identity full;
 alter table public.vendedores replica identity full;
 alter table public.productos replica identity full;
 alter table public.app_config replica identity full;
@@ -104,6 +169,33 @@ alter table public.app_config replica identity full;
 alter table public.productos enable row level security;
 alter table public.vendedores enable row level security;
 alter table public.ventas enable row level security;
+alter table public.stock_movimientos enable row level security;
+alter table public.administradores enable row level security;
+alter table public.audit_log enable row level security;
+
+drop policy if exists "administradores_select" on public.administradores;
+create policy "administradores_select" on public.administradores
+  for select using (true);
+
+drop policy if exists "administradores_write" on public.administradores;
+create policy "administradores_write" on public.administradores
+  for all using (true) with check (true);
+
+drop policy if exists "audit_log_select" on public.audit_log;
+create policy "audit_log_select" on public.audit_log
+  for select using (true);
+
+drop policy if exists "audit_log_insert" on public.audit_log;
+create policy "audit_log_insert" on public.audit_log
+  for insert with check (true);
+
+drop policy if exists "stock_mov_select" on public.stock_movimientos;
+create policy "stock_mov_select" on public.stock_movimientos
+  for select using (true);
+
+drop policy if exists "stock_mov_insert" on public.stock_movimientos;
+create policy "stock_mov_insert" on public.stock_movimientos
+  for insert with check (true);
 
 drop policy if exists "productos_select" on public.productos;
 create policy "productos_select" on public.productos

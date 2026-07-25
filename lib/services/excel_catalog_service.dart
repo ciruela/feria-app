@@ -17,15 +17,88 @@ class ExcelImportResult {
 }
 
 class ExcelCatalogService {
+  /// Columnas que exporta la app (encabezados del template).
   static const headers = [
     'tipo',
     'marca',
     'calibre',
     'modelo',
     'codigo',
+    'descripcion',
     'precio_usd',
+    'balas_por_caja',
     'stock',
+    'balas_total',
+    'stock_inicial',
+    'vendido',
   ];
+
+  /// Mapea encabezados libres (CCI, mayúsculas, acentos) a claves canónicas.
+  static String? _canonicalHeader(String raw) {
+    final h = raw
+        .trim()
+        .toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u');
+
+    switch (h) {
+      case 'tipo':
+        return 'tipo';
+      case 'marca':
+        return 'marca';
+      case 'calibre':
+      case 'calib':
+        return 'calibre';
+      case 'modelo':
+        return 'modelo';
+      case 'codigo':
+      case 'code':
+      case 'cod':
+        return 'codigo';
+      case 'descripcion':
+      case 'detalle':
+      case 'descripcion interna':
+        return 'descripcion';
+      case 'precio_usd':
+      case 'precio usd':
+      case 'precio':
+      case 'precio (usd)':
+      case 'precio u\$s':
+      case 'precio us\$':
+        return 'precio_usd';
+      case 'balas_por_caja':
+      case 'balas por caja':
+      case 'caja x':
+      case 'caja_x':
+      case 'cajax':
+      case 'balas/caja':
+      case 'x caja':
+        return 'balas_por_caja';
+      case 'stock':
+      case 'cajas':
+      case 'stock_cajas':
+      case 'stock cajas':
+      case 'total de cajas':
+      case 'total cajas':
+        return 'stock';
+      case 'total':
+      case 'total_balas':
+      case 'total balas':
+      case 'balas':
+      case 'balas_total':
+        return 'total_balas';
+      case 'stock_inicial':
+      case 'inicial':
+        return 'stock_inicial';
+      case 'vendido':
+        return 'vendido';
+      default:
+        return null;
+    }
+  }
 
   Uint8List exportProducts(List<Product> products) {
     final excel = Excel.createExcel();
@@ -41,18 +114,19 @@ class ExcelCatalogService {
 
     for (var row = 0; row < products.length; row++) {
       final product = products[row];
-      _writeCell(sheet, 0, row + 1, product.type.key);
-      _writeCell(sheet, 1, row + 1, product.marca);
-      _writeCell(sheet, 2, row + 1, product.calibre);
-      _writeCell(sheet, 3, row + 1, product.modelo);
-      _writeCell(sheet, 4, row + 1, product.codigo);
-      _writeCell(sheet, 5, row + 1, product.precioUsd.toString());
-      _writeCell(
-        sheet,
-        6,
-        row + 1,
-        product.stock?.toString() ?? '',
-      );
+      final r = row + 1;
+      _writeCell(sheet, 0, r, product.type.key);
+      _writeCell(sheet, 1, r, product.marca);
+      _writeCell(sheet, 2, r, product.calibre);
+      _writeCell(sheet, 3, r, product.modelo);
+      _writeCell(sheet, 4, r, product.codigo);
+      _writeCell(sheet, 5, r, product.descripcion);
+      _writeCell(sheet, 6, r, product.precioUsd.toString());
+      _writeCell(sheet, 7, r, product.roundsPerBox?.toString() ?? '');
+      _writeCell(sheet, 8, r, product.stock?.toString() ?? '');
+      _writeCell(sheet, 9, r, product.balasDisponibles?.toString() ?? '');
+      _writeCell(sheet, 10, r, product.stockInicial?.toString() ?? '');
+      _writeCell(sheet, 11, r, product.unidadesVendidas?.toString() ?? '');
     }
 
     final bytes = excel.encode();
@@ -77,13 +151,12 @@ class ExcelCatalogService {
     final columnIndex = <String, int>{};
 
     for (var i = 0; i < headerRow.length; i++) {
-      final header = _cellText(headerRow[i]).trim().toLowerCase();
-      if (header.isNotEmpty) {
-        columnIndex[header] = i;
+      final canonical = _canonicalHeader(_cellText(headerRow[i]));
+      if (canonical != null && !columnIndex.containsKey(canonical)) {
+        columnIndex[canonical] = i;
       }
     }
 
-    _requireColumn(columnIndex, 'tipo');
     _requireColumn(columnIndex, 'marca');
     _requireColumn(columnIndex, 'calibre');
 
@@ -141,7 +214,9 @@ class ExcelProductRow {
     required this.modelo,
     required this.codigo,
     required this.precioUsd,
+    this.descripcion = '',
     this.stock,
+    this.roundsPerBox,
   });
 
   final ProductType type;
@@ -149,14 +224,25 @@ class ExcelProductRow {
   final String calibre;
   final String modelo;
   final String codigo;
+  final String descripcion;
   final double precioUsd;
+
+  /// Stock en unidades vendibles: cajas (munición) o unidades (armas).
   final int? stock;
 
+  /// Balas por caja (munición).
+  final int? roundsPerBox;
+
+  bool get isMunicion => type == ProductType.municion;
+
   factory ExcelProductRow.fromMap(Map<String, String> data) {
-    final typeKey = data['tipo']?.trim() ?? '';
+    // tipo: si falta, se asume munición (planillas CCI son munición).
+    final typeKey = data['tipo']?.trim().toLowerCase() ?? '';
     ProductType type;
     switch (typeKey) {
+      case '':
       case 'municion':
+      case 'munición':
         type = ProductType.municion;
       case 'arma_corta':
         type = ProductType.armaCorta;
@@ -169,10 +255,17 @@ class ExcelProductRow {
     final precioRaw = data['precio_usd']?.replaceAll(',', '.') ?? '0';
     final precio = double.tryParse(precioRaw) ?? 0;
 
-    int? stock;
-    final stockRaw = data['stock']?.trim() ?? '';
-    if (stockRaw.isNotEmpty) {
-      stock = int.tryParse(stockRaw);
+    int? roundsPerBox = _parseInt(data['balas_por_caja']);
+    if (roundsPerBox != null && roundsPerBox <= 0) roundsPerBox = null;
+
+    int? stock = _parseInt(data['stock']);
+
+    // Munición sin cajas explícitas: derivar cajas de TOTAL balas ÷ balas por caja.
+    if (type == ProductType.municion && stock == null && roundsPerBox != null) {
+      final totalBalas = _parseInt(data['total_balas']);
+      if (totalBalas != null) {
+        stock = (totalBalas / roundsPerBox).round();
+      }
     }
 
     return ExcelProductRow(
@@ -181,9 +274,19 @@ class ExcelProductRow {
       calibre: data['calibre']?.trim() ?? '',
       modelo: data['modelo']?.trim() ?? '',
       codigo: data['codigo']?.trim() ?? '',
+      descripcion: data['descripcion']?.trim() ?? '',
       precioUsd: precio,
       stock: stock,
+      roundsPerBox: roundsPerBox,
     );
+  }
+
+  static int? _parseInt(String? raw) {
+    final value = raw?.trim() ?? '';
+    if (value.isEmpty) return null;
+    // Soporta "1.000" o "1,000" como miles.
+    final normalized = value.replaceAll('.', '').replaceAll(',', '');
+    return int.tryParse(normalized) ?? int.tryParse(value);
   }
 
   Product toNewProduct(int index) {
@@ -200,8 +303,11 @@ class ExcelProductRow {
       calibre: calibre,
       codigo: codigo.isNotEmpty ? codigo : slug,
       modelo: modelo,
+      descripcion: descripcion,
       precioUsd: precioUsd,
       stock: stock,
+      stockInicial: stock,
+      roundsPerBox: isMunicion ? roundsPerBox : null,
     );
   }
 }

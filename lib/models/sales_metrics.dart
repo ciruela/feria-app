@@ -86,8 +86,11 @@ class DaySalesMetrics {
     var muni = const CategoryMetrics();
     final paymentMap = <String, PaymentMetrics>{};
     final sellerMap = <String, SellerMetrics>{};
+    var validSales = 0;
 
     for (final sale in sales) {
+      if (sale.anulada) continue;
+      validSales += 1;
       totalArs += sale.collectedArs;
       totalUsd += sale.collectedUsd;
 
@@ -145,7 +148,7 @@ class DaySalesMetrics {
 
     return DaySalesMetrics(
       date: date,
-      saleCount: sales.length,
+      saleCount: validSales,
       totalArs: totalArs,
       totalUsd: totalUsd,
       armaCorta: corta,

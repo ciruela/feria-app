@@ -7,7 +7,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';
+import '../models/audit_entry.dart';
 import '../models/seller.dart';
+import 'audit_service.dart';
 import 'supabase_seller_repository.dart';
 import 'supabase_service.dart';
 
@@ -143,6 +145,12 @@ class SellerService extends ChangeNotifier {
     _sellers.add(seller);
     await _persistCache();
     await _pushToSupabase(seller);
+    AuditService.instance.log(
+      accion: 'Agregó vendedor',
+      entidad: AuditEntidad.vendedor,
+      entidadId: seller.id,
+      detalle: seller.nombre,
+    );
     notifyListeners();
     return seller;
   }
@@ -159,6 +167,7 @@ class SellerService extends ChangeNotifier {
     final index = _sellers.indexWhere((seller) => seller.id == id);
     if (index == -1) return;
 
+    final removed = _sellers[index];
     _sellers.removeAt(index);
     if (_selected?.id == id) {
       await clearSelection();
@@ -173,6 +182,12 @@ class SellerService extends ChangeNotifier {
         rethrow;
       }
     }
+    AuditService.instance.log(
+      accion: 'Eliminó vendedor',
+      entidad: AuditEntidad.vendedor,
+      entidadId: id,
+      detalle: removed.nombre,
+    );
     notifyListeners();
   }
 
@@ -207,6 +222,12 @@ class SellerService extends ChangeNotifier {
     if (SupabaseService.isConfigured) {
       await _supabaseSellers.updateName(id, trimmed);
     }
+    AuditService.instance.log(
+      accion: 'Renombró vendedor',
+      entidad: AuditEntidad.vendedor,
+      entidadId: id,
+      detalle: '${current.nombre} → $trimmed',
+    );
     notifyListeners();
   }
 
@@ -214,6 +235,7 @@ class SellerService extends ChangeNotifier {
     final index = _sellers.indexWhere((seller) => seller.id == id);
     if (index == -1) return;
 
+    final nombre = _sellers[index].nombre;
     _sellers[index] = _sellers[index].copyWith(activo: active);
     if (!active && _selected?.id == id) {
       await clearSelection();
@@ -223,6 +245,12 @@ class SellerService extends ChangeNotifier {
     if (SupabaseService.isConfigured) {
       await _supabaseSellers.setActive(id, activo: active);
     }
+    AuditService.instance.log(
+      accion: active ? 'Reactivó vendedor' : 'Desactivó vendedor',
+      entidad: AuditEntidad.vendedor,
+      entidadId: id,
+      detalle: nombre,
+    );
     notifyListeners();
   }
 

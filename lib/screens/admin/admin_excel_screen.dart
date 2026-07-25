@@ -96,13 +96,21 @@ class _AdminExcelScreenState extends State<AdminExcelScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Columnas: tipo, marca, calibre, modelo, codigo, precio_usd, stock',
+            'Columnas: tipo, marca, calibre, modelo, codigo, descripcion, '
+            'precio_usd, balas_por_caja, stock (cajas).',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Munición: "stock" = cajas. Si en vez de cajas ponés "total_balas" '
+            '(balas) junto con "balas_por_caja", la app calcula las cajas sola. '
+            'También reconoce encabezados tipo CCI: CAJA X, TOTAL, CAJAS, PRECIO.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 8),
           Text(
             'Armas: usá modelo. Munición: usá codigo. '
-            'Al importar se actualiza stock y precio.',
+            'Al importar se actualiza stock, precio, descripción y balas por caja.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 24),

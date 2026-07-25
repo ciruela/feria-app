@@ -408,7 +408,9 @@ class _ProductAdminTile extends StatelessWidget {
         ? 'Sin stock'
         : product.stock! <= 0
             ? 'SIN STOCK'
-            : 'Stock: ${product.stock}';
+            : product.isMunicion
+                ? '${product.stock} cajas'
+                : 'Stock: ${product.stock}';
 
     return Material(
       color: AppColors.surface,
@@ -464,6 +466,11 @@ class _ProductAdminTile extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if (product.isMunicion &&
+                        product.stockInicial != null) ...[
+                      const SizedBox(height: 8),
+                      _MunicionStockLine(product: product),
+                    ],
                   ],
                 ),
               ),
@@ -493,12 +500,75 @@ class _ProductAdminTile extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (product.isMunicion &&
+                      product.balasDisponibles != null &&
+                      product.stock != null &&
+                      product.stock! > 0) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '${product.balasDisponibles} balas',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   const Icon(Icons.edit, color: AppColors.primary, size: 28),
                 ],
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MunicionStockLine extends StatelessWidget {
+  const _MunicionStockLine({required this.product});
+
+  final Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    final inicial = product.stockInicial ?? 0;
+    final vendido = product.unidadesVendidas ?? 0;
+    final actual = product.stock ?? 0;
+
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        _pill('Inicial', '$inicial', AppColors.textSecondary),
+        _pill('Vendido', '$vendido', AppColors.primary),
+        _pill('Actual', '$actual', AppColors.accent),
+      ],
+    );
+  }
+
+  Widget _pill(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: RichText(
+        text: TextSpan(
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+          children: [
+            TextSpan(text: '$label '),
+            TextSpan(
+              text: value,
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ],
         ),
       ),
     );

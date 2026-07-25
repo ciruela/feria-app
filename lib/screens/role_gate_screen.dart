@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/admin_user.dart';
 import '../models/app_role.dart';
+import '../models/audit_entry.dart';
+import '../services/admin_service.dart';
+import '../services/audit_service.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/big_action_button.dart';
@@ -62,16 +66,32 @@ class RoleGateScreen extends StatelessWidget {
   }
 
   Future<void> _askAdminPin(BuildContext context) async {
-    final ok = await showDialog<bool>(
+    final admin = await showDialog<AdminUser>(
       context: context,
       builder: (_) => const _AdminPinDialog(),
     );
 
-    if (ok == true && context.mounted) {
-      _enterAs(context, AppRole.admin);
-    }
+    if (admin == null || !context.mounted) return;
+
+    context.read<AuthService>().loginAs(AppRole.admin);
+    context.read<AdminService>().startSession(admin);
+    AuditService.instance.setActor(
+      id: admin.id == _masterId ? null : admin.id,
+      nombre: admin.nombre,
+    );
+    AuditService.instance.log(
+      accion: 'Ingresó al panel de administración',
+      entidad: AuditEntidad.acceso,
+    );
+
+    final screen = const AdminHomeScreen();
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => screen),
+    );
   }
 }
+
+const _masterId = 'master';
 
 class _HeroHeader extends StatelessWidget {
   @override
@@ -149,16 +169,31 @@ class _AdminPinDialogState extends State<_AdminPinDialog> {
     super.dispose();
   }
 
+  AdminUser? _resolve() {
+    final pin = _controller.text.trim();
+    final named = context.read<AdminService>().verifyPin(pin);
+    if (named != null) return named;
+    if (context.read<AuthService>().verifyAdminPin(pin)) {
+      return const AdminUser(
+        id: _masterId,
+        nombre: 'Admin',
+        pin: '',
+      );
+    }
+    return null;
+  }
+
   void _submit() {
-    if (_formKey.currentState?.validate() ?? false) {
-      Navigator.of(context).pop(true);
+    final admin = _resolve();
+    if (admin != null) {
+      Navigator.of(context).pop(admin);
+    } else {
+      _formKey.currentState?.validate();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.read<AuthService>();
-
     return AlertDialog(
       icon: Container(
         width: 56,
@@ -188,7 +223,7 @@ class _AdminPinDialogState extends State<_AdminPinDialog> {
             hintText: '••••',
           ),
           validator: (value) {
-            if (value == null || !auth.verifyAdminPin(value)) {
+            if (_resolve() == null) {
               return 'PIN incorrecto';
             }
             return null;
@@ -214,7 +249,16 @@ class _AdminPinDialogState extends State<_AdminPinDialog> {
 }
 
 void exitToRoleGate(BuildContext context) {
-  context.read<AuthService>().logout();
+  final auth = context.read<AuthService>();
+  if (auth.isAdmin) {
+    AuditService.instance.log(
+      accion: 'Salió del panel de administración',
+      entidad: AuditEntidad.acceso,
+    );
+    AuditService.instance.clearActor();
+    context.read<AdminService>().endSession();
+  }
+  auth.logout();
   Navigator.of(context).pushAndRemoveUntil(
     MaterialPageRoute(builder: (_) => const RoleGateScreen()),
     (_) => false,

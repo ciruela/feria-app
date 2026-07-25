@@ -1,5 +1,7 @@
+import '../models/audit_entry.dart';
 import '../models/budget.dart';
 import '../models/sale_record.dart';
+import 'audit_service.dart';
 import 'supabase_catalog_repository.dart';
 import 'supabase_service.dart';
 import 'comprobante_pdf_service.dart';
@@ -64,7 +66,75 @@ class SupabaseSalesRepository {
       // La venta queda guardada aunque falle el PDF.
     }
 
-    await _decrementStock(budget);
+    await _decrementStock(budget, saleId: saleId, sellerId: sellerId);
+
+    final itemsCount = budget.lines.fold<int>(0, (sum, l) => sum + l.quantity);
+    AuditService.instance.log(
+      accion: 'Registró venta',
+      entidad: AuditEntidad.venta,
+      entidadId: saleId,
+      detalle: '$itemsCount ítems · USD ${budget.totalUsdLines.toStringAsFixed(0)}'
+          ' · ${budget.customer.fullName.isEmpty ? 'sin cliente' : budget.customer.fullName}',
+      actorId: sellerId,
+      actorNombre: budget.sellerName ?? 'Vendedor',
+    );
+  }
+
+  /// Anula una venta (soft-delete): conserva la fila para auditoría, restituye
+  /// el stock de cada producto y registra la acción. Devuelve `true` si la
+  /// anulación se aplicó (o `false` si la venta ya estaba anulada).
+  Future<bool> voidSale(
+    SaleRecord sale, {
+    required String motivo,
+    String? actorId,
+    String? actorNombre,
+  }) async {
+    // Evita doble anulación (y doble restitución de stock).
+    final existing = await SupabaseService.client
+        .from(_table)
+        .select('anulada')
+        .eq('id', sale.id)
+        .maybeSingle();
+    if (existing == null) return false;
+    if (existing['anulada'] as bool? ?? false) return false;
+
+    await SupabaseService.client.from(_table).update({
+      'anulada': true,
+      'anulada_motivo': motivo,
+      'anulada_por': actorNombre ?? '',
+      'anulada_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', sale.id);
+
+    final quantities = <String, int>{};
+    for (final line in sale.lines) {
+      if (line.productId.isEmpty) continue;
+      quantities.update(
+        line.productId,
+        (value) => value + line.quantity,
+        ifAbsent: () => line.quantity,
+      );
+    }
+
+    for (final entry in quantities.entries) {
+      await _catalog.restoreStock(
+        entry.key,
+        entry.value,
+        ventaId: sale.id,
+        vendedorId: sale.vendedorId,
+      );
+    }
+
+    AuditService.instance.log(
+      accion: 'Anuló venta',
+      entidad: AuditEntidad.venta,
+      entidadId: sale.id,
+      detalle:
+          'Motivo: $motivo · ${sale.clienteNombre.trim().isEmpty ? 'sin cliente' : sale.clienteNombre.trim()}',
+      actorId: actorId,
+      actorNombre: actorNombre,
+    );
+
+    return true;
   }
 
   Map<String, dynamic> _itemsPayload(Budget budget) {
@@ -104,14 +174,29 @@ class SupabaseSalesRepository {
     };
   }
 
-  Future<void> _decrementStock(Budget budget) async {
-    final processed = <String>{};
+  Future<void> _decrementStock(
+    Budget budget, {
+    String? saleId,
+    String? sellerId,
+  }) async {
+    final quantities = <String, int>{};
 
     for (final line in budget.lines) {
       if (line.productId.isEmpty) continue;
-      if (!processed.add(line.productId)) continue;
+      quantities.update(
+        line.productId,
+        (value) => value + line.quantity,
+        ifAbsent: () => line.quantity,
+      );
+    }
 
-      await _catalog.decrementStock(line.productId, line.quantity);
+    for (final entry in quantities.entries) {
+      await _catalog.decrementStock(
+        entry.key,
+        entry.value,
+        ventaId: saleId,
+        vendedorId: sellerId,
+      );
     }
   }
 }

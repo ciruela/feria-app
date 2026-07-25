@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'screens/role_gate_screen.dart';
 import 'config/app_config.dart';
+import 'services/admin_service.dart';
 import 'services/auth_service.dart';
 import 'services/budget_service.dart';
 import 'services/cart_service.dart';
@@ -27,6 +28,7 @@ Future<void> main() async {
   final catalogService = CatalogService();
   final exchangeRateService = ExchangeRateService();
   final authService = AuthService();
+  final adminService = AdminService();
   final sellerService = SellerService();
   final cartService = CartService();
   final pricingSettingsService = PricingSettingsService();
@@ -41,6 +43,7 @@ Future<void> main() async {
   await catalogService.load();
   await exchangeRateService.load();
   await authService.load();
+  await adminService.load();
   await sellerService.load();
   await pricingSettingsService.load();
 
@@ -59,6 +62,7 @@ Future<void> main() async {
           value: exchangeRateService,
         ),
         ChangeNotifierProvider<AuthService>.value(value: authService),
+        ChangeNotifierProvider<AdminService>.value(value: adminService),
         ChangeNotifierProvider<SellerService>.value(value: sellerService),
         ChangeNotifierProvider<CartService>.value(value: cartService),
         ChangeNotifierProvider<PricingSettingsService>.value(

@@ -10,6 +10,7 @@ import '../../services/product_photo_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/uppercase_input.dart';
 import '../../widgets/feria_shell.dart';
+import 'admin_stock_movimientos_screen.dart';
 
 class AdminProductEditScreen extends StatefulWidget {
   const AdminProductEditScreen({
@@ -29,10 +30,13 @@ class _AdminProductEditScreenState extends State<AdminProductEditScreen> {
   late final TextEditingController _modeloController;
   late final TextEditingController _calibreController;
   late final TextEditingController _codigoController;
+  late final TextEditingController _descripcionController;
+  late final TextEditingController _roundsPerBoxController;
   final _photos = ProductPhotoService();
 
   Product? _product;
   bool _uploadingPhoto = false;
+  bool _deletingProduct = false;
   String? _deletingPath;
 
   @override
@@ -58,6 +62,12 @@ class _AdminProductEditScreenState extends State<AdminProductEditScreen> {
     _codigoController = TextEditingController(
       text: _product?.codigo ?? '',
     );
+    _descripcionController = TextEditingController(
+      text: _product?.descripcion ?? '',
+    );
+    _roundsPerBoxController = TextEditingController(
+      text: _product?.roundsPerBox?.toString() ?? '',
+    );
   }
 
   @override
@@ -67,6 +77,8 @@ class _AdminProductEditScreenState extends State<AdminProductEditScreen> {
     _modeloController.dispose();
     _calibreController.dispose();
     _codigoController.dispose();
+    _descripcionController.dispose();
+    _roundsPerBoxController.dispose();
     super.dispose();
   }
 
@@ -125,6 +137,54 @@ class _AdminProductEditScreenState extends State<AdminProductEditScreen> {
 
     if (confirmed != true || !mounted) return;
     await _deletePhoto(storagePath);
+  }
+
+  Future<void> _confirmDeleteProduct() async {
+    final product = _product;
+    if (product == null) return;
+
+    final label = product.isArma ? product.modeloDisplay : product.codigo;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar producto'),
+        content: Text(
+          '¿Eliminar "$label" (${product.marca}) del catálogo?\n\n'
+          'Se borra en Supabase y desaparece para todo el equipo.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('CANCELAR'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'ELIMINAR',
+              style: TextStyle(color: AppColors.danger),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deletingProduct = true);
+    try {
+      await context.read<CatalogService>().deleteProduct(product.id);
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Producto eliminado')),
+      );
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (!mounted) return;
+      _showError('No se pudo eliminar el producto: $error');
+    } finally {
+      if (mounted) setState(() => _deletingProduct = false);
+    }
   }
 
   Future<void> _deletePhoto(String storagePath) async {
@@ -251,30 +311,98 @@ class _AdminProductEditScreenState extends State<AdminProductEditScreen> {
               border: OutlineInputBorder(),
             ),
           ),
+          if (product.isMunicion) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _descripcionController,
+              textCapitalization: TextCapitalization.characters,
+              inputFormatters: UpperCaseTextFormatter.formatters,
+              decoration: const InputDecoration(
+                labelText: 'Descripción',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           _ReadOnlyField(label: 'Tipo', value: product.type.label),
+          if (product.stockInicial != null) ...[
+            const SizedBox(height: 16),
+            _StockSummaryCard(product: product),
+          ],
           const SizedBox(height: 24),
           TextField(
             controller: _precioController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: 'Precio USD',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: product.isMunicion ? 'Precio USD (por caja)' : 'Precio USD',
+              border: const OutlineInputBorder(),
             ),
           ),
+          if (product.isMunicion) ...[
+            const SizedBox(height: 16),
+            TextField(
+              controller: _roundsPerBoxController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Balas por caja',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           TextField(
             controller: _stockController,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Stock (vacío = no mostrar)',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: product.isMunicion
+                  ? 'Cajas actuales (vacío = no mostrar)'
+                  : 'Stock (vacío = no mostrar)',
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: _uploadingPhoto ? null : () => _save(context, product),
+            onPressed: _uploadingPhoto || _deletingProduct
+                ? null
+                : () => _save(context, product),
             child: const Text('GUARDAR CAMBIOS'),
+          ),
+          if (AppConfig.useSupabase) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => AdminStockMovimientosScreen(
+                      productId: product.id,
+                      title: 'Movimientos · ${product.isArma ? product.modeloDisplay : product.codigo}',
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.history_rounded),
+              label: const Text('VER MOVIMIENTOS'),
+            ),
+          ],
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _uploadingPhoto || _deletingProduct
+                ? null
+                : _confirmDeleteProduct,
+            icon: _deletingProduct
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.delete_outline_rounded),
+            label: Text(
+              _deletingProduct ? 'ELIMINANDO...' : 'ELIMINAR PRODUCTO',
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.danger,
+              side: const BorderSide(color: AppColors.danger),
+            ),
           ),
         ],
       ),
@@ -313,13 +441,25 @@ class _AdminProductEditScreenState extends State<AdminProductEditScreen> {
       return;
     }
 
+    int? roundsPerBox = product.roundsPerBox;
+    if (product.isMunicion) {
+      roundsPerBox = int.tryParse(_roundsPerBoxController.text.trim());
+      if (roundsPerBox == null || roundsPerBox <= 0) {
+        _showError('Completá las balas por caja');
+        return;
+      }
+    }
+
     final updated = product.copyWith(
       precioUsd: precio,
       stock: stock,
       foto: '',
       modelo: product.isArma ? _modeloController.text.trim() : product.modelo,
+      descripcion:
+          product.isMunicion ? _descripcionController.text.trim() : product.descripcion,
       calibre: calibre,
       codigo: codigo,
+      roundsPerBox: roundsPerBox,
     );
 
     await context.read<CatalogService>().updateProduct(updated);
@@ -527,6 +667,102 @@ class _PhotoPlaceholder extends StatelessWidget {
           Text(
             'Sin fotos',
             style: TextStyle(color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StockSummaryCard extends StatelessWidget {
+  const _StockSummaryCard({required this.product});
+
+  final Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    final muni = product.isMunicion && product.roundsPerBox != null;
+    final unidad = muni ? 'cajas' : 'u.';
+
+    String cell(int? cajas, int? balas) {
+      if (cajas == null) return '—';
+      final base = '$cajas $unidad';
+      if (muni && balas != null) return '$base\n$balas balas';
+      return base;
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          _StockCell(
+            label: 'Inicial',
+            value: cell(product.stockInicial, product.balasIniciales),
+          ),
+          _divider(),
+          _StockCell(
+            label: 'Vendido',
+            value: cell(product.unidadesVendidas, product.balasVendidas),
+            highlight: true,
+          ),
+          _divider(),
+          _StockCell(
+            label: 'Actual',
+            value: cell(product.stock, product.balasDisponibles),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _divider() => Container(
+        width: 1,
+        height: 44,
+        color: AppColors.border,
+      );
+}
+
+class _StockCell extends StatelessWidget {
+  const _StockCell({
+    required this.label,
+    required this.value,
+    this.highlight = false,
+  });
+
+  final String label;
+  final String value;
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textSecondary,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              height: 1.2,
+              color: highlight ? AppColors.primary : AppColors.textPrimary,
+            ),
           ),
         ],
       ),

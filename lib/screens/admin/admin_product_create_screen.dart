@@ -22,12 +22,16 @@ class _AdminProductCreateScreenState extends State<AdminProductCreateScreen> {
   final _calibreController = TextEditingController();
   final _modeloController = TextEditingController();
   final _codigoController = TextEditingController();
+  final _descripcionController = TextEditingController();
   final _precioController = TextEditingController();
   final _stockController = TextEditingController(text: '1');
+  final _roundsPerBoxController = TextEditingController();
   bool _saving = false;
 
   bool get _isArma =>
       _type == ProductType.armaCorta || _type == ProductType.armaLarga;
+
+  bool get _isMunicion => _type == ProductType.municion;
 
   @override
   void dispose() {
@@ -35,8 +39,10 @@ class _AdminProductCreateScreenState extends State<AdminProductCreateScreen> {
     _calibreController.dispose();
     _modeloController.dispose();
     _codigoController.dispose();
+    _descripcionController.dispose();
     _precioController.dispose();
     _stockController.dispose();
+    _roundsPerBoxController.dispose();
     super.dispose();
   }
 
@@ -58,6 +64,15 @@ class _AdminProductCreateScreenState extends State<AdminProductCreateScreen> {
       }
     }
 
+    int? roundsPerBox;
+    if (_isMunicion) {
+      roundsPerBox = int.tryParse(_roundsPerBoxController.text.trim());
+      if (roundsPerBox == null || roundsPerBox <= 0) {
+        _showError('Completá las balas por caja');
+        return;
+      }
+    }
+
     setState(() => _saving = true);
     try {
       await context.read<CatalogService>().addProduct(
@@ -66,8 +81,10 @@ class _AdminProductCreateScreenState extends State<AdminProductCreateScreen> {
             calibre: _calibreController.text,
             codigo: _codigoController.text,
             modelo: _modeloController.text,
+            descripcion: _descripcionController.text,
             precioUsd: precio,
             stock: stock,
+            roundsPerBox: roundsPerBox,
           );
 
       if (!mounted) return;
@@ -86,6 +103,24 @@ class _AdminProductCreateScreenState extends State<AdminProductCreateScreen> {
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
+    );
+  }
+
+  Widget _buildMunicionPreview() {
+    final cajas = int.tryParse(_stockController.text.trim());
+    final rpb = int.tryParse(_roundsPerBoxController.text.trim());
+    if (cajas == null || rpb == null || cajas < 0 || rpb <= 0) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Text(
+        '$cajas cajas × $rpb balas = ${cajas * rpb} balas totales',
+        style: const TextStyle(
+          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 
@@ -182,27 +217,57 @@ class _AdminProductCreateScreenState extends State<AdminProductCreateScreen> {
                 border: OutlineInputBorder(),
               ),
             ),
+          if (_isMunicion) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _descripcionController,
+              textCapitalization: TextCapitalization.characters,
+              inputFormatters: UpperCaseTextFormatter.formatters,
+              enabled: !_saving,
+              decoration: const InputDecoration(
+                labelText: 'Descripción (opcional)',
+                hintText: 'Ej: C.22 LR VARMINT V-MAX 30GR',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           TextField(
             controller: _precioController,
             enabled: !_saving,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: 'Precio USD',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: _isMunicion ? 'Precio USD (por caja)' : 'Precio USD',
+              border: const OutlineInputBorder(),
             ),
           ),
+          if (_isMunicion) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _roundsPerBoxController,
+              enabled: !_saving,
+              keyboardType: TextInputType.number,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(
+                labelText: 'Balas por caja',
+                hintText: 'Ej: 50',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           TextField(
             controller: _stockController,
             enabled: !_saving,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Stock inicial',
-              hintText: 'Ej: 10',
-              border: OutlineInputBorder(),
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              labelText: _isMunicion ? 'Cajas iniciales' : 'Stock inicial',
+              hintText: _isMunicion ? 'Ej: 16' : 'Ej: 10',
+              border: const OutlineInputBorder(),
             ),
           ),
+          if (_isMunicion) _buildMunicionPreview(),
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: _saving ? null : _save,

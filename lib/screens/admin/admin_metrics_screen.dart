@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../config/app_config.dart';
 import '../../models/sale_record.dart';
 import '../../models/sales_metrics.dart';
+import '../../services/audit_service.dart';
 import '../../services/comprobante_pdf_service.dart';
 import '../../services/sales_metrics_service.dart';
 import '../../theme/app_theme.dart';
@@ -51,6 +52,41 @@ class _AdminMetricsScreenState extends State<AdminMetricsScreen> {
         _error = error.toString();
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _voidSale(SaleRecord sale) async {
+    final motivo = await showDialog<String>(
+      context: context,
+      builder: (_) => const _VoidReasonDialog(),
+    );
+    if (motivo == null) return;
+
+    setState(() => _loading = true);
+    try {
+      final actor = AuditService.instance.actorNombre;
+      final ok = await _service.voidSale(
+        sale,
+        motivo: motivo,
+        actorNombre: actor.isEmpty ? 'Admin' : actor,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ok
+                ? 'Venta anulada y stock restituido'
+                : 'La venta ya estaba anulada',
+          ),
+        ),
+      );
+      await _loadMetrics();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo anular la venta: $error')),
+      );
     }
   }
 
@@ -139,7 +175,10 @@ class _AdminMetricsScreenState extends State<AdminMetricsScreen> {
                           subtitle: 'PDF guardados del día',
                         ),
                         const SizedBox(height: 12),
-                        _ComprobantesSection(sales: _metrics!.sales),
+                        _ComprobantesSection(
+                          sales: _metrics!.sales,
+                          onVoid: _voidSale,
+                        ),
                         const SizedBox(height: 24),
                         const SectionHeader(
                           title: 'Por vendedor',
@@ -388,9 +427,10 @@ class _PaymentSection extends StatelessWidget {
 }
 
 class _ComprobantesSection extends StatelessWidget {
-  const _ComprobantesSection({required this.sales});
+  const _ComprobantesSection({required this.sales, required this.onVoid});
 
   final List<SaleRecord> sales;
+  final Future<void> Function(SaleRecord sale) onVoid;
 
   @override
   Widget build(BuildContext context) {
@@ -417,15 +457,22 @@ class _ComprobantesSection extends StatelessWidget {
         }
         final totalLabel =
             totalParts.isEmpty ? 'Sin importe' : totalParts.join(' · ');
+        final anulada = sale.anulada;
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: anulada
+                  ? AppColors.danger.withValues(alpha: 0.06)
+                  : AppColors.surface,
               borderRadius: AppDecorations.radiusMd,
-              border: Border.all(color: AppColors.border),
+              border: Border.all(
+                color: anulada
+                    ? AppColors.danger.withValues(alpha: 0.4)
+                    : AppColors.border,
+              ),
             ),
             child: Row(
               children: [
@@ -433,9 +480,45 @@ class _ComprobantesSection extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        client,
-                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              client,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                decoration: anulada
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                                color: anulada
+                                    ? AppColors.textSecondary
+                                    : AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          if (anulada) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.danger,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'ANULADA',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       Text(
                         '$timeLabel · $totalLabel',
@@ -444,6 +527,19 @@ class _ComprobantesSection extends StatelessWidget {
                           fontSize: 13,
                         ),
                       ),
+                      if (anulada && sale.anuladaMotivo.trim().isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            'Motivo: ${sale.anuladaMotivo.trim()}'
+                            '${sale.anuladaPor.trim().isEmpty ? '' : ' · ${sale.anuladaPor.trim()}'}',
+                            style: const TextStyle(
+                              color: AppColors.danger,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -458,15 +554,14 @@ class _ComprobantesSection extends StatelessWidget {
                     onPressed: () => _sharePdf(context, sale.pdfPath!),
                     icon: const Icon(Icons.ios_share_rounded),
                   ),
-                ] else
-                  const Padding(
-                    padding: EdgeInsets.only(left: 8),
-                    child: Text(
-                      'Sin PDF',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
+                ],
+                if (!anulada)
+                  IconButton(
+                    tooltip: 'Anular venta',
+                    onPressed: () => onVoid(sale),
+                    icon: const Icon(
+                      Icons.block_rounded,
+                      color: AppColors.danger,
                     ),
                   ),
               ],
@@ -497,6 +592,75 @@ class _ComprobantesSection extends StatelessWidget {
         SnackBar(content: Text('No se pudo compartir el PDF: $error')),
       );
     }
+  }
+}
+
+class _VoidReasonDialog extends StatefulWidget {
+  const _VoidReasonDialog();
+
+  @override
+  State<_VoidReasonDialog> createState() => _VoidReasonDialogState();
+}
+
+class _VoidReasonDialogState extends State<_VoidReasonDialog> {
+  final _controller = TextEditingController();
+  bool _valid = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() {
+      final next = _controller.text.trim().isNotEmpty;
+      if (next != _valid) setState(() => _valid = next);
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Anular venta'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Se restituirá el stock y quedará registrado en la auditoría. '
+            'Esta acción no se puede deshacer.',
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            maxLines: 2,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(
+              labelText: 'Motivo',
+              hintText: 'Ej: carga errónea, cliente se arrepintió…',
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _valid
+              ? () => Navigator.of(context).pop(_controller.text.trim())
+              : null,
+          style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+          child: const Text('Anular venta'),
+        ),
+      ],
+    );
   }
 }
 

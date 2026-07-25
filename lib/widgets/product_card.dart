@@ -136,7 +136,10 @@ class ProductCard extends StatelessWidget {
                         ],
                         if (product.stock != null) ...[
                           const SizedBox(height: 12),
-                          _StockBadge(stock: product.stock!),
+                          _StockBadge(
+                            stock: product.stock!,
+                            unitLabel: product.isMunicion ? 'CAJAS' : null,
+                          ),
                         ],
                         const SizedBox(height: 10),
                         Row(
@@ -292,14 +295,16 @@ class _InfoRow extends StatelessWidget {
 }
 
 class _StockBadge extends StatelessWidget {
-  const _StockBadge({required this.stock});
+  const _StockBadge({required this.stock, this.unitLabel});
 
   final int stock;
+  final String? unitLabel;
 
   @override
   Widget build(BuildContext context) {
     final sinStock = stock <= 0;
     final color = sinStock ? AppColors.danger : AppColors.success;
+    final unit = unitLabel != null ? ' ${unitLabel!}' : '';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -318,7 +323,7 @@ class _StockBadge extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            sinStock ? 'SIN STOCK' : 'STOCK: $stock',
+            sinStock ? 'SIN STOCK' : 'STOCK: $stock$unit',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w800,
