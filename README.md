@@ -144,7 +144,7 @@ Para cargar los secrets de Apple en GitHub:
 4. Cuando Apple aprueba la revisión beta, el **link público** de TestFlight empieza a funcionar
 5. Los testers reciben la update (con **actualizaciones automáticas** activadas en TestFlight)
 
-**Qué está automatizado:** compilar, firmar, subir, cumplimiento de exportación (`ITSAppUsesNonExemptEncryption`), asignar grupos, enviar a revisión beta.
+**Billing GitHub Actions:** compilar usa `macos-26` (~8 min, minutos ×10). La espera a que Apple procese el build corre en un job aparte con `ubuntu-latest` (minutos ×1), para no dejar la Mac ocupada 45 minutos.
 
 **Qué no se puede automatizar:** la aprobación de Apple (suele tardar horas la primera vez; las siguientes suelen ser más rápidas). Configuración **una sola vez** en App Store Connect → TestFlight → Información para revisión beta (email, teléfono, descripción de qué probar).
 
