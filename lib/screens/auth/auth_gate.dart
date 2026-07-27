@@ -4,8 +4,9 @@ import 'package:provider/provider.dart';
 import '../../services/tenant_session_service.dart';
 import '../role_gate_screen.dart';
 import '../super_admin/super_admin_home_screen.dart';
-import 'auth_screen.dart';
+import 'auth_landing_screen.dart';
 import 'email_confirmation_screen.dart';
+import 'no_organization_screen.dart';
 import 'workspace_selector_screen.dart';
 
 /// Decide la pantalla inicial segun autenticacion, confirmacion de email y tenant.
@@ -54,7 +55,6 @@ class _AuthGateState extends State<AuthGate> {
       }
       return;
     }
-    // Bootstrap solo una vez por sesion; evita bucle con refreshSession/provision.
     if (session.isEmailConfirmed && !_bootstrapped && !_bootstrapping) {
       _bootstrap();
     }
@@ -71,7 +71,7 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     _bootstrapping = true;
-    await session.provisionTenantIfNeeded();
+    await session.bootstrapSession();
     if (!mounted) return;
     setState(() {
       _bootstrapped = true;
@@ -92,7 +92,7 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     if (!session.isSignedIn) {
-      return const AuthScreen();
+      return const AuthLandingScreen();
     }
 
     if (!session.isEmailConfirmed) {
@@ -103,6 +103,10 @@ class _AuthGateState extends State<AuthGate> {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
+    }
+
+    if (session.hasNoOrganizationAccess) {
+      return const NoOrganizationScreen();
     }
 
     switch (session.view) {
