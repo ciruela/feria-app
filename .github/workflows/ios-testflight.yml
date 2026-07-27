@@ -23,7 +23,9 @@ on:
       - 'pubspec.yaml'
       - 'pubspec.lock'
       - 'assets/**'
-      - '.github/workflows/ios-testflight.yml'
+      # OJO: no incluir este archivo. Si se lista, editar el propio workflow
+      # (aunque sea un comentario) dispara un deploy innecesario. Para probar
+      # cambios en el pipeline, usar "Run workflow" (workflow_dispatch).
   workflow_dispatch:
     inputs:
       skip_distribute:
