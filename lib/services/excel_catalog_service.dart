@@ -17,6 +17,10 @@ class ExcelImportResult {
 }
 
 class ExcelCatalogService {
+  /// Marca por defecto para munición cuando la planilla no trae columna "marca"
+  /// (caso típico: planilla de proveedor CCI). Se puede editar luego por producto.
+  static const defaultMunicionBrand = 'CCI';
+
   /// Columnas que exporta la app (encabezados del template).
   static const headers = [
     'tipo',
@@ -157,8 +161,22 @@ class ExcelCatalogService {
       }
     }
 
-    _requireColumn(columnIndex, 'marca');
-    _requireColumn(columnIndex, 'calibre');
+    // No exigimos "marca"/"calibre" (las planillas de proveedor tipo CCI no las
+    // traen). Basta con poder identificar el producto y tener un precio.
+    final hasIdentity = columnIndex.containsKey('codigo') ||
+        columnIndex.containsKey('descripcion') ||
+        columnIndex.containsKey('modelo');
+    if (!hasIdentity) {
+      throw Exception(
+        'El Excel necesita al menos una columna de "codigo", "descripcion" '
+        'o "modelo".',
+      );
+    }
+    if (!columnIndex.containsKey('precio_usd')) {
+      throw Exception(
+        'Falta la columna de precio en el Excel (ej. "precio", "precio_usd").',
+      );
+    }
 
     final rows = <Map<String, String>>[];
 
@@ -174,17 +192,15 @@ class ExcelCatalogService {
         data[entry.key] = _cellText(cell).trim();
       }
 
-      if (data['marca']?.isEmpty ?? true) continue;
+      // Saltear filas sin ningún identificador (ej. filas de subtotal).
+      final hasData = (data['codigo']?.isNotEmpty ?? false) ||
+          (data['descripcion']?.isNotEmpty ?? false) ||
+          (data['modelo']?.isNotEmpty ?? false);
+      if (!hasData) continue;
       rows.add(data);
     }
 
     return rows;
-  }
-
-  static void _requireColumn(Map<String, int> columns, String name) {
-    if (!columns.containsKey(name)) {
-      throw Exception('Falta la columna "$name" en el Excel');
-    }
   }
 
   static void _writeCell(
@@ -268,9 +284,16 @@ class ExcelProductRow {
       }
     }
 
+    // Si la planilla no trae marca (típico en munición de proveedor), usamos
+    // una por defecto para que el producto sea válido; se puede editar luego.
+    var marca = data['marca']?.trim() ?? '';
+    if (marca.isEmpty && type == ProductType.municion) {
+      marca = ExcelCatalogService.defaultMunicionBrand;
+    }
+
     return ExcelProductRow(
       type: type,
-      marca: data['marca']?.trim() ?? '',
+      marca: marca,
       calibre: data['calibre']?.trim() ?? '',
       modelo: data['modelo']?.trim() ?? '',
       codigo: data['codigo']?.trim() ?? '',
