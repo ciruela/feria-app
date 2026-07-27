@@ -131,8 +131,24 @@ class ProductCard extends StatelessWidget {
                           _InfoRow(label: 'CALIBRE', value: product.calibre),
                         ] else ...[
                           _InfoRow(label: 'CÓDIGO', value: product.codigo),
-                          const SizedBox(height: 10),
-                          _InfoRow(label: 'CALIBRE', value: product.calibre),
+                          if (product.calibre.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            _InfoRow(label: 'CALIBRE', value: product.calibre),
+                          ],
+                          if (product.granos.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            _InfoRow(
+                              label: 'PESO PUNTA',
+                              value: product.granos,
+                            ),
+                          ],
+                          if (product.descripcion.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            _InfoRow(
+                              label: 'DETALLE',
+                              value: product.descripcion,
+                            ),
+                          ],
                         ],
                         if (product.stock != null) ...[
                           const SizedBox(height: 12),

@@ -485,6 +485,7 @@ class CatalogService extends ChangeNotifier {
           _products[index] = existing.copyWith(
             precioUsd: row.precioUsd > 0 ? row.precioUsd : existing.precioUsd,
             stock: newStock,
+            calibre: row.calibre.isNotEmpty ? row.calibre : existing.calibre,
             modelo: row.modelo.isNotEmpty ? row.modelo : existing.modelo,
             descripcion: row.descripcion.isNotEmpty
                 ? row.descripcion
@@ -531,29 +532,47 @@ class CatalogService extends ChangeNotifier {
     for (final product in _products) {
       if (product.type != row.type) continue;
       if (product.marca.toLowerCase() != row.marca.toLowerCase()) continue;
-      if (product.calibre.toLowerCase() != row.calibre.toLowerCase()) continue;
+      // El calibre solo desempata si ambos lo tienen (las planillas CCI no lo traen).
+      if (product.calibre.isNotEmpty &&
+          row.calibre.isNotEmpty &&
+          product.calibre.toLowerCase() != row.calibre.toLowerCase()) {
+        continue;
+      }
 
       if (product.isArma) {
         final rowModel = row.modelo.isNotEmpty ? row.modelo : row.codigo;
         if (product.modeloDisplay.toLowerCase() == rowModel.toLowerCase()) {
           return product;
         }
-      } else if (product.codigo.toLowerCase() ==
-          (row.codigo.isNotEmpty ? row.codigo : row.modelo).toLowerCase()) {
-        return product;
+      } else {
+        // Munición: matchear por código; si no hay, por modelo o descripción.
+        final rowKey = row.codigo.isNotEmpty
+            ? row.codigo
+            : (row.modelo.isNotEmpty ? row.modelo : row.descripcion);
+        if (rowKey.isEmpty) continue;
+        final key = rowKey.toLowerCase();
+        if (product.codigo.toLowerCase() == key ||
+            product.descripcion.toLowerCase() == key) {
+          return product;
+        }
       }
     }
     return null;
   }
 
   bool _canCreateFromRow(ExcelProductRow row) {
-    if (row.marca.isEmpty || row.calibre.isEmpty) return false;
+    if (row.marca.isEmpty) return false;
     final isArma =
         row.type == ProductType.armaCorta || row.type == ProductType.armaLarga;
     if (isArma) {
+      // Las armas sí necesitan calibre e identificación.
+      if (row.calibre.isEmpty) return false;
       return row.modelo.isNotEmpty || row.codigo.isNotEmpty;
     }
-    return row.codigo.isNotEmpty || row.modelo.isNotEmpty;
+    // Munición: alcanza con código, modelo o descripción (calibre opcional).
+    return row.codigo.isNotEmpty ||
+        row.modelo.isNotEmpty ||
+        row.descripcion.isNotEmpty;
   }
 
   Future<void> _persistCache() async {

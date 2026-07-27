@@ -52,6 +52,41 @@ void main() {
       expect(_municion(stock: 2).inStock, isTrue);
     });
 
+    test('granos (peso de la punta) se deriva de la descripción', () {
+      const m = Product(
+        id: 'm',
+        type: ProductType.municion,
+        marca: 'CCI',
+        calibre: '.22 LR',
+        codigo: '20732',
+        descripcion: 'C.22 40G LR MINI MAG 1235FPS CCI M.960 (50)',
+        precioUsd: 10,
+      );
+      expect(m.granos, '40 gr');
+
+      const sinDesc = Product(
+        id: 'm2',
+        type: ProductType.municion,
+        marca: 'CCI',
+        calibre: '.22 LR',
+        codigo: 'x',
+        precioUsd: 10,
+      );
+      expect(sinDesc.granos, '');
+
+      const arma = Product(
+        id: 'a',
+        type: ProductType.armaLarga,
+        marca: 'X',
+        calibre: '.308',
+        modelo: 'M700',
+        codigo: '',
+        descripcion: '40G algo',
+        precioUsd: 100,
+      );
+      expect(arma.granos, ''); // solo aplica a munición
+    });
+
     test('derivados de balas para munición', () {
       final m = _municion(stock: 3, inicial: 5, rpb: 50);
       expect(m.cajasDisponibles, 3);

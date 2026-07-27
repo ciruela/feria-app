@@ -97,7 +97,8 @@ class _AdminExcelScreenState extends State<AdminExcelScreen> {
           const SizedBox(height: 8),
           Text(
             'Columnas: tipo, marca, calibre, modelo, codigo, descripcion, '
-            'precio_usd, balas_por_caja, stock (cajas).',
+            'precio_usd, balas_por_caja, stock (cajas). En munición, "marca" y '
+            '"calibre" son opcionales (si falta la marca se usa CCI).',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 8),
