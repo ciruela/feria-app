@@ -9,6 +9,7 @@ import '../../services/sales_metrics_service.dart';
 import '../../services/seller_service.dart';
 import '../../services/stock_cierre_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/app_logger.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/big_action_button.dart';
 import '../../widgets/feria_shell.dart';
@@ -184,7 +185,9 @@ class AdminHomeScreen extends StatelessWidget {
                             content: Text('Catálogo publicado en Supabase'),
                           ),
                         );
-                      } catch (_) {
+                      } catch (e, s) {
+                        AppLogger.error('Error al publicar catálogo en Supabase',
+                            error: e, stackTrace: s);
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -368,14 +371,19 @@ class _TodayDashboardState extends State<_TodayDashboard> {
       try {
         final cierre = await _cierreService.cierreForDay(today, products);
         balas = cierre.totalBalasVendidas;
-      } catch (_) {}
+      } catch (e, s) {
+        AppLogger.warn('No se pudo calcular balas vendidas del día',
+            error: e, stackTrace: s);
+      }
       if (!mounted) return;
       setState(() {
         _metrics = metrics;
         _balasVendidas = balas;
         _loading = false;
       });
-    } catch (_) {
+    } catch (e, s) {
+      AppLogger.error('No se pudieron cargar las métricas del panel',
+          error: e, stackTrace: s);
       if (!mounted) return;
       setState(() => _loading = false);
     }

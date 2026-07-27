@@ -1,0 +1,45 @@
+# Analisis de calidad con SonarCloud (hasta 50k LOC en el free tier).
+#
+# Requisitos (una sola vez):
+#   1. Crear el proyecto en https://sonarcloud.io (org "ciruela").
+#   2. Desactivar "Automatic Analysis" en SonarCloud (usamos CI-based).
+#   3. Agregar el secret SONAR_TOKEN en GitHub -> Settings -> Secrets -> Actions.
+
+name: SonarCloud
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sonarcloud:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Sonar necesita el historial completo para el blame/nuevo-codigo.
+          fetch-depth: 0
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test with coverage
+        run: flutter test --coverage
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io

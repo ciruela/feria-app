@@ -11,6 +11,8 @@ import '../config/app_config.dart';
 import '../models/audit_entry.dart';
 import '../models/product.dart';
 import '../models/stock_movimiento.dart';
+import '../utils/app_logger.dart';
+import '../utils/ids.dart';
 import 'audit_service.dart';
 import 'excel_catalog_service.dart';
 import 'supabase_catalog_repository.dart';
@@ -103,9 +105,10 @@ class CatalogService extends ChangeNotifier {
           await prefs.setInt(_lastSyncKey, _lastSync!.millisecondsSinceEpoch);
         }
       }
-    } catch (error) {
+    } catch (error, stackTrace) {
       if (silent) {
-        debugPrint('CatalogService silent sync: $error');
+        AppLogger.warn('Sync silencioso de catálogo falló',
+            error: error, stackTrace: stackTrace);
       } else {
         _lastError = error.toString();
         if (_products.isEmpty) {
@@ -419,14 +422,9 @@ class CatalogService extends ChangeNotifier {
       ProductType.armaLarga => 'al',
     };
 
-    var max = 0;
-    for (final product in _products) {
-      if (!product.id.startsWith('$prefix-')) continue;
-      final number = int.tryParse(product.id.substring(prefix.length + 1));
-      if (number != null && number > max) max = number;
-    }
-
-    return '$prefix-${(max + 1).toString().padLeft(3, '0')}';
+    // ID globalmente unico: en multi-tenant no puede ser secuencial por tenant
+    // (colisionaria con otras armerias, la PK de productos es global).
+    return newId(prefix);
   }
 
   Future<void> publishAllToSupabase() async {
@@ -503,8 +501,10 @@ class CatalogService extends ChangeNotifier {
         } else {
           skipped++;
         }
-      } catch (_) {
+      } catch (e, s) {
         skipped++;
+        AppLogger.warn('Fila de Excel omitida por error de parseo',
+            error: e, stackTrace: s);
       }
     }
 

@@ -1,5 +1,6 @@
 import '../models/product.dart';
 import '../models/stock_movimiento.dart';
+import '../utils/app_logger.dart';
 import 'product_photo_service.dart';
 import 'supabase_service.dart';
 import 'supabase_stock_movimientos_repository.dart';
@@ -76,8 +77,10 @@ class SupabaseCatalogRepository {
         ventaId: ventaId,
         vendedorId: vendedorId,
       );
-    } catch (_) {
+    } catch (e, s) {
       // El movimiento es auditoría: no bloquea la venta si falla.
+      AppLogger.warn('No se registró el movimiento de stock (venta)',
+          error: e, stackTrace: s);
     }
   }
 
@@ -119,8 +122,9 @@ class SupabaseCatalogRepository {
         ventaId: ventaId,
         vendedorId: vendedorId,
       );
-    } catch (_) {
-      // Auditoría best-effort.
+    } catch (e, s) {
+      AppLogger.warn('No se registró el movimiento de stock (anulación)',
+          error: e, stackTrace: s);
     }
   }
 
@@ -144,8 +148,9 @@ class SupabaseCatalogRepository {
         stockDespues: stockDespues,
         nota: nota,
       );
-    } catch (_) {
-      // Auditoría best-effort.
+    } catch (e, s) {
+      AppLogger.warn('No se registró el ajuste manual de stock',
+          error: e, stackTrace: s);
     }
   }
 

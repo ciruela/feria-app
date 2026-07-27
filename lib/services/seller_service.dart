@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/app_config.dart';
 import '../models/audit_entry.dart';
 import '../models/seller.dart';
+import '../utils/ids.dart';
 import 'audit_service.dart';
 import 'supabase_seller_repository.dart';
 import 'supabase_service.dart';
@@ -269,16 +270,7 @@ class SellerService extends ChangeNotifier {
     notifyListeners();
   }
 
-  String _nextId() {
-    var max = 0;
-    for (final seller in _sellers) {
-      if (seller.id.startsWith('v')) {
-        final number = int.tryParse(seller.id.substring(1));
-        if (number != null && number > max) max = number;
-      }
-    }
-    return 'v${max + 1}';
-  }
+  String _nextId() => newId('v');
 
   void _subscribeRealtime() {
     if (!SupabaseService.isConfigured) return;

@@ -6,6 +6,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';
 import '../models/admin_user.dart';
+import '../utils/app_logger.dart';
+import '../utils/ids.dart';
+import '../utils/pin_hash.dart';
 import 'supabase_admin_repository.dart';
 import 'supabase_service.dart';
 
@@ -64,7 +67,7 @@ class AdminService extends ChangeNotifier {
     final clean = pin.trim();
     if (clean.isEmpty) return null;
     for (final admin in _admins) {
-      if (admin.activo && admin.pin == clean) return admin;
+      if (admin.activo && pinMatches(clean, admin.pin)) return admin;
     }
     return null;
   }
@@ -72,7 +75,7 @@ class AdminService extends ChangeNotifier {
   bool pinInUse(String pin, {String? exceptId}) {
     final clean = pin.trim();
     return _admins.any(
-      (admin) => admin.id != exceptId && admin.pin == clean,
+      (admin) => admin.id != exceptId && pinMatches(clean, admin.pin),
     );
   }
 
@@ -111,7 +114,7 @@ class AdminService extends ChangeNotifier {
     final admin = AdminUser(
       id: _nextId(),
       nombre: trimmedNombre,
-      pin: trimmedPin,
+      pin: hashPin(trimmedPin),
       activo: true,
     );
 
@@ -147,13 +150,14 @@ class AdminService extends ChangeNotifier {
 
     var newPin = current.pin;
     if (pin != null && pin.trim().isNotEmpty) {
-      newPin = pin.trim();
-      if (newPin.length < 4) {
+      final rawPin = pin.trim();
+      if (rawPin.length < 4) {
         throw ArgumentError('El PIN debe tener al menos 4 dígitos');
       }
-      if (pinInUse(newPin, exceptId: id)) {
+      if (pinInUse(rawPin, exceptId: id)) {
         throw ArgumentError('Ese PIN ya está en uso');
       }
+      newPin = hashPin(rawPin);
     }
 
     final updated = current.copyWith(
@@ -185,16 +189,7 @@ class AdminService extends ChangeNotifier {
     notifyListeners();
   }
 
-  String _nextId() {
-    var max = 0;
-    for (final admin in _admins) {
-      if (admin.id.startsWith('a')) {
-        final number = int.tryParse(admin.id.substring(1));
-        if (number != null && number > max) max = number;
-      }
-    }
-    return 'a${max + 1}';
-  }
+  String _nextId() => newId('a');
 
   Future<void> _push(AdminUser admin) async {
     if (!SupabaseService.isConfigured) return;
@@ -215,7 +210,9 @@ class AdminService extends ChangeNotifier {
       _admins = list
           .map((item) => AdminUser.fromJson(item as Map<String, dynamic>))
           .toList();
-    } catch (_) {
+    } catch (e, s) {
+      AppLogger.warn('Cache de admins corrupta; se reinicia',
+          error: e, stackTrace: s);
       _admins = [];
     }
   }

@@ -1,6 +1,7 @@
 import '../models/audit_entry.dart';
 import '../models/budget.dart';
 import '../models/sale_record.dart';
+import '../utils/app_logger.dart';
 import 'audit_service.dart';
 import 'supabase_catalog_repository.dart';
 import 'supabase_service.dart';
@@ -62,8 +63,10 @@ class SupabaseSalesRepository {
           .from(_table)
           .update({'pdf_path': pdfPath})
           .eq('id', saleId);
-    } catch (_) {
+    } catch (e, s) {
       // La venta queda guardada aunque falle el PDF.
+      AppLogger.warn('No se pudo generar/subir el PDF de la venta $saleId',
+          error: e, stackTrace: s);
     }
 
     await _decrementStock(budget, saleId: saleId, sellerId: sellerId);

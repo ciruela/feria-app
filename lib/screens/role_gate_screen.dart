@@ -7,6 +7,7 @@ import '../models/audit_entry.dart';
 import '../services/admin_service.dart';
 import '../services/audit_service.dart';
 import '../services/auth_service.dart';
+import '../services/tenant_session_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/big_action_button.dart';
 import '../widgets/feria_shell.dart';
@@ -19,9 +20,27 @@ class RoleGateScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final session = context.watch<TenantSessionService>();
+
     return FeriaScaffold(
-      appBar: const FeriaAppBar(
-        title: Text('Catálogo Feria'),
+      appBar: FeriaAppBar(
+        title: const Text('Catálogo Feria'),
+        showBackButton: false,
+        actions: [
+          if (session.isSignedIn && session.destinationCount > 1)
+            IconButton(
+              tooltip: 'Cambiar de armería',
+              onPressed: () =>
+                  context.read<TenantSessionService>().backToSelector(),
+              icon: const Icon(Icons.swap_horiz_rounded),
+            ),
+          if (session.isSignedIn)
+            IconButton(
+              tooltip: 'Cerrar sesión',
+              onPressed: () => context.read<TenantSessionService>().signOut(),
+              icon: const Icon(Icons.logout_rounded),
+            ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),

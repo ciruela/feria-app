@@ -273,19 +273,21 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
     setState(() => _finalizing = true);
     final snapshot = budget.copyWithCustomer(_customer);
+    final sellerId = context.read<SellerService>().selected?.id;
+    final exchangeRate = context.read<ExchangeRateService>().rate;
 
     try {
       if (AppConfig.useSupabase) {
         try {
           await SupabaseSalesRepository().insert(
             snapshot,
-            sellerId: context.read<SellerService>().selected?.id,
-            exchangeRate: context.read<ExchangeRateService>().rate,
+            sellerId: sellerId,
+            exchangeRate: exchangeRate,
           );
-        } catch (_) {
+        } catch (error) {
           if (mounted) {
             _showMessage(
-              'Comprobante generado, no se pudo guardar en nube',
+              'Comprobante generado, no se pudo guardar en nube: $error',
             );
           }
         }

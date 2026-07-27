@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'screens/role_gate_screen.dart';
+import 'screens/auth/auth_gate.dart';
 import 'config/app_config.dart';
 import 'services/admin_service.dart';
 import 'services/auth_service.dart';
@@ -16,6 +16,7 @@ import 'services/pricing_service.dart';
 import 'services/pricing_settings_service.dart';
 import 'services/seller_service.dart';
 import 'services/supabase_service.dart';
+import 'services/tenant_session_service.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
@@ -28,6 +29,7 @@ Future<void> main() async {
   final catalogService = CatalogService();
   final exchangeRateService = ExchangeRateService();
   final authService = AuthService();
+  final tenantSession = TenantSessionService();
   final adminService = AdminService();
   final sellerService = SellerService();
   final cartService = CartService();
@@ -39,6 +41,8 @@ Future<void> main() async {
     cartTotals: cartTotalsService,
   );
   final invoiceService = InvoiceService(pricing: pricingService);
+
+  tenantSession.start();
 
   await catalogService.load();
   await exchangeRateService.load();
@@ -62,6 +66,9 @@ Future<void> main() async {
           value: exchangeRateService,
         ),
         ChangeNotifierProvider<AuthService>.value(value: authService),
+        ChangeNotifierProvider<TenantSessionService>.value(
+          value: tenantSession,
+        ),
         ChangeNotifierProvider<AdminService>.value(value: adminService),
         ChangeNotifierProvider<SellerService>.value(value: sellerService),
         ChangeNotifierProvider<CartService>.value(value: cartService),
@@ -87,7 +94,7 @@ class FeriaApp extends StatelessWidget {
       title: 'Catálogo Feria',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
-      home: const RoleGateScreen(),
+      home: const AuthGate(),
     );
   }
 }
