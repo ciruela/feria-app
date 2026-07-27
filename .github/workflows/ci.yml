@@ -1,10 +1,11 @@
 name: CI
 
-# Validación (analyze + tests) en TODOS los branches y PRs.
+# Validación (analyze + tests) en cada PR y al llegar a main.
 # No compila ni sube nada a Apple: eso lo hace "iOS TestFlight" solo en main.
+# Trabajás en un branch -> abrís PR (corre acá) -> merge a main (corre + deploy).
 on:
   push:
-    branches: ['**']
+    branches: [main]
     paths:
       - 'lib/**'
       - 'test/**'
@@ -13,7 +14,6 @@ on:
       - 'analysis_options.yaml'
       - '.github/workflows/**'
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
