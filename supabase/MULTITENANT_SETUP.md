@@ -30,9 +30,13 @@ en producción.
 - **Confirmación de email (obligatorio para registro):**
   Dashboard → Authentication → Providers → Email → activar **Confirm email**.
   Opcional: personalizar la plantilla del mail en Authentication → Email Templates.
-- **Registro self-service:** pestaña "Registrarse" (email + contraseña + nombre
-  de empresa). Tras confirmar el mail y volver a ingresar, se crea el tenant
-  automáticamente (`provision_my_tenant`).
+- **Registro self-service:** pantalla **Registrar mi armería** (nombre, email,
+  contraseña, nombre de armería). Tras confirmar el mail y volver a ingresar, se
+  crea el tenant automáticamente (`provision_my_tenant`) **solo** si el registro
+  incluyó `registration_intent: create_organization` en user_metadata.
+- **Iniciar sesión:** no crea organizaciones. Cuentas sin membership ven la
+  pantalla "Sin acceso" hasta recibir invitación (fase 2) o registrar armería.
+- Ejecutar `008_provision_guard.sql` en prod para reforzar el guard en SQL.
 - **Tenant World Guns (feria):** ejecutar `006_world_guns_tenant.sql` — migra
   los datos de `default` a `world-guns` y vincula al dueño.
 

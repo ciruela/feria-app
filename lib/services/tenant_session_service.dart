@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../auth/registration_intent.dart';
 import '../config/app_config.dart';
 import '../utils/app_logger.dart';
 import '../utils/jwt.dart';
@@ -28,14 +30,6 @@ enum WorkspaceView { none, platform, tenant }
 
 /// Maneja la sesion de autenticacion (Supabase Auth) y expone la identidad
 /// del tenant a partir de los claims del JWT (tenant_id, rol, super admin).
-///
-/// Modelo hibrido: los admins/duenos inician sesion con email/contrasena; esta
-/// sesion define el tenant. Los vendedores luego se identifican con PIN sobre
-/// esta misma sesion (ver AdminService / SellerService).
-///
-/// Multi-membresia: un usuario puede pertenecer a varias armerias (y/o ser
-/// platform admin). Tras el login elige a donde entrar; el tenant activo se
-/// persiste en app_metadata via RPC `set_active_tenant` y se regenera el JWT.
 class TenantSessionService extends ChangeNotifier {
   StreamSubscription<AuthState>? _sub;
 
@@ -50,13 +44,11 @@ class TenantSessionService extends ChangeNotifier {
   bool _membershipsLoaded = false;
   WorkspaceView _view = WorkspaceView.none;
   bool _provisioning = false;
-  bool _provisionChecked = false;
   bool _loadingMemberships = false;
-  String? _pendingCompanyName;
+  bool _awaitingOrgRegistrationLocal = false;
 
   bool get isConfigured => AppConfig.useSupabase;
 
-  /// Si no usamos Supabase (modo local), no hay login: la app entra directo.
   bool get requiresLogin => isConfigured && !isSignedIn;
 
   bool get isSignedIn =>
@@ -80,33 +72,42 @@ class TenantSessionService extends ChangeNotifier {
     return user?.emailConfirmedAt != null;
   }
 
-  /// Tras signUp con confirmacion de email, la sesion puede ser null hasta confirmar.
+  /// Tras registrar org sin sesion inmediata (confirmacion de email pendiente).
   bool get awaitingEmailConfirmation =>
-      isConfigured && !isSignedIn && _pendingCompanyName != null;
+      isConfigured && !isSignedIn && _awaitingOrgRegistrationLocal;
 
-  /// Cantidad de destinos disponibles (armerias + panel de plataforma).
+  /// Sin memberships ni panel de plataforma: cuenta autenticada sin acceso.
+  bool get hasNoOrganizationAccess => computeHasNoOrganizationAccess(
+        membershipsLoaded: _membershipsLoaded,
+        membershipCount: _memberships.length,
+        isPlatformAdmin: _isPlatformAdmin,
+        isTenantViewNone: _view == WorkspaceView.none,
+      );
+
   int get destinationCount => _memberships.length + (_isPlatformAdmin ? 1 : 0);
 
-  /// True si hay que mostrar el selector (mas de un destino y todavia no eligio).
   bool get needsWorkspaceChoice =>
       _view == WorkspaceView.none && destinationCount > 1;
+
+  bool get hasCreateOrganizationIntent =>
+      RegistrationIntent.hasCreateOrganizationIntent(_userMetadata());
 
   void start() {
     if (!isConfigured) return;
     _readClaims();
+    unawaited(_loadAwaitingOrgFlag().then((_) => notifyListeners()));
     _sub = SupabaseService.client.auth.onAuthStateChange.listen((state) {
       _readClaims();
       if (state.event == AuthChangeEvent.signedOut) {
         _memberships = const [];
         _membershipsLoaded = false;
         _view = WorkspaceView.none;
-        _pendingCompanyName = null;
-        _provisionChecked = false;
+        _awaitingOrgRegistrationLocal = false;
+        _clearAwaitingOrgFlag();
       }
       if (state.event == AuthChangeEvent.signedIn) {
-        _pendingCompanyName = null;
-        _provisionChecked = false;
         _membershipsLoaded = false;
+        _view = WorkspaceView.none;
       }
       notifyListeners();
     });
@@ -116,6 +117,33 @@ class TenantSessionService extends ChangeNotifier {
   void dispose() {
     _sub?.cancel();
     super.dispose();
+  }
+
+  Map<String, dynamic>? _userMetadata() {
+    return SupabaseService.client.auth.currentUser?.userMetadata;
+  }
+
+  Future<void> _loadAwaitingOrgFlag() async {
+    final prefs = await SharedPreferences.getInstance();
+    _awaitingOrgRegistrationLocal =
+        prefs.getBool(RegistrationIntent.prefsAwaitingOrgKey) ?? false;
+  }
+
+  Future<void> _setAwaitingOrgFlag(bool value) async {
+    _awaitingOrgRegistrationLocal = value;
+    final prefs = await SharedPreferences.getInstance();
+    if (value) {
+      await prefs.setBool(RegistrationIntent.prefsAwaitingOrgKey, true);
+    } else {
+      await prefs.remove(RegistrationIntent.prefsAwaitingOrgKey);
+    }
+    notifyListeners();
+  }
+
+  Future<void> _clearAwaitingOrgFlag() async {
+    _awaitingOrgRegistrationLocal = false;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(RegistrationIntent.prefsAwaitingOrgKey);
   }
 
   void _readClaims() {
@@ -135,11 +163,11 @@ class TenantSessionService extends ChangeNotifier {
     _isPlatformAdmin = platform == true || platform == 'true';
   }
 
+  /// Inicio de sesion con cuenta personal. Nunca crea una organizacion.
   Future<bool> signIn(String email, String password) async {
     if (!isConfigured) return false;
     _busy = true;
     _error = null;
-    _pendingCompanyName = null;
     notifyListeners();
     try {
       await SupabaseService.client.auth.signInWithPassword(
@@ -147,9 +175,9 @@ class TenantSessionService extends ChangeNotifier {
         password: password,
       );
       await SupabaseService.client.auth.refreshSession();
+      await _clearAwaitingOrgFlag();
       _view = WorkspaceView.none;
       _membershipsLoaded = false;
-      _provisionChecked = false;
       _readClaims();
       _busy = false;
       notifyListeners();
@@ -167,12 +195,12 @@ class TenantSessionService extends ChangeNotifier {
     }
   }
 
-  /// Registro: crea usuario en Auth con metadata de empresa. Supabase envia email
-  /// de confirmacion; el tenant se provisiona al primer login confirmado.
-  Future<bool> signUp({
+  /// Registro exclusivo del flujo "Registrar mi armeria".
+  Future<bool> signUpForOrganization({
     required String email,
     required String password,
     required String companyName,
+    required String fullName,
   }) async {
     if (!isConfigured) return false;
     _busy = true;
@@ -180,22 +208,32 @@ class TenantSessionService extends ChangeNotifier {
     notifyListeners();
     try {
       final trimmedCompany = companyName.trim();
+      final trimmedName = fullName.trim();
       final response = await SupabaseService.client.auth.signUp(
         email: email.trim(),
         password: password,
-        data: {'company_name': trimmedCompany},
+        data: RegistrationIntent.signUpMetadata(
+          companyName: trimmedCompany,
+          fullName: trimmedName,
+        ),
       );
 
       if (response.session != null) {
-        // Confirmacion de email deshabilitada en el proyecto: provisionar ya.
-        _pendingCompanyName = null;
+        await _clearAwaitingOrgFlag();
         await SupabaseService.client.auth.refreshSession();
-        await provisionTenantIfNeeded(companyName: trimmedCompany);
+        final provisioned = await provisionOrganization(
+          companyName: trimmedCompany,
+        );
+        if (!provisioned) {
+          _busy = false;
+          notifyListeners();
+          return false;
+        }
         _view = WorkspaceView.none;
         _membershipsLoaded = false;
         _readClaims();
       } else {
-        _pendingCompanyName = trimmedCompany;
+        await _setAwaitingOrgFlag(true);
       }
 
       _busy = false;
@@ -215,27 +253,72 @@ class TenantSessionService extends ChangeNotifier {
   }
 
   void clearPendingRegistration() {
-    _pendingCompanyName = null;
+    unawaited(_clearAwaitingOrgFlag());
     notifyListeners();
   }
 
-  /// Crea tenant + membership si el usuario confirmo email y aun no tiene armeria.
-  Future<bool> provisionTenantIfNeeded({String? companyName}) async {
+  /// Usuario ya autenticado sin armería: marca intención y provisiona.
+  Future<bool> createOrganizationForCurrentUser({
+    required String companyName,
+    required String fullName,
+  }) async {
     if (!isConfigured || !isSignedIn || !isEmailConfirmed) return false;
-    if (_provisionChecked) return true;
+    if (_memberships.isNotEmpty) return true;
+
+    _busy = true;
+    _error = null;
+    notifyListeners();
+    try {
+      await SupabaseService.client.auth.updateUser(
+        UserAttributes(
+          data: RegistrationIntent.signUpMetadata(
+            companyName: companyName,
+            fullName: fullName,
+          ),
+        ),
+      );
+      await SupabaseService.client.auth.refreshSession();
+      _readClaims();
+      final ok = await provisionOrganization(companyName: companyName);
+      if (ok) {
+        _membershipsLoaded = false;
+        await loadMemberships(force: true);
+      }
+      _busy = false;
+      notifyListeners();
+      return ok;
+    } on AuthException catch (e) {
+      _error = e.message;
+      _busy = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      _busy = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Crea tenant + membership owner. Solo desde flujo de registro de org.
+  Future<bool> provisionOrganization({String? companyName}) async {
+    if (!isConfigured || !isSignedIn || !isEmailConfirmed) return false;
+    if (!hasCreateOrganizationIntent) return false;
+    if (_memberships.isNotEmpty) return true;
 
     _provisioning = true;
     _error = null;
     notifyListeners();
     try {
       final params = <String, dynamic>{};
-      final name = (companyName ?? _pendingCompanyName ?? '').trim();
-      if (name.isNotEmpty) params['p_nombre'] = name;
+      final name = (companyName ?? '').trim();
+      final fromMeta = RegistrationIntent.companyNameFrom(_userMetadata()) ?? '';
+      final resolved = name.isNotEmpty ? name : fromMeta;
+      if (resolved.isNotEmpty) params['p_nombre'] = resolved;
 
       await SupabaseService.client.rpc('provision_my_tenant', params: params);
       await SupabaseService.client.auth.refreshSession();
-      _pendingCompanyName = null;
-      _provisionChecked = true;
+      await _clearAwaitingOrgFlag();
       _readClaims();
       _provisioning = false;
       notifyListeners();
@@ -248,7 +331,23 @@ class TenantSessionService extends ChangeNotifier {
     }
   }
 
-  /// Carga las armerias a las que el usuario tiene acceso (para el selector).
+  /// Tras login: carga memberships y provisiona solo si hay intencion de registro.
+  Future<void> bootstrapSession() async {
+    if (!isConfigured || !isSignedIn || !isEmailConfirmed) return;
+
+    await loadMemberships(force: true);
+
+    if (shouldProvisionOrganization(
+      hasCreateOrganizationIntent: hasCreateOrganizationIntent,
+      activeMembershipCount: _memberships.length,
+    )) {
+      final ok = await provisionOrganization();
+      if (ok) {
+        await loadMemberships(force: true);
+      }
+    }
+  }
+
   Future<void> loadMemberships({bool force = false}) async {
     if (!isConfigured || !isSignedIn) return;
     if (_loadingMemberships) return;
@@ -291,7 +390,6 @@ class TenantSessionService extends ChangeNotifier {
 
       _membershipsLoaded = true;
 
-      // Auto-seleccion: solo si hay UN destino (solo armeria o solo plataforma).
       if (_view == WorkspaceView.none && destinationCount == 1) {
         if (_isPlatformAdmin) {
           _view = WorkspaceView.platform;
@@ -316,20 +414,16 @@ class TenantSessionService extends ChangeNotifier {
       final result = await SupabaseService.client.rpc('am_i_platform_admin');
       _isPlatformAdmin = result == true;
     } catch (e, s) {
-      // Si falla, seguimos con lo que diga el JWT.
       AppLogger.warn('am_i_platform_admin falló; uso el claim del JWT',
           error: e, stackTrace: s);
     }
   }
 
-  /// Entra al panel global de plataforma (super admin).
   void enterPlatform() {
     _view = WorkspaceView.platform;
     notifyListeners();
   }
 
-  /// Cambia el tenant activo: persiste la eleccion en app_metadata (RPC) y
-  /// regenera el JWT para que la RLS opere sobre esa armeria.
   Future<bool> enterTenant(String tenantId) async {
     if (!isConfigured || !isSignedIn) return false;
     _busy = true;
@@ -354,7 +448,6 @@ class TenantSessionService extends ChangeNotifier {
     }
   }
 
-  /// Vuelve al selector de espacio de trabajo (si hay mas de un destino).
   void backToSelector() {
     _view = WorkspaceView.none;
     notifyListeners();
@@ -365,15 +458,13 @@ class TenantSessionService extends ChangeNotifier {
     try {
       await SupabaseService.client.auth.signOut();
     } catch (e, s) {
-      // Ignorar: igual limpiamos el estado local.
       AppLogger.warn('signOut remoto falló; limpio estado local',
           error: e, stackTrace: s);
     }
     _memberships = const [];
     _membershipsLoaded = false;
     _view = WorkspaceView.none;
-    _pendingCompanyName = null;
-    _provisionChecked = false;
+    await _clearAwaitingOrgFlag();
     _readClaims();
     notifyListeners();
   }

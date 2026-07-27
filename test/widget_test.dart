@@ -22,7 +22,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('App loads role gate screen', (WidgetTester tester) async {
+  testWidgets('App sin Supabase muestra role gate', (WidgetTester tester) async {
     final catalogService = CatalogService();
     final exchangeRateService = ExchangeRateService();
     final authService = AuthService();

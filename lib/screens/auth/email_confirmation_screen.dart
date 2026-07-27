@@ -45,8 +45,9 @@ class EmailConfirmationScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   const Text(
-                    'Te enviamos un enlace de confirmación. Abrilo desde el '
-                    'mismo dispositivo y después volvé a iniciar sesión.',
+                    'Te enviamos un enlace de confirmación para tu nueva armería. '
+                    'Abrilo desde el mismo dispositivo y después volvé a iniciar '
+                    'sesión con el email que registraste.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppColors.textSecondary,

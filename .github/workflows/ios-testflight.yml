@@ -1,6 +1,6 @@
-# DEPLOY: compila y sube a TestFlight SOLO al mergear a main (cambios de app).
-# El trabajo en branches/PRs nunca dispara esto (lo valida CI + SonarCloud).
-# Flujo GitOps: branch -> PR (CI/Sonar) -> merge a main -> deploy a TestFlight.
+# DEPLOY: compila y sube a TestFlight solo de forma manual (workflow_dispatch).
+# El trabajo en branches/PRs y merges a main no disparan esto (lo valida CI + SonarCloud).
+# Flujo GitOps: branch -> PR (CI/Sonar) -> merge a main -> deploy manual cuando corresponda.
 #
 # Secrets en GitHub → Settings → Secrets and variables → Actions:
 #   SUPABASE_URL
@@ -15,15 +15,6 @@
 name: iOS TestFlight
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'lib/**'
-      - 'ios/**'
-      - 'pubspec.yaml'
-      - 'pubspec.lock'
-      - 'assets/**'
-      - '.github/workflows/ios-testflight.yml'
   workflow_dispatch:
     inputs:
       skip_distribute:
