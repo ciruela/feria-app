@@ -105,16 +105,16 @@ void main() {
       expect(r.modelo, 'M.63');
     });
 
-    test('sin M.xxx usa grains como modelo', () {
+    test('sin M.xxx el modelo queda vacío (los grains van aparte)', () {
       final r = p('C.22 32G LR VARMINT 1640FPS CCI (50)');
       expect(r.calibre, '.22 LR');
-      expect(r.modelo, '32gr');
+      expect(r.modelo, '');
     });
 
     test('no confunde MINI MAG con magnum', () {
       final r = p('C.22 36G LR VARMINT / MINI MAG 1260FPS  CCI MINI NAG (100)');
       expect(r.calibre, '.22 LR');
-      expect(r.modelo, '36gr');
+      expect(r.modelo, '');
     });
 
     test('modelo con sufijo alfanumérico (960CC)', () {

@@ -151,7 +151,10 @@ class ExcelCatalogService {
   /// Ejemplos:
   ///   "C.22 40G LR MINI MAG 1235FPS CCI M.960 (50)" -> (.22 LR, M.960)
   ///   "C.22 30G WMG 2200 FPS VARMINT MAXI-MAG TNT M.63 (50)" -> (.22 Mag, M.63)
-  ///   "C.22 40G LR SMALL GAME / SUBSONIC 1050 FPS CCI (100)" -> (.22 LR, 40gr)
+  ///   "C.22 40G LR SMALL GAME / SUBSONIC 1050 FPS CCI (100)" -> (.22 LR, '')
+  ///
+  /// El "40G" es el peso de la punta (grains) y se expone aparte vía
+  /// [Product.granos], no como modelo.
   static ({String calibre, String modelo}) parseMunicionDescription(
     String descripcion,
   ) {
@@ -171,15 +174,10 @@ class ExcelCatalogService {
     }
 
     // Modelo: código interno "M.xxx" (requiere el punto para no confundir con
-    // palabras como MINI/MAXI/MAG). Si no hay, usamos los grains como etiqueta.
+    // palabras como MINI/MAXI/MAG). Si no hay, queda vacío.
     var modelo = '';
     final m = RegExp(r'\bM\.\s*([A-Z0-9]+)').firstMatch(d);
-    if (m != null) {
-      modelo = 'M.${m.group(1)}';
-    } else {
-      final g = RegExp(r'\b(\d{2,3})\s*GR?\b').firstMatch(d);
-      if (g != null) modelo = '${g.group(1)}gr';
-    }
+    if (m != null) modelo = 'M.${m.group(1)}';
 
     return (calibre: calibre, modelo: modelo);
   }

@@ -63,6 +63,15 @@ class Product {
 
   String get modeloDisplay => modelo.isNotEmpty ? modelo : codigo;
 
+  /// Peso de la punta (grains) para munición. Se deriva de la descripción
+  /// estilo CCI ("C.22 40G LR...") -> "40 gr". Vacío si no se detecta.
+  String get granos {
+    if (!isMunicion || descripcion.isEmpty) return '';
+    final match =
+        RegExp(r'\b(\d{2,3})\s*GR?\b', caseSensitive: false).firstMatch(descripcion);
+    return match != null ? '${match.group(1)} gr' : '';
+  }
+
   bool get hasNetworkPhoto => fotoUrls.isNotEmpty;
 
   bool get hasLocalPhoto => foto.isNotEmpty;
