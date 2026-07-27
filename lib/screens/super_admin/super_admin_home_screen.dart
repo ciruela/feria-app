@@ -4,14 +4,18 @@ import 'package:provider/provider.dart';
 import '../../services/supabase_service.dart';
 import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/app_logger.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/feria_shell.dart';
 import '../../widgets/section_header.dart';
 
 /// Panel global del super admin de la plataforma (vos). Ve datos agregados de
-/// TODAS las armerias. Las metricas se calculan del lado del servidor con
-/// service-role (Edge Function `platform-metrics`), nunca con la clave en el
-/// cliente.
+/// TODAS las armerias.
+///
+/// Las metricas se calculan en el cliente leyendo directo de Supabase: como el
+/// usuario es platform admin, las policies RLS (`is_platform_admin()`) le
+/// permiten ver filas de todos los tenants. No depende de ninguna Edge Function
+/// (un componente menos que deployar/que se pueda caer en la feria).
 class SuperAdminHomeScreen extends StatefulWidget {
   const SuperAdminHomeScreen({super.key});
 
@@ -36,21 +40,95 @@ class _SuperAdminHomeScreenState extends State<SuperAdminHomeScreen> {
       _error = null;
     });
     try {
-      final res = await SupabaseService.client.functions.invoke(
-        'platform-metrics',
+      final client = SupabaseService.client;
+      final results = await Future.wait([
+        client.from('tenants').select('id,nombre,slug,activo'),
+        client.from('ventas').select('tenant_id,total_ars,total_usd,anulada'),
+        client.from('vendedores').select('tenant_id,activo'),
+      ]);
+
+      final metrics = _aggregate(
+        tenants: _rows(results[0]),
+        ventas: _rows(results[1]),
+        vendedores: _rows(results[2]),
       );
       if (!mounted) return;
       setState(() {
-        _metrics = (res.data as Map).cast<String, dynamic>();
+        _metrics = metrics;
         _loading = false;
       });
-    } catch (error) {
+    } catch (error, stackTrace) {
+      AppLogger.error('No se pudieron cargar las métricas de plataforma',
+          error: error, stackTrace: stackTrace);
       if (!mounted) return;
       setState(() {
         _error = error.toString();
         _loading = false;
       });
     }
+  }
+
+  List<Map<String, dynamic>> _rows(dynamic data) =>
+      (data as List).map((e) => (e as Map).cast<String, dynamic>()).toList();
+
+  /// Agrega métricas cross-tenant (misma forma que devolvía la Edge Function).
+  Map<String, dynamic> _aggregate({
+    required List<Map<String, dynamic>> tenants,
+    required List<Map<String, dynamic>> ventas,
+    required List<Map<String, dynamic>> vendedores,
+  }) {
+    final byTenant = <String, Map<String, dynamic>>{};
+    for (final t in tenants) {
+      byTenant[t['id'] as String] = {
+        'id': t['id'],
+        'nombre': t['nombre'],
+        'slug': t['slug'],
+        'activo': t['activo'] ?? true,
+        'sales_count': 0,
+        'total_ars': 0.0,
+        'total_usd': 0.0,
+        'seller_count': 0,
+      };
+    }
+
+    final ventasValidas = ventas.where((v) => v['anulada'] != true);
+    var totalArs = 0.0;
+    var totalUsd = 0.0;
+    var salesCount = 0;
+    for (final v in ventasValidas) {
+      final ars = (v['total_ars'] as num?)?.toDouble() ?? 0;
+      final usd = (v['total_usd'] as num?)?.toDouble() ?? 0;
+      totalArs += ars;
+      totalUsd += usd;
+      salesCount++;
+      final row = byTenant[v['tenant_id']];
+      if (row != null) {
+        row['sales_count'] = (row['sales_count'] as int) + 1;
+        row['total_ars'] = (row['total_ars'] as double) + ars;
+        row['total_usd'] = (row['total_usd'] as double) + usd;
+      }
+    }
+
+    for (final s in vendedores) {
+      final row = byTenant[s['tenant_id']];
+      if (row != null) {
+        row['seller_count'] = (row['seller_count'] as int) + 1;
+      }
+    }
+
+    final tenantList = byTenant.values.toList()
+      ..sort((a, b) =>
+          (b['total_ars'] as double).compareTo(a['total_ars'] as double));
+
+    return {
+      'tenant_count': tenants.length,
+      'active_tenants': tenants.where((t) => t['activo'] != false).length,
+      'seller_count': vendedores.length,
+      'sales_count': salesCount,
+      'total_ars': totalArs,
+      'total_usd': totalUsd,
+      'tenants': tenantList,
+    };
   }
 
   @override
