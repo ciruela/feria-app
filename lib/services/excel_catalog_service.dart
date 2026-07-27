@@ -40,13 +40,20 @@ class ExcelCatalogService {
   /// Mapea encabezados libres (CCI, mayúsculas, acentos) a claves canónicas.
   static String? _canonicalHeader(String raw) {
     final h = raw
+        .replaceAll('\u00a0', ' ') // espacios duros de Excel/CCI
         .trim()
         .toLowerCase()
+        .replaceAll(RegExp(r'\s+'), ' ')
         .replaceAll('á', 'a')
         .replaceAll('é', 'e')
         .replaceAll('í', 'i')
         .replaceAll('ó', 'o')
         .replaceAll('ú', 'u');
+
+    if (h.isEmpty) return null;
+    // Precio: cualquier encabezado que arranque con "precio" (precio, precio
+    // usd, precio u$d., etc.).
+    if (h.startsWith('precio')) return 'precio_usd';
 
     switch (h) {
       case 'tipo':
@@ -66,13 +73,6 @@ class ExcelCatalogService {
       case 'detalle':
       case 'descripcion interna':
         return 'descripcion';
-      case 'precio_usd':
-      case 'precio usd':
-      case 'precio':
-      case 'precio (usd)':
-      case 'precio u\$s':
-      case 'precio us\$':
-        return 'precio_usd';
       case 'balas_por_caja':
       case 'balas por caja':
       case 'caja x':
@@ -102,6 +102,63 @@ class ExcelCatalogService {
       default:
         return null;
     }
+  }
+
+  /// Ubica la fila de encabezados (tolerando filas de título arriba y
+  /// encabezados partidos en dos filas, como CAJA + X / PRECIO + U$D.) y
+  /// detecta la marca si aparece como "Marca: XXX" en el preámbulo.
+  static _HeaderMatch _findHeader(List<List<Data?>> rows) {
+    final maxScan = rows.length < 25 ? rows.length : 25;
+    _HeaderMatch? best;
+
+    for (var h = 0; h < maxScan; h++) {
+      final cols = <String, int>{};
+      final above = h > 0 ? rows[h - 1] : const <Data?>[];
+      final cur = rows[h];
+      final width = cur.length > above.length ? cur.length : above.length;
+
+      for (var i = 0; i < width; i++) {
+        final topText = i < above.length ? _cellText(above[i]) : '';
+        final curText = i < cur.length ? _cellText(cur[i]) : '';
+        final canonical = _canonicalHeader('$topText $curText');
+        if (canonical != null && !cols.containsKey(canonical)) {
+          cols[canonical] = i;
+        }
+      }
+
+      final hasIdentity = cols.containsKey('codigo') ||
+          cols.containsKey('descripcion') ||
+          cols.containsKey('modelo');
+      final hasPrice = cols.containsKey('precio_usd');
+      if (hasIdentity &&
+          hasPrice &&
+          (best == null || cols.length > best.columns.length)) {
+        best = _HeaderMatch(columns: cols, dataStart: h + 1);
+      }
+    }
+
+    if (best == null) {
+      throw Exception(
+        'No encontré los encabezados en el Excel. Necesito una columna de '
+        'código/descripción/modelo y una de precio.',
+      );
+    }
+    return best;
+  }
+
+  static String? _detectBrand(List<List<Data?>> rows, int upTo) {
+    final re = RegExp(r'marca\s*:\s*(.+)', caseSensitive: false);
+    for (var r = 0; r < upTo && r < rows.length; r++) {
+      for (final cell in rows[r]) {
+        final text = _cellText(cell).replaceAll('\u00a0', ' ').trim();
+        final match = re.firstMatch(text);
+        if (match != null) {
+          final brand = match.group(1)?.trim() ?? '';
+          if (brand.isNotEmpty) return brand;
+        }
+      }
+    }
+    return null;
   }
 
   Uint8List exportProducts(List<Product> products) {
@@ -151,36 +208,16 @@ class ExcelCatalogService {
       throw Exception('El Excel no tiene filas');
     }
 
-    final headerRow = sheet.rows.first;
-    final columnIndex = <String, int>{};
-
-    for (var i = 0; i < headerRow.length; i++) {
-      final canonical = _canonicalHeader(_cellText(headerRow[i]));
-      if (canonical != null && !columnIndex.containsKey(canonical)) {
-        columnIndex[canonical] = i;
-      }
-    }
-
     // No exigimos "marca"/"calibre" (las planillas de proveedor tipo CCI no las
-    // traen). Basta con poder identificar el producto y tener un precio.
-    final hasIdentity = columnIndex.containsKey('codigo') ||
-        columnIndex.containsKey('descripcion') ||
-        columnIndex.containsKey('modelo');
-    if (!hasIdentity) {
-      throw Exception(
-        'El Excel necesita al menos una columna de "codigo", "descripcion" '
-        'o "modelo".',
-      );
-    }
-    if (!columnIndex.containsKey('precio_usd')) {
-      throw Exception(
-        'Falta la columna de precio en el Excel (ej. "precio", "precio_usd").',
-      );
-    }
+    // traen). Detectamos la fila de encabezados (que puede estar más abajo o
+    // partida en dos filas) y la marca del preámbulo ("Marca: CCI").
+    final header = _findHeader(sheet.rows);
+    final columnIndex = header.columns;
+    final brand = _detectBrand(sheet.rows, header.dataStart);
 
     final rows = <Map<String, String>>[];
 
-    for (var r = 1; r < sheet.rows.length; r++) {
+    for (var r = header.dataStart; r < sheet.rows.length; r++) {
       final row = sheet.rows[r];
       if (row.isEmpty || row.every((cell) => _cellText(cell).trim().isEmpty)) {
         continue;
@@ -189,15 +226,24 @@ class ExcelCatalogService {
       final data = <String, String>{};
       for (final entry in columnIndex.entries) {
         final cell = entry.value < row.length ? row[entry.value] : null;
-        data[entry.key] = _cellText(cell).trim();
+        data[entry.key] = _cellText(cell).replaceAll('\u00a0', ' ').trim();
       }
 
-      // Saltear filas sin ningún identificador (ej. filas de subtotal).
+      // Saltear filas sin ningún identificador (ej. filas de subtotal/total).
       final hasData = (data['codigo']?.isNotEmpty ?? false) ||
           (data['descripcion']?.isNotEmpty ?? false) ||
           (data['modelo']?.isNotEmpty ?? false);
       if (!hasData) continue;
+
+      // Marca detectada en el preámbulo cuando la fila no la trae.
+      if (brand != null && (data['marca']?.isEmpty ?? true)) {
+        data['marca'] = brand;
+      }
       rows.add(data);
+    }
+
+    if (rows.isEmpty) {
+      throw Exception('No encontré filas de productos debajo de los encabezados.');
     }
 
     return rows;
@@ -220,6 +266,15 @@ class ExcelCatalogService {
     if (value == null) return '';
     return value.toString();
   }
+}
+
+/// Resultado de ubicar la fila de encabezados: mapa columna->índice y la fila
+/// donde arrancan los datos.
+class _HeaderMatch {
+  const _HeaderMatch({required this.columns, required this.dataStart});
+
+  final Map<String, int> columns;
+  final int dataStart;
 }
 
 class ExcelProductRow {

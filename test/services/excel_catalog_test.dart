@@ -25,7 +25,70 @@ Uint8List _sheetBytes(List<String> headers, List<List<Object>> rows) {
   return Uint8List.fromList(excel.encode()!);
 }
 
+Uint8List _cciReportBytes() {
+  // Reproduce la planilla real de CCI: filas de título, "Marca: CCI" y un
+  // encabezado partido en dos filas (CAJA + X, PRECIO + U$D.).
+  final excel = Excel.createExcel();
+  final name = excel.sheets.keys.first;
+  excel.rename(name, 'Hoja');
+  final s = excel['Hoja'];
+  void put(int c, int r, String v) => s
+      .cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r))
+      .value = TextCellValue(v);
+
+  put(1, 0, 'Informe de stock por marca');
+  put(0, 1, 'Marca: CCI');
+  // Encabezado fila 3 (índice 2) + fila 4 (índice 3).
+  put(2, 2, 'TOTAL');
+  put(3, 2, 'CAJA ');
+  put(4, 2, 'CAJAS');
+  put(5, 2, 'PRECIO');
+  put(0, 3, 'Código');
+  put(1, 3, 'Descripción');
+  put(3, 3, 'X');
+  put(5, 3, 'U\$D.');
+  // Datos (índice 4+).
+  put(0, 4, '20732');
+  put(1, 4, 'C.22 30G LR VARMIT V-MAX (50)');
+  put(2, 4, '800');
+  put(3, 4, '50');
+  put(4, 4, '16');
+  put(5, 4, '75');
+  put(0, 5, '20824');
+  put(1, 5, 'C.22 30G WMG (50)');
+  put(2, 5, '4950');
+  put(3, 5, '50');
+  put(5, 5, '58');
+  return Uint8List.fromList(excel.encode()!);
+}
+
 void main() {
+  group('ExcelCatalogService.parseRows (reporte CCI real)', () {
+    test('salta preámbulo, une encabezado partido y detecta marca', () {
+      final rows = ExcelCatalogService().parseRows(_cciReportBytes());
+      expect(rows.length, 2);
+      final first = rows.first;
+      expect(first['codigo'], '20732');
+      expect(first['balas_por_caja'], '50');
+      expect(first['total_balas'], '800');
+      expect(first['stock'], '16');
+      expect(first['precio_usd'], '75');
+      expect(first['marca'], 'CCI'); // detectada del preámbulo
+
+      final row = ExcelProductRow.fromMap(first);
+      expect(row.marca, 'CCI');
+      expect(row.stock, 16);
+      expect(row.roundsPerBox, 50);
+      expect(row.precioUsd, 75);
+    });
+
+    test('deriva cajas cuando la columna CAJAS viene vacía', () {
+      final rows = ExcelCatalogService().parseRows(_cciReportBytes());
+      final second = ExcelProductRow.fromMap(rows[1]);
+      expect(second.stock, 99); // 4950 / 50
+    });
+  });
+
   group('ExcelProductRow.fromMap (CCI)', () {
     test('munición sin marca usa CCI por defecto', () {
       final row = ExcelProductRow.fromMap({
