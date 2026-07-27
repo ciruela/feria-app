@@ -1,8 +1,10 @@
 name: CI
 
+# Validación (analyze + tests) en TODOS los branches y PRs.
+# No compila ni sube nada a Apple: eso lo hace "iOS TestFlight" solo en main.
 on:
   push:
-    branches: [main]
+    branches: ['**']
     paths:
       - 'lib/**'
       - 'test/**'
@@ -13,6 +15,10 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
