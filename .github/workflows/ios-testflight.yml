@@ -1,4 +1,6 @@
-# Compila y sube a TestFlight en cada push a main (cambios de app).
+# DEPLOY: compila y sube a TestFlight SOLO al mergear a main (cambios de app).
+# El trabajo en branches/PRs nunca dispara esto (lo valida CI + SonarCloud).
+# Flujo GitOps: branch -> PR (CI/Sonar) -> merge a main -> deploy a TestFlight.
 #
 # Secrets en GitHub → Settings → Secrets and variables → Actions:
 #   SUPABASE_URL
