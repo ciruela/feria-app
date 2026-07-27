@@ -485,6 +485,7 @@ class CatalogService extends ChangeNotifier {
           _products[index] = existing.copyWith(
             precioUsd: row.precioUsd > 0 ? row.precioUsd : existing.precioUsd,
             stock: newStock,
+            calibre: row.calibre.isNotEmpty ? row.calibre : existing.calibre,
             modelo: row.modelo.isNotEmpty ? row.modelo : existing.modelo,
             descripcion: row.descripcion.isNotEmpty
                 ? row.descripcion

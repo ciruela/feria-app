@@ -146,6 +146,44 @@ class ExcelCatalogService {
     return best;
   }
 
+  /// Extrae calibre y modelo desde una descripción de munición estilo CCI.
+  ///
+  /// Ejemplos:
+  ///   "C.22 40G LR MINI MAG 1235FPS CCI M.960 (50)" -> (.22 LR, M.960)
+  ///   "C.22 30G WMG 2200 FPS VARMINT MAXI-MAG TNT M.63 (50)" -> (.22 Mag, M.63)
+  ///   "C.22 40G LR SMALL GAME / SUBSONIC 1050 FPS CCI (100)" -> (.22 LR, 40gr)
+  static ({String calibre, String modelo}) parseMunicionDescription(
+    String descripcion,
+  ) {
+    final d = descripcion.toUpperCase().replaceAll('\u00a0', ' ');
+
+    // Calibre: token "C.22", "C.223", "C.9", "C.5.56"...
+    var calibre = '';
+    final cal = RegExp(r'\bC\.?\s*(\d{1,3}(?:\.\d{1,3})?)').firstMatch(d);
+    if (cal != null) {
+      calibre = '.${cal.group(1)}';
+      // Subtipo rimfire típico del .22.
+      if (RegExp(r'\bLR\b').hasMatch(d)) {
+        calibre = '$calibre LR';
+      } else if (RegExp(r'\bWM[RG]\b').hasMatch(d)) {
+        calibre = '$calibre Mag';
+      }
+    }
+
+    // Modelo: código interno "M.xxx" (requiere el punto para no confundir con
+    // palabras como MINI/MAXI/MAG). Si no hay, usamos los grains como etiqueta.
+    var modelo = '';
+    final m = RegExp(r'\bM\.\s*([A-Z0-9]+)').firstMatch(d);
+    if (m != null) {
+      modelo = 'M.${m.group(1)}';
+    } else {
+      final g = RegExp(r'\b(\d{2,3})\s*GR?\b').firstMatch(d);
+      if (g != null) modelo = '${g.group(1)}gr';
+    }
+
+    return (calibre: calibre, modelo: modelo);
+  }
+
   static String? _detectBrand(List<List<Data?>> rows, int upTo) {
     final re = RegExp(r'marca\s*:\s*(.+)', caseSensitive: false);
     for (var r = 0; r < upTo && r < rows.length; r++) {
@@ -346,13 +384,26 @@ class ExcelProductRow {
       marca = ExcelCatalogService.defaultMunicionBrand;
     }
 
+    var calibre = data['calibre']?.trim() ?? '';
+    var modelo = data['modelo']?.trim() ?? '';
+    final descripcion = data['descripcion']?.trim() ?? '';
+
+    // Munición CCI: los datos vienen empaquetados en la descripción
+    // ("C.22 40G LR MINI MAG 1235FPS CCI M.960 (50)"). Extraemos calibre y
+    // modelo cuando la planilla no trae esas columnas por separado.
+    if (type == ProductType.municion && descripcion.isNotEmpty) {
+      final parsed = ExcelCatalogService.parseMunicionDescription(descripcion);
+      if (calibre.isEmpty) calibre = parsed.calibre;
+      if (modelo.isEmpty) modelo = parsed.modelo;
+    }
+
     return ExcelProductRow(
       type: type,
       marca: marca,
-      calibre: data['calibre']?.trim() ?? '',
-      modelo: data['modelo']?.trim() ?? '',
+      calibre: calibre,
+      modelo: modelo,
       codigo: data['codigo']?.trim() ?? '',
-      descripcion: data['descripcion']?.trim() ?? '',
+      descripcion: descripcion,
       precioUsd: precio,
       stock: stock,
       roundsPerBox: roundsPerBox,

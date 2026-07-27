@@ -89,6 +89,54 @@ void main() {
     });
   });
 
+  group('parseMunicionDescription (CCI)', () {
+    ({String calibre, String modelo}) p(String d) =>
+        ExcelCatalogService.parseMunicionDescription(d);
+
+    test('extrae calibre .22 LR y modelo M.xxx', () {
+      final r = p('C.22 40G LR 710 TARGET QUIET FPS  CCI  M.960 (50)');
+      expect(r.calibre, '.22 LR');
+      expect(r.modelo, 'M.960');
+    });
+
+    test('detecta magnum por WMG', () {
+      final r = p('C.22 30G WMG 2200 FPS VARMINT MAXI-MAG TNT M.63  (50)');
+      expect(r.calibre, '.22 Mag');
+      expect(r.modelo, 'M.63');
+    });
+
+    test('sin M.xxx usa grains como modelo', () {
+      final r = p('C.22 32G LR VARMINT 1640FPS CCI (50)');
+      expect(r.calibre, '.22 LR');
+      expect(r.modelo, '32gr');
+    });
+
+    test('no confunde MINI MAG con magnum', () {
+      final r = p('C.22 36G LR VARMINT / MINI MAG 1260FPS  CCI MINI NAG (100)');
+      expect(r.calibre, '.22 LR');
+      expect(r.modelo, '36gr');
+    });
+
+    test('modelo con sufijo alfanumérico (960CC)', () {
+      final r = p('C.22 32G LR DEFENSE M.960CC CCI (50)');
+      expect(r.calibre, '.22 LR');
+      expect(r.modelo, 'M.960CC');
+    });
+
+    test('fromMap puebla calibre/modelo desde la descripción', () {
+      final row = ExcelProductRow.fromMap({
+        'codigo': '20732',
+        'descripcion': 'C.22 30G LR VARMIT V-MAX 30GR 2200 FPS CCI M.73 (50)',
+        'balas_por_caja': '50',
+        'total_balas': '800',
+        'precio_usd': '75',
+      });
+      expect(row.calibre, '.22 LR');
+      expect(row.modelo, 'M.73');
+      expect(row.marca, 'CCI');
+    });
+  });
+
   group('ExcelProductRow.fromMap (CCI)', () {
     test('munición sin marca usa CCI por defecto', () {
       final row = ExcelProductRow.fromMap({
