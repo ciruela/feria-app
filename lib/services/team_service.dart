@@ -76,7 +76,7 @@ class TeamService {
       if (error.code == 'PGRST202') {
         throw StateError(
           'Falta aplicar la migración de equipo en Supabase. '
-          'Ejecutá supabase/apply_pending_migrations.sql en el SQL Editor.',
+          'Ejecutá supabase/migrations/011_team_members.sql en el SQL Editor.',
         );
       }
       rethrow;
@@ -93,7 +93,7 @@ class TeamService {
       if (error.code == 'PGRST202') {
         throw StateError(
           'Falta aplicar la migración de equipo en Supabase. '
-          'Ejecutá supabase/apply_pending_migrations.sql en el SQL Editor.',
+          'Ejecutá supabase/migrations/011_team_members.sql en el SQL Editor.',
         );
       }
       rethrow;

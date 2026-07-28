@@ -46,6 +46,8 @@ check_table() {
 }
 
 ok=true
+check_table tenants || ok=false
+check_table memberships || ok=false
 check_table productos || ok=false
 check_table vendedores || ok=false
 check_table ventas || ok=false
@@ -62,8 +64,8 @@ if $ok; then
   echo "✓ Supabase listo. Corré la app con:"
   echo "  ./scripts/run_ios_device.sh"
   echo
-  echo "En Admin → Publicar catálogo a Supabase (carga inicial de productos)"
+  echo "Migraciones pendientes: ver supabase/README.md"
 else
-  echo "Faltan tablas. Ejecutá supabase/bootstrap.sql en el SQL Editor del Dashboard."
+  echo "Faltan tablas. Ejecutá las migraciones en supabase/migrations/ (ver supabase/README.md)."
   exit 1
 fi

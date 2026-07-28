@@ -11,7 +11,6 @@ import 'services/cart_totals_service.dart';
 import 'services/catalog_service.dart';
 import 'services/data_sync_service.dart';
 import 'services/exchange_rate_service.dart';
-import 'services/invoice_service.dart';
 import 'services/pricing_service.dart';
 import 'services/pricing_settings_service.dart';
 import 'services/in_tenant_flow_service.dart';
@@ -42,8 +41,6 @@ Future<void> main() async {
     pricing: pricingService,
     cartTotals: cartTotalsService,
   );
-  final invoiceService = InvoiceService(pricing: pricingService);
-
   tenantSession.start();
 
   if (!AppConfig.useSupabase) {
@@ -83,7 +80,6 @@ Future<void> main() async {
         Provider<PricingService>.value(value: pricingService),
         Provider<CartTotalsService>.value(value: cartTotalsService),
         Provider<BudgetService>.value(value: budgetService),
-        Provider<InvoiceService>.value(value: invoiceService),
       ],
       child: const FeriaApp(),
     ),

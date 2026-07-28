@@ -5,7 +5,7 @@ App Flutter para catálogo de precios en feria de armas, caza y pesca (uso inter
 ## Configuración Supabase (obligatorio para sync entre celulares)
 
 1. Creá un proyecto en [supabase.com](https://supabase.com)
-2. Seguí [`supabase/SETUP.md`](supabase/SETUP.md): ejecutá `schema.sql`, `seed.sql` y creá el bucket `feria-fotos`
+2. Seguí [`supabase/README.md`](supabase/README.md): ejecutá las migraciones en orden (001–012)
 3. Copiá credenciales a `.env`:
 
 ```bash
@@ -108,9 +108,9 @@ flutter run -d "iPhone 15 Pro" $(scripts/dart_defines.sh)
 
 En dispositivos reales el escaneo de DNI, PDF e impresión funcionan con normalidad.
 
-## CI — TestFlight automático (GitHub Actions)
+## CI — TestFlight (GitHub Actions)
 
-Cada push a `main` que toque `lib/`, `ios/` o `pubspec.yaml` compila y sube a **TestFlight**.
+TestFlight se dispara **manualmente** desde GitHub → Actions → **iOS TestFlight** (`workflow_dispatch`). El workflow exige que CI esté verde en el mismo commit antes de compilar.
 
 ### Configurar secrets (una sola vez)
 
@@ -138,8 +138,9 @@ Para cargar los secrets de Apple en GitHub:
 
 ### Flujo
 
-1. Editás código y hacés `git push` a `main`
-2. GitHub Actions compila el IPA con **Xcode 26 / iOS SDK 26** (`macos-26` runner) y lo sube a TestFlight
+1. Merge/push a `main` y esperá que **CI** y **SonarCloud** pasen
+2. GitHub → Actions → **iOS TestFlight** → **Run workflow**
+3. El job compila el IPA con **Xcode 26 / iOS SDK 26** (`macos-26` runner) y lo sube a TestFlight
 3. El CI asigna el build al grupo externo `Mundo escopeta ext` y **envía a revisión beta** (el grupo interno recibe builds solo para el equipo de App Store Connect, sin asignación por API)
 4. Cuando Apple aprueba la revisión beta, el **link público** de TestFlight empieza a funcionar
 5. Los testers reciben la update (con **actualizaciones automáticas** activadas en TestFlight)
@@ -174,7 +175,7 @@ Variables en `.env` o `--dart-define`:
 | `SUPABASE_URL` | Project URL del dashboard |
 | `SUPABASE_ANON_KEY` | anon public key |
 
-Setup completo: [`supabase/SETUP.md`](supabase/SETUP.md)
+Setup completo: [`supabase/README.md`](supabase/README.md)
 
 ## PIN admin por defecto
 

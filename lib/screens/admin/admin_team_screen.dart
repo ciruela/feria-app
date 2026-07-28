@@ -220,7 +220,7 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
                           SizedBox(height: 6),
                           Text(
                             'Para invitar por email y ver todos los correos, ejecutá '
-                            'el archivo apply_pending_migrations.sql en Supabase → SQL Editor. '
+                            'supabase/migrations/011_team_members.sql en Supabase → SQL Editor. '
                             'Mientras tanto podés ver miembros básicos abajo.',
                             style: TextStyle(
                               fontSize: 13,

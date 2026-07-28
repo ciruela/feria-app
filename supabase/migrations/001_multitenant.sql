@@ -255,7 +255,7 @@ create policy "platform_admins_all" on public.platform_admins
 -- Correr SOLO despues de desplegar la app con Supabase Auth (Fase 2).
 -- Reemplaza las policies abiertas por policies por tenant.
 -- Para revertir temporalmente al modo abierto, volve a las policies
--- `using (true)` de supabase/schema.sql.
+-- Reemplaza las policies abiertas del esquema legacy pre-multitenant.
 -- =====================================================================
 
 do $$
