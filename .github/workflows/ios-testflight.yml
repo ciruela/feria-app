@@ -28,7 +28,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  ci-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require green CI on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          conclusion="$(gh run list \
+            --repo "${{ github.repository }}" \
+            --commit "${{ github.sha }}" \
+            --workflow CI \
+            --json conclusion \
+            -q '.[0].conclusion // empty')"
+          if [[ "$conclusion" != "success" ]]; then
+            echo "::error::CI no pasó en ${GITHUB_SHA} (estado: ${conclusion:-sin run}). Abortando TestFlight."
+            exit 1
+          fi
+          echo "CI OK en este commit."
+
   build:
+    needs: ci-gate
     runs-on: macos-26
     timeout-minutes: 45
     outputs:

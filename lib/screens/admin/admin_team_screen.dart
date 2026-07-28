@@ -138,8 +138,6 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final session = context.watch<TenantSessionService>();
-
     return FeriaScaffold(
       appBar: FeriaAppBar(
         title: const Text('Equipo de la armería'),
