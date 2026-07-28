@@ -163,6 +163,48 @@ class TenantSessionService extends ChangeNotifier {
     _isPlatformAdmin = platform == true || platform == 'true';
   }
 
+  /// Refresca el JWT y activa el tenant si hace falta (escrituras RLS en Supabase).
+  Future<void> ensureSupabaseWriteContext() async {
+    if (!isConfigured || !isSignedIn) {
+      throw StateError('No hay sesión activa. Volvé a iniciar sesión.');
+    }
+    if (!_membershipsLoaded) {
+      await loadMemberships(force: true);
+    }
+
+    await SupabaseService.client.auth.refreshSession();
+    _readClaims();
+    if (_hasSupabaseWriteContext) return;
+
+    final activeRaw =
+        SupabaseService.client.auth.currentUser?.appMetadata['active_tenant'];
+    final active = (activeRaw is String ? activeRaw : activeRaw?.toString())
+        ?.trim();
+    if (active != null && active.isNotEmpty) {
+      if (await enterTenant(active) && _hasSupabaseWriteContext) return;
+    }
+
+    if (_view == WorkspaceView.tenant && _memberships.isNotEmpty) {
+      if (await enterTenant(_memberships.first.id) && _hasSupabaseWriteContext) {
+        return;
+      }
+    }
+
+    if (_memberships.length == 1) {
+      if (await enterTenant(_memberships.first.id) && _hasSupabaseWriteContext) {
+        return;
+      }
+    }
+
+    throw StateError(
+      'No hay armería activa en la sesión. '
+      'Volvé al selector y elegí una organización antes de importar.',
+    );
+  }
+
+  bool get _hasSupabaseWriteContext =>
+      _isPlatformAdmin || (_tenantId != null && _tenantId!.isNotEmpty);
+
   /// Inicio de sesion con cuenta personal. Nunca crea una organizacion.
   Future<bool> signIn(String email, String password) async {
     if (!isConfigured) return false;

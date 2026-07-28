@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/catalog_service.dart';
+import '../../services/tenant_session_service.dart';
 import '../../widgets/feria_shell.dart';
 
 class AdminExcelScreen extends StatefulWidget {
@@ -48,6 +49,7 @@ class _AdminExcelScreenState extends State<AdminExcelScreen> {
     setState(() => _busy = true);
     try {
       final catalog = context.read<CatalogService>();
+      final session = context.read<TenantSessionService>();
       final picked = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['xlsx'],
@@ -58,6 +60,8 @@ class _AdminExcelScreenState extends State<AdminExcelScreen> {
         return;
       }
 
+      await session.ensureSupabaseWriteContext();
+      if (!mounted) return;
       final result = await catalog.importFromExcel(
         picked.files.single.bytes!,
       );

@@ -517,7 +517,7 @@ class CatalogService extends ChangeNotifier {
 
     await _persistCache();
     if (SupabaseService.isConfigured && changedProducts.isNotEmpty) {
-      _requireSupabaseWriteContext();
+      await _ensureSupabaseWriteContext();
       await _supabaseCatalog.upsertAll(changedProducts);
     }
 
@@ -555,7 +555,9 @@ class CatalogService extends ChangeNotifier {
   }
 
   /// RLS exige tenant activo en el JWT (o platform admin) para escribir productos.
-  void _requireSupabaseWriteContext() {
+  Future<void> _ensureSupabaseWriteContext() async {
+    if (!SupabaseService.isConfigured) return;
+    await SupabaseService.client.auth.refreshSession();
     final session = SupabaseService.client.auth.currentSession;
     if (session == null) {
       throw StateError('No hay sesión activa. Volvé a iniciar sesión.');

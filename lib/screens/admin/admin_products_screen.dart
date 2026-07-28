@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/product.dart';
 import '../../services/catalog_service.dart';
+import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/filter_buttons.dart';
@@ -56,6 +57,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
     setState(() => _ioBusy = true);
     try {
       final catalog = context.read<CatalogService>();
+      final session = context.read<TenantSessionService>();
       final picked = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['xlsx'],
@@ -66,6 +68,8 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
         return;
       }
 
+      await session.ensureSupabaseWriteContext();
+      if (!mounted) return;
       final result = await catalog.importFromExcel(
         picked.files.single.bytes!,
       );
