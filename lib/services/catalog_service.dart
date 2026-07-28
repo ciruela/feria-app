@@ -13,6 +13,7 @@ import '../models/product.dart';
 import '../models/stock_movimiento.dart';
 import '../utils/app_logger.dart';
 import '../utils/ids.dart';
+import '../utils/jwt.dart';
 import 'audit_service.dart';
 import 'excel_catalog_service.dart';
 import 'supabase_catalog_repository.dart';
@@ -473,6 +474,7 @@ class CatalogService extends ChangeNotifier {
     var updated = 0;
     var added = 0;
     var skipped = 0;
+    final changedProducts = <Product>[];
 
     for (var i = 0; i < rows.length; i++) {
       try {
@@ -482,7 +484,7 @@ class CatalogService extends ChangeNotifier {
         if (existing != null) {
           final index = _products.indexWhere((product) => product.id == existing.id);
           final newStock = row.stock ?? existing.stock;
-          _products[index] = existing.copyWith(
+          final product = existing.copyWith(
             precioUsd: row.precioUsd > 0 ? row.precioUsd : existing.precioUsd,
             stock: newStock,
             calibre: row.calibre.isNotEmpty ? row.calibre : existing.calibre,
@@ -495,9 +497,13 @@ class CatalogService extends ChangeNotifier {
                 : existing.roundsPerBox,
             stockInicial: existing.stockInicial ?? newStock,
           );
+          _products[index] = product;
+          changedProducts.add(product);
           updated++;
         } else if (_canCreateFromRow(row)) {
-          _products.add(row.toNewProduct(i + 1));
+          final product = _productFromExcelRow(row);
+          _products.add(product);
+          changedProducts.add(product);
           added++;
         } else {
           skipped++;
@@ -510,8 +516,9 @@ class CatalogService extends ChangeNotifier {
     }
 
     await _persistCache();
-    if (SupabaseService.isConfigured) {
-      await _supabaseCatalog.upsertAll(_products);
+    if (SupabaseService.isConfigured && changedProducts.isNotEmpty) {
+      _requireSupabaseWriteContext();
+      await _supabaseCatalog.upsertAll(changedProducts);
     }
 
     AuditService.instance.log(
@@ -526,6 +533,44 @@ class CatalogService extends ChangeNotifier {
 
   Uint8List exportToExcel() {
     return ExcelCatalogService().exportProducts(_products);
+  }
+
+  /// Producto nuevo desde Excel con ID global único (multi-tenant).
+  Product _productFromExcelRow(ExcelProductRow row) {
+    return Product(
+      id: _nextProductId(row.type),
+      type: row.type,
+      marca: row.marca,
+      calibre: row.calibre,
+      codigo: row.codigo.isNotEmpty
+          ? row.codigo
+          : (row.modelo.isNotEmpty ? row.modelo : 'item'),
+      modelo: row.modelo,
+      descripcion: row.descripcion,
+      precioUsd: row.precioUsd,
+      stock: row.stock,
+      stockInicial: row.stock,
+      roundsPerBox: row.isMunicion ? row.roundsPerBox : null,
+    );
+  }
+
+  /// RLS exige tenant activo en el JWT (o platform admin) para escribir productos.
+  void _requireSupabaseWriteContext() {
+    final session = SupabaseService.client.auth.currentSession;
+    if (session == null) {
+      throw StateError('No hay sesión activa. Volvé a iniciar sesión.');
+    }
+    final claims = decodeJwtPayload(session.accessToken);
+    final tenantId = (claims['tenant_id'] as String?)?.trim();
+    final platformAdmin = claims['is_platform_admin'];
+    final isPlatformAdmin =
+        platformAdmin == true || platformAdmin == 'true';
+    if ((tenantId == null || tenantId.isEmpty) && !isPlatformAdmin) {
+      throw StateError(
+        'No hay armería activa en la sesión. '
+        'Volvé al selector y elegí una organización antes de importar.',
+      );
+    }
   }
 
   Product? _findMatchingRow(ExcelProductRow row) {

@@ -1,6 +1,7 @@
 import '../models/product.dart';
 import '../models/stock_movimiento.dart';
 import '../utils/app_logger.dart';
+import '../utils/jwt.dart';
 import 'product_photo_service.dart';
 import 'supabase_service.dart';
 import 'supabase_stock_movimientos_repository.dart';
@@ -174,8 +175,7 @@ class SupabaseCatalogRepository {
 
   Map<String, dynamic> _toRow(Product product) {
     final paths = ProductPhotoService.pathsForStorage(product);
-
-    return {
+    final row = <String, dynamic>{
       'id': product.id,
       'type': product.type.key,
       'marca': product.marca,
@@ -192,5 +192,19 @@ class SupabaseCatalogRepository {
       'rounds_per_box': product.roundsPerBox,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
+
+    final tenantId = _tenantIdFromJwt();
+    if (tenantId != null) {
+      row['tenant_id'] = tenantId;
+    }
+    return row;
+  }
+
+  String? _tenantIdFromJwt() {
+    final session = SupabaseService.client.auth.currentSession;
+    if (session == null) return null;
+    final id = (decodeJwtPayload(session.accessToken)['tenant_id'] as String?)
+        ?.trim();
+    return id != null && id.isNotEmpty ? id : null;
   }
 }
