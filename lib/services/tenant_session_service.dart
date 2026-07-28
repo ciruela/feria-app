@@ -5,9 +5,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../auth/registration_intent.dart';
+import '../auth/workspace_resolution.dart';
 import '../config/app_config.dart';
+import '../models/seller.dart';
 import '../utils/app_logger.dart';
 import '../utils/jwt.dart';
+import 'seller_portal_service.dart';
 import 'supabase_service.dart';
 
 /// Una armeria a la que el usuario tiene acceso (una de sus membresias).
@@ -34,6 +37,7 @@ class TenantSessionService extends ChangeNotifier {
   StreamSubscription<AuthState>? _sub;
 
   String? _tenantId;
+  String? _selectedTenantId;
   String _appRole = '';
   bool _isPlatformAdmin = false;
   String _email = '';
@@ -46,6 +50,11 @@ class TenantSessionService extends ChangeNotifier {
   bool _provisioning = false;
   bool _loadingMemberships = false;
   bool _awaitingOrgRegistrationLocal = false;
+  bool _sessionReady = false;
+  bool _bootstrapping = false;
+  bool _preferWorkspaceSelector = false;
+  String? _sellerId;
+  String _sellerNombre = '';
 
   bool get isConfigured => AppConfig.useSupabase;
 
@@ -55,9 +64,30 @@ class TenantSessionService extends ChangeNotifier {
       isConfigured && SupabaseService.client.auth.currentSession != null;
 
   String? get tenantId => _tenantId;
+
+  /// Tenant activo: claim del JWT o el elegido en el selector (fallback).
+  String? get effectiveTenantId {
+    final claim = _tenantId?.trim();
+    if (claim != null && claim.isNotEmpty) return claim;
+    final selected = _selectedTenantId?.trim();
+    if (selected != null && selected.isNotEmpty) return selected;
+    return null;
+  }
+
   String get appRole => _appRole;
   bool get isPlatformAdmin => _isPlatformAdmin;
   String get email => _email;
+  String? get sellerId => _sellerId;
+  String get sellerNombre => _sellerNombre;
+  bool get isAnonymous {
+    if (!isConfigured) return false;
+    return SupabaseService.client.auth.currentUser?.isAnonymous ?? false;
+  }
+
+  /// Vendedor que entró por dominio + clave (sin cuenta email).
+  bool get isSellerPortalSession =>
+      isSignedIn && _appRole == 'seller' && effectiveTenantId != null;
+
   bool get busy => _busy;
   String? get error => _error;
 
@@ -65,6 +95,8 @@ class TenantSessionService extends ChangeNotifier {
   bool get membershipsLoaded => _membershipsLoaded;
   WorkspaceView get view => _view;
   bool get provisioning => _provisioning;
+  bool get sessionReady => _sessionReady;
+  bool get bootstrapping => _bootstrapping;
 
   bool get isEmailConfirmed {
     if (!isSignedIn) return false;
@@ -99,15 +131,9 @@ class TenantSessionService extends ChangeNotifier {
     _sub = SupabaseService.client.auth.onAuthStateChange.listen((state) {
       _readClaims();
       if (state.event == AuthChangeEvent.signedOut) {
-        _memberships = const [];
-        _membershipsLoaded = false;
-        _view = WorkspaceView.none;
+        _resetWorkspaceState();
         _awaitingOrgRegistrationLocal = false;
         _clearAwaitingOrgFlag();
-      }
-      if (state.event == AuthChangeEvent.signedIn) {
-        _membershipsLoaded = false;
-        _view = WorkspaceView.none;
       }
       notifyListeners();
     });
@@ -117,6 +143,62 @@ class TenantSessionService extends ChangeNotifier {
   void dispose() {
     _sub?.cancel();
     super.dispose();
+  }
+
+  void _resetWorkspaceState() {
+    _memberships = const [];
+    _membershipsLoaded = false;
+    _view = WorkspaceView.none;
+    _selectedTenantId = null;
+    _sessionReady = false;
+    _preferWorkspaceSelector = false;
+  }
+
+  bool get needsSessionBootstrap =>
+      isSignedIn &&
+      isEmailConfirmed &&
+      !isSellerPortalSession &&
+      !_sessionReady;
+
+  Future<void> ensureSessionReady() async {
+    if (!needsSessionBootstrap || _bootstrapping) return;
+    _bootstrapping = true;
+    notifyListeners();
+    try {
+      await bootstrapSession();
+      _sessionReady = true;
+    } catch (e, s) {
+      AppLogger.error('Bootstrap de sesión falló', error: e, stackTrace: s);
+      _error = e.toString();
+    } finally {
+      _bootstrapping = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _applyWorkspaceResolution() async {
+    final resolution = resolveWorkspace(
+      currentView: _view,
+      jwtTenantId: _tenantId,
+      membershipIds: _memberships.map((m) => m.id).toList(),
+      isPlatformAdmin: _isPlatformAdmin,
+      allowJwtAutoSelect: !_preferWorkspaceSelector,
+    );
+
+    if (resolution.autoEnterTenantId != null) {
+      await enterTenant(resolution.autoEnterTenantId!);
+      return;
+    }
+
+    if (resolution.syncActiveTenant &&
+        resolution.tenantId != null &&
+        resolution.tenantId!.isNotEmpty) {
+      await enterTenant(resolution.tenantId!);
+      return;
+    }
+
+    _view = resolution.view;
+    _selectedTenantId = resolution.tenantId;
   }
 
   Map<String, dynamic>? _userMetadata() {
@@ -153,12 +235,16 @@ class TenantSessionService extends ChangeNotifier {
       _appRole = '';
       _isPlatformAdmin = false;
       _email = '';
+      _sellerId = null;
+      _sellerNombre = '';
       return;
     }
     _email = session.user.email ?? '';
     final claims = decodeJwtPayload(session.accessToken);
     _tenantId = (claims['tenant_id'] as String?)?.trim();
     _appRole = (claims['app_role'] as String?)?.trim() ?? '';
+    _sellerId = (claims['seller_id'] as String?)?.trim();
+    _sellerNombre = (claims['seller_nombre'] as String?)?.trim() ?? '';
     final platform = claims['is_platform_admin'];
     _isPlatformAdmin = platform == true || platform == 'true';
   }
@@ -168,6 +254,9 @@ class TenantSessionService extends ChangeNotifier {
     if (!isConfigured || !isSignedIn) {
       throw StateError('No hay sesión activa. Volvé a iniciar sesión.');
     }
+    await SupabaseService.client.auth.refreshSession();
+    _readClaims();
+    if (isSellerPortalSession && _hasSupabaseWriteContext) return;
     if (!_membershipsLoaded) {
       await loadMemberships(force: true);
     }
@@ -196,9 +285,16 @@ class TenantSessionService extends ChangeNotifier {
       }
     }
 
+    final session = SupabaseService.client.auth.currentSession;
+    final claims =
+        session == null ? const {} : decodeJwtPayload(session.accessToken);
     throw StateError(
       'No hay armería activa en la sesión. '
-      'Volvé al selector y elegí una organización antes de importar.',
+      'El token de Supabase no trae tenant_id (revisar el hook de Auth). '
+      'Diag: tenant_id=${claims['tenant_id'] ?? '∅'} · '
+      'is_platform_admin=${claims['is_platform_admin'] ?? '∅'} · '
+      'app_role=${claims['app_role'] ?? '∅'} · '
+      'memberships=${_memberships.length} · active_tenant=${active ?? '∅'}',
     );
   }
 
@@ -219,8 +315,12 @@ class TenantSessionService extends ChangeNotifier {
       await SupabaseService.client.auth.refreshSession();
       await _clearAwaitingOrgFlag();
       _view = WorkspaceView.none;
+      _selectedTenantId = null;
       _membershipsLoaded = false;
+      _sessionReady = false;
+      _preferWorkspaceSelector = true;
       _readClaims();
+      await ensureSessionReady();
       _busy = false;
       notifyListeners();
       return true;
@@ -432,14 +532,7 @@ class TenantSessionService extends ChangeNotifier {
 
       _membershipsLoaded = true;
 
-      if (_view == WorkspaceView.none && destinationCount == 1) {
-        if (_isPlatformAdmin) {
-          _view = WorkspaceView.platform;
-        } else if (_memberships.length == 1) {
-          await enterTenant(_memberships.first.id);
-          return;
-        }
-      }
+      await _applyWorkspaceResolution();
       notifyListeners();
     } catch (e) {
       _error = e.toString();
@@ -463,6 +556,15 @@ class TenantSessionService extends ChangeNotifier {
 
   void enterPlatform() {
     _view = WorkspaceView.platform;
+    _preferWorkspaceSelector = false;
+    notifyListeners();
+  }
+
+  void backToSelector() {
+    _selectedTenantId = null;
+    _view = WorkspaceView.none;
+    _preferWorkspaceSelector = true;
+    _sessionReady = true;
     notifyListeners();
   }
 
@@ -478,7 +580,9 @@ class TenantSessionService extends ChangeNotifier {
       );
       await SupabaseService.client.auth.refreshSession();
       _readClaims();
+      _selectedTenantId = tenantId;
       _view = WorkspaceView.tenant;
+      _preferWorkspaceSelector = false;
       _busy = false;
       notifyListeners();
       return true;
@@ -490,9 +594,47 @@ class TenantSessionService extends ChangeNotifier {
     }
   }
 
-  void backToSelector() {
-    _view = WorkspaceView.none;
+  /// Portal vendedor: sesión anónima + JWT con tenant y seller_id.
+  Future<void> signInSellerPortal({
+    required String slug,
+    required String codigo,
+    required Seller seller,
+    required String tenantId,
+  }) async {
+    if (!isConfigured) {
+      throw StateError('Supabase no configurado');
+    }
+
+    _busy = true;
+    _error = null;
     notifyListeners();
+
+    try {
+      await SupabaseService.client.auth.signOut();
+
+      await SupabaseService.client.auth.signInAnonymously();
+
+      await SellerPortalService().completeLogin(
+        slug: slug,
+        codigo: codigo,
+        sellerId: seller.id,
+      );
+
+      await SupabaseService.client.auth.refreshSession();
+      _readClaims();
+      _selectedTenantId = tenantId;
+      _view = WorkspaceView.tenant;
+      _membershipsLoaded = true;
+      _memberships = const [];
+      _sessionReady = true;
+      _busy = false;
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _busy = false;
+      notifyListeners();
+      rethrow;
+    }
   }
 
   Future<void> signOut() async {
@@ -503,9 +645,7 @@ class TenantSessionService extends ChangeNotifier {
       AppLogger.warn('signOut remoto falló; limpio estado local',
           error: e, stackTrace: s);
     }
-    _memberships = const [];
-    _membershipsLoaded = false;
-    _view = WorkspaceView.none;
+    _resetWorkspaceState();
     await _clearAwaitingOrgFlag();
     _readClaims();
     notifyListeners();

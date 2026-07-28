@@ -14,6 +14,7 @@ import 'services/exchange_rate_service.dart';
 import 'services/invoice_service.dart';
 import 'services/pricing_service.dart';
 import 'services/pricing_settings_service.dart';
+import 'services/in_tenant_flow_service.dart';
 import 'services/seller_service.dart';
 import 'services/supabase_service.dart';
 import 'services/tenant_session_service.dart';
@@ -30,6 +31,7 @@ Future<void> main() async {
   final exchangeRateService = ExchangeRateService();
   final authService = AuthService();
   final tenantSession = TenantSessionService();
+  final inTenantFlow = InTenantFlowService();
   final adminService = AdminService();
   final sellerService = SellerService();
   final cartService = CartService();
@@ -44,11 +46,13 @@ Future<void> main() async {
 
   tenantSession.start();
 
-  await catalogService.load();
+  if (!AppConfig.useSupabase) {
+    await catalogService.load();
+    await sellerService.load();
+  }
   await exchangeRateService.load();
   await authService.load();
   await adminService.load();
-  await sellerService.load();
   await pricingSettingsService.load();
 
   final dataSyncService = DataSyncService(
@@ -69,6 +73,7 @@ Future<void> main() async {
         ChangeNotifierProvider<TenantSessionService>.value(
           value: tenantSession,
         ),
+        ChangeNotifierProvider<InTenantFlowService>.value(value: inTenantFlow),
         ChangeNotifierProvider<AdminService>.value(value: adminService),
         ChangeNotifierProvider<SellerService>.value(value: sellerService),
         ChangeNotifierProvider<CartService>.value(value: cartService),

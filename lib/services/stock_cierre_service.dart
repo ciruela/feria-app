@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:excel/excel.dart';
 
 import '../models/product.dart';
+import '../models/sale_record.dart';
 import '../models/stock_movimiento.dart';
 import 'supabase_stock_movimientos_repository.dart';
 
@@ -52,6 +53,10 @@ class CierreResumen {
   Iterable<CierreLine> get municion => lines.where((l) => l.isMunicion);
   Iterable<CierreLine> get armas => lines.where((l) => !l.isMunicion);
 
+  /// Solo productos con ventas, cargas o ajustes en el día.
+  Iterable<CierreLine> get conActividad =>
+      lines.where((l) => l.tieneActividad);
+
   int get totalCajasVendidas =>
       municion.fold(0, (sum, l) => sum + l.vendidoCajas);
 
@@ -63,7 +68,22 @@ class CierreResumen {
   int get totalBalasCierre =>
       municion.fold(0, (sum, l) => sum + (l.cierreBalas ?? 0));
 
-  bool get isEmpty => lines.every((l) => !l.tieneActividad);
+  bool get isEmpty => !conActividad.any((l) => true);
+}
+
+/// Totales de stock actual de la armería (sin listar cada producto).
+class StockAlCierre {
+  const StockAlCierre({
+    required this.cajasMunicion,
+    required this.balasMunicion,
+    required this.unidadesArmas,
+    required this.productosConStock,
+  });
+
+  final int cajasMunicion;
+  final int balasMunicion;
+  final int unidadesArmas;
+  final int productosConStock;
 }
 
 class StockCierreService {
@@ -105,8 +125,8 @@ class StockCierreService {
       final cierre = product.stock ?? 0;
       final apertura = cierre - netDelta;
 
-      // Sólo incluir productos con actividad o con stock definido.
-      if (movs.isEmpty && product.stock == null) continue;
+      // Solo productos con movimientos en el día (evita listar todo el catálogo).
+      if (movs.isEmpty) continue;
 
       lines.add(
         CierreLine(
@@ -135,12 +155,204 @@ class StockCierreService {
     return CierreResumen(day: day, lines: lines);
   }
 
+  StockAlCierre stockAlCierre(List<Product> products) {
+    var cajasMunicion = 0;
+    var balasMunicion = 0;
+    var unidadesArmas = 0;
+    var productosConStock = 0;
+
+    for (final product in products) {
+      final stock = product.stock;
+      if (stock == null || stock <= 0) continue;
+      productosConStock++;
+      if (product.isMunicion) {
+        cajasMunicion += stock;
+        final rpb = product.roundsPerBox;
+        if (rpb != null && rpb > 0) balasMunicion += stock * rpb;
+      } else if (product.isArma) {
+        unidadesArmas += stock;
+      }
+    }
+
+    return StockAlCierre(
+      cajasMunicion: cajasMunicion,
+      balasMunicion: balasMunicion,
+      unidadesArmas: unidadesArmas,
+      productosConStock: productosConStock,
+    );
+  }
+
   Uint8List exportToExcel(CierreResumen resumen) {
+    return exportCierreCompleto(
+      resumen: resumen,
+      ventas: const [],
+      stockAlCierre: const StockAlCierre(
+        cajasMunicion: 0,
+        balasMunicion: 0,
+        unidadesArmas: 0,
+        productosConStock: 0,
+      ),
+    );
+  }
+
+  Uint8List exportCierreCompleto({
+    required CierreResumen resumen,
+    required List<SaleRecord> ventas,
+    required StockAlCierre stockAlCierre,
+  }) {
     final excel = Excel.createExcel();
     final defaultName = excel.sheets.keys.first;
-    excel.rename(defaultName, 'Cierre');
-    final sheet = excel['Cierre'];
 
+    _writeResumenSheet(
+      excel,
+      defaultName,
+      resumen: resumen,
+      ventas: ventas,
+      stockAlCierre: stockAlCierre,
+    );
+
+    final ventasSheet = excel['Ventas'];
+    _writeVentasSheet(ventasSheet, ventas);
+
+    final detalleSheet = excel['Detalle ventas'];
+    _writeDetalleVentasSheet(detalleSheet, ventas);
+
+    final movSheet = excel['Movimientos'];
+    _writeMovimientosSheet(movSheet, resumen.conActividad.toList());
+
+    final bytes = excel.encode();
+    if (bytes == null) {
+      throw Exception('No se pudo generar el Excel del cierre');
+    }
+    return Uint8List.fromList(bytes);
+  }
+
+  void _writeResumenSheet(
+    Excel excel,
+    String sheetName, {
+    required CierreResumen resumen,
+    required List<SaleRecord> ventas,
+    required StockAlCierre stockAlCierre,
+  }) {
+    excel.rename(sheetName, 'Resumen');
+    final sheet = excel['Resumen'];
+
+    var ventasArs = 0.0;
+    var ventasUsd = 0.0;
+    var comprobantes = 0;
+    for (final sale in ventas) {
+      if (sale.anulada) continue;
+      comprobantes++;
+      ventasArs += sale.collectedArs;
+      ventasUsd += sale.collectedUsd;
+    }
+
+    final rows = <List<String>>[
+      ['Fecha', _formatDay(resumen.day)],
+      ['Comprobantes', '$comprobantes'],
+      ['Cobrado ARS', ventasArs.toStringAsFixed(0)],
+      ['Cobrado USD', ventasUsd.toStringAsFixed(2)],
+      ['', ''],
+      ['VENDIDO (stock)', ''],
+      ['Cajas munición', '${resumen.totalCajasVendidas}'],
+      ['Balas munición', '${resumen.totalBalasVendidas}'],
+      ['Armas', '${resumen.totalArmasVendidas}'],
+      ['', ''],
+      ['STOCK AL CIERRE (actual)', ''],
+      ['Productos con stock', '${stockAlCierre.productosConStock}'],
+      ['Cajas munición', '${stockAlCierre.cajasMunicion}'],
+      ['Balas munición', '${stockAlCierre.balasMunicion}'],
+      ['Unidades armas', '${stockAlCierre.unidadesArmas}'],
+    ];
+
+    for (var r = 0; r < rows.length; r++) {
+      _write(sheet, 0, r, rows[r][0]);
+      _write(sheet, 1, r, rows[r][1]);
+    }
+  }
+
+  void _writeVentasSheet(Sheet sheet, List<SaleRecord> ventas) {
+    const headers = [
+      'hora',
+      'cliente',
+      'dni',
+      'vendedor',
+      'total_ars',
+      'total_usd',
+      'anulada',
+    ];
+    for (var col = 0; col < headers.length; col++) {
+      _write(sheet, col, 0, headers[col]);
+    }
+
+    final sorted = [...ventas]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    for (var i = 0; i < sorted.length; i++) {
+      final sale = sorted[i];
+      final t = sale.createdAt;
+      final hora =
+          '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+      final r = i + 1;
+      _write(sheet, 0, r, hora);
+      _write(sheet, 1, r, sale.clienteNombre);
+      _write(sheet, 2, r, sale.clienteDni);
+      _write(sheet, 3, r, sale.sellerName ?? '');
+      _write(sheet, 4, r, sale.collectedArs.toStringAsFixed(0));
+      _write(sheet, 5, r, sale.collectedUsd.toStringAsFixed(2));
+      _write(sheet, 6, r, sale.anulada ? 'SI' : 'NO');
+    }
+  }
+
+  void _writeDetalleVentasSheet(Sheet sheet, List<SaleRecord> ventas) {
+    const headers = [
+      'hora',
+      'cliente',
+      'detalle',
+      'cantidad',
+      'importe_ars',
+      'importe_usd',
+      'anulada',
+    ];
+    for (var col = 0; col < headers.length; col++) {
+      _write(sheet, col, 0, headers[col]);
+    }
+
+    var row = 1;
+    final sorted = [...ventas]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    for (final sale in sorted) {
+      final t = sale.createdAt;
+      final hora =
+          '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+      for (final line in sale.lines) {
+        _write(sheet, 0, row, hora);
+        _write(sheet, 1, row, sale.clienteNombre);
+        _write(
+          sheet,
+          2,
+          row,
+          line.detail.isNotEmpty
+              ? line.detail
+              : (line.code.isNotEmpty ? line.code : line.productId),
+        );
+        _write(sheet, 3, row, '${line.quantity}');
+        _write(
+          sheet,
+          4,
+          row,
+          line.paysInUsd ? '' : line.lineArs.toStringAsFixed(0),
+        );
+        _write(
+          sheet,
+          5,
+          row,
+          line.paysInUsd ? line.lineUsd.toStringAsFixed(2) : '',
+        );
+        _write(sheet, 6, row, sale.anulada ? 'SI' : 'NO');
+        row++;
+      }
+    }
+  }
+
+  void _writeMovimientosSheet(Sheet sheet, List<CierreLine> lines) {
     const headers = [
       'tipo',
       'marca',
@@ -159,13 +371,11 @@ class StockCierreService {
     ];
 
     for (var col = 0; col < headers.length; col++) {
-      sheet
-          .cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: 0))
-          .value = TextCellValue(headers[col]);
+      _write(sheet, col, 0, headers[col]);
     }
 
-    for (var i = 0; i < resumen.lines.length; i++) {
-      final line = resumen.lines[i];
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
       final p = line.product;
       final r = i + 1;
       _write(sheet, 0, r, p.type.key);
@@ -183,13 +393,26 @@ class StockCierreService {
       _write(sheet, 12, r, line.vendidoBalas?.toString() ?? '');
       _write(sheet, 13, r, line.cierreBalas?.toString() ?? '');
     }
+  }
 
+  static String _formatDay(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  // Legacy single-sheet export kept for tests — writes movimientos only.
+  Uint8List _exportMovimientosOnly(CierreResumen resumen) {
+    final excel = Excel.createExcel();
+    final defaultName = excel.sheets.keys.first;
+    excel.rename(defaultName, 'Cierre');
+    _writeMovimientosSheet(excel['Cierre'], resumen.lines);
     final bytes = excel.encode();
     if (bytes == null) {
       throw Exception('No se pudo generar el Excel del cierre');
     }
     return Uint8List.fromList(bytes);
   }
+
+  Uint8List exportMovimientosExcel(CierreResumen resumen) =>
+      _exportMovimientosOnly(resumen);
 
   static void _write(Sheet sheet, int col, int row, String value) {
     sheet

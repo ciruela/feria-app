@@ -14,6 +14,7 @@ import '../models/stock_movimiento.dart';
 import '../utils/app_logger.dart';
 import '../utils/ids.dart';
 import '../utils/jwt.dart';
+import '../utils/tenant_cache.dart';
 import 'audit_service.dart';
 import 'excel_catalog_service.dart';
 import 'supabase_catalog_repository.dart';
@@ -21,33 +22,51 @@ import 'product_photo_service.dart';
 import 'supabase_service.dart';
 
 class CatalogService extends ChangeNotifier {
-  static const _cacheKey = 'catalog_cache_json';
-  static const _lastSyncKey = 'catalog_last_sync';
+  static const _cacheKeyBase = 'catalog_cache_json';
+  static const _lastSyncKeyBase = 'catalog_last_sync';
 
   List<Product> _products = [];
   DateTime? _lastSync;
   bool _isSyncing = false;
   String? _lastError;
   RealtimeChannel? _realtimeChannel;
+  String? _tenantScope;
 
   List<Product> get products => List.unmodifiable(_products);
   DateTime? get lastSync => _lastSync;
   bool get isSyncing => _isSyncing;
   String? get lastError => _lastError;
   bool get isFromCloud => AppConfig.usesRemoteCatalog;
+  bool get hasTenantScope =>
+      !AppConfig.useSupabase ||
+      (_tenantScope != null && _tenantScope!.isNotEmpty);
 
-  final SupabaseCatalogRepository _supabaseCatalog = SupabaseCatalogRepository();
-  final ProductPhotoService _productPhotos = ProductPhotoService();
+  String get _cacheKey => tenantCacheKey(_cacheKeyBase, _tenantScope);
+  String get _lastSyncKey => tenantCacheKey(_lastSyncKeyBase, _tenantScope);
+
+  /// Aísla cache y datos por armería. Llamar antes de [load] al elegir tenant.
+  void bindTenant(String? tenantId) {
+    final next = tenantId?.trim();
+    if (_tenantScope == next) return;
+    _tenantScope = next;
+    _products = [];
+    _lastSync = null;
+    _lastError = null;
+    _realtimeChannel?.unsubscribe();
+    _realtimeChannel = null;
+  }
 
   Future<void> load() async {
+    if (AppConfig.useSupabase && !hasTenantScope) return;
+
     final loadedFromCache = await _loadFromCache();
-    if (!loadedFromCache) {
+    if (!loadedFromCache && !AppConfig.useSupabase) {
       await _loadFromAssets();
     }
 
     if (AppConfig.usesRemoteCatalog) {
       await syncFromCloud();
-    } else if (_products.isEmpty) {
+    } else if (_products.isEmpty && !AppConfig.useSupabase) {
       await _loadFromAssets();
     }
 
@@ -112,7 +131,7 @@ class CatalogService extends ChangeNotifier {
             error: error, stackTrace: stackTrace);
       } else {
         _lastError = error.toString();
-        if (_products.isEmpty) {
+        if (_products.isEmpty && !AppConfig.useSupabase) {
           await _loadFromAssets();
         }
       }
@@ -638,6 +657,98 @@ class CatalogService extends ChangeNotifier {
       _lastError = error.toString();
     }
   }
+
+  /// Descuenta stock tras una venta confirmada (local + Supabase).
+  Future<void> applySaleStockDecrement(
+    Map<String, int> quantities, {
+    String? saleId,
+    String? sellerId,
+  }) async {
+    if (quantities.isEmpty) return;
+
+    var changed = false;
+    for (final entry in quantities.entries) {
+      if (entry.value <= 0) continue;
+
+      final index = _products.indexWhere((product) => product.id == entry.key);
+      if (index == -1) {
+        AppLogger.warn(
+          'Venta: producto ${entry.key} no está en el catálogo local',
+        );
+        continue;
+      }
+
+      final product = _products[index];
+      final current = product.stock;
+      if (current == null) {
+        AppLogger.warn(
+          'Venta: ${product.id} no tiene stock cargado — no se descontó',
+        );
+        continue;
+      }
+
+      final next = (current - entry.value).clamp(0, current);
+      if (next == current) continue;
+
+      _products[index] = product.copyWith(stock: next);
+      changed = true;
+
+      if (SupabaseService.isConfigured) {
+        await _supabaseCatalog.decrementStock(
+          entry.key,
+          entry.value,
+          ventaId: saleId,
+          vendedorId: sellerId,
+        );
+      }
+    }
+
+    if (changed) {
+      await _persistCache();
+      notifyListeners();
+    }
+  }
+
+  /// Restituye stock al anular una venta (local + Supabase).
+  Future<void> applySaleStockRestore(
+    Map<String, int> quantities, {
+    String? saleId,
+    String? sellerId,
+  }) async {
+    if (quantities.isEmpty) return;
+
+    var changed = false;
+    for (final entry in quantities.entries) {
+      if (entry.value <= 0) continue;
+
+      final index = _products.indexWhere((product) => product.id == entry.key);
+      if (index == -1) continue;
+
+      final product = _products[index];
+      final current = product.stock;
+      if (current == null) continue;
+
+      _products[index] = product.copyWith(stock: current + entry.value);
+      changed = true;
+
+      if (SupabaseService.isConfigured) {
+        await _supabaseCatalog.restoreStock(
+          entry.key,
+          entry.value,
+          ventaId: saleId,
+          vendedorId: sellerId,
+        );
+      }
+    }
+
+    if (changed) {
+      await _persistCache();
+      notifyListeners();
+    }
+  }
+
+  final SupabaseCatalogRepository _supabaseCatalog = SupabaseCatalogRepository();
+  final ProductPhotoService _productPhotos = ProductPhotoService();
 
   List<Product> byType(ProductType type) {
     return _products.where((product) => product.type == type).toList();

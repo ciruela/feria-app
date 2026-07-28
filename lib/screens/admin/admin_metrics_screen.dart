@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../config/app_config.dart';
-import '../../models/sale_record.dart';
 import '../../models/sales_metrics.dart';
-import '../../services/audit_service.dart';
-import '../../services/comprobante_pdf_service.dart';
+import '../../services/catalog_service.dart';
 import '../../services/sales_metrics_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/feria_shell.dart';
 import '../../widgets/section_header.dart';
+import 'admin_comprobantes_screen.dart';
 
 class AdminMetricsScreen extends StatefulWidget {
   const AdminMetricsScreen({super.key});
@@ -19,16 +19,22 @@ class AdminMetricsScreen extends StatefulWidget {
 }
 
 class _AdminMetricsScreenState extends State<AdminMetricsScreen> {
-  final _service = SalesMetricsService();
+  SalesMetricsService? _service;
   DateTime _selectedDay = DateTime.now();
   DaySalesMetrics? _metrics;
   bool _loading = false;
   String? _error;
 
+  bool _metricsRequested = false;
+
   @override
-  void initState() {
-    super.initState();
-    if (AppConfig.useSupabase) {
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _service ??= SalesMetricsService(
+      catalog: context.read<CatalogService>(),
+    );
+    if (AppConfig.useSupabase && !_metricsRequested) {
+      _metricsRequested = true;
       _loadMetrics();
     }
   }
@@ -40,7 +46,9 @@ class _AdminMetricsScreenState extends State<AdminMetricsScreen> {
     });
 
     try {
-      final metrics = await _service.metricsForDay(_selectedDay);
+      final service = _service;
+      if (service == null) return;
+      final metrics = await service.metricsForDay(_selectedDay);
       if (!mounted) return;
       setState(() {
         _metrics = metrics;
@@ -52,41 +60,6 @@ class _AdminMetricsScreenState extends State<AdminMetricsScreen> {
         _error = error.toString();
         _loading = false;
       });
-    }
-  }
-
-  Future<void> _voidSale(SaleRecord sale) async {
-    final motivo = await showDialog<String>(
-      context: context,
-      builder: (_) => const _VoidReasonDialog(),
-    );
-    if (motivo == null) return;
-
-    setState(() => _loading = true);
-    try {
-      final actor = AuditService.instance.actorNombre;
-      final ok = await _service.voidSale(
-        sale,
-        motivo: motivo,
-        actorNombre: actor.isEmpty ? 'Admin' : actor,
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            ok
-                ? 'Venta anulada y stock restituido'
-                : 'La venta ya estaba anulada',
-          ),
-        ),
-      );
-      await _loadMetrics();
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo anular la venta: $error')),
-      );
     }
   }
 
@@ -135,7 +108,18 @@ class _AdminMetricsScreenState extends State<AdminMetricsScreen> {
                       ],
                       if (_metrics != null) ...[
                         const SizedBox(height: 20),
-                        _SummarySection(metrics: _metrics!),
+                        _SummarySection(
+                          metrics: _metrics!,
+                          onComprobantesTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => AdminComprobantesScreen(
+                                  initialDate: _selectedDay,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                         const SizedBox(height: 24),
                         const SectionHeader(
                           title: 'Por categoría',
@@ -169,16 +153,6 @@ class _AdminMetricsScreenState extends State<AdminMetricsScreen> {
                         ),
                         const SizedBox(height: 12),
                         _PaymentSection(payments: _metrics!.payments),
-                        const SizedBox(height: 24),
-                        const SectionHeader(
-                          title: 'Comprobantes emitidos',
-                          subtitle: 'PDF guardados del día',
-                        ),
-                        const SizedBox(height: 12),
-                        _ComprobantesSection(
-                          sales: _metrics!.sales,
-                          onVoid: _voidSale,
-                        ),
                         const SizedBox(height: 24),
                         const SectionHeader(
                           title: 'Por vendedor',
@@ -291,9 +265,13 @@ class _DateSelector extends StatelessWidget {
 }
 
 class _SummarySection extends StatelessWidget {
-  const _SummarySection({required this.metrics});
+  const _SummarySection({
+    required this.metrics,
+    required this.onComprobantesTap,
+  });
 
   final DaySalesMetrics metrics;
+  final VoidCallback onComprobantesTap;
 
   @override
   Widget build(BuildContext context) {
@@ -303,8 +281,9 @@ class _SummarySection extends StatelessWidget {
           icon: Icons.receipt_long_rounded,
           label: 'Comprobantes',
           value: '${metrics.saleCount}',
-          subtitle: '${metrics.totalUnits} ítems vendidos',
+          subtitle: 'Tocá para ver, descargar o compartir PDFs',
           accentColor: AppColors.primary,
+          onTap: onComprobantesTap,
         ),
         const SizedBox(height: 12),
         Row(
@@ -422,244 +401,6 @@ class _PaymentSection extends StatelessWidget {
           ),
         );
       }).toList(),
-    );
-  }
-}
-
-class _ComprobantesSection extends StatelessWidget {
-  const _ComprobantesSection({required this.sales, required this.onVoid});
-
-  final List<SaleRecord> sales;
-  final Future<void> Function(SaleRecord sale) onVoid;
-
-  @override
-  Widget build(BuildContext context) {
-    if (sales.isEmpty) {
-      return const _EmptyMetric(message: 'Sin comprobantes este día');
-    }
-
-    final sorted = [...sales]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-    return Column(
-      children: sorted.map((sale) {
-        final time = TimeOfDay.fromDateTime(sale.createdAt);
-        final timeLabel =
-            '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-        final client = sale.clienteNombre.trim().isEmpty
-            ? 'Sin nombre'
-            : sale.clienteNombre.trim();
-        final totalParts = <String>[];
-        if (sale.collectedArs > 0) {
-          totalParts.add(formatArs(sale.collectedArs));
-        }
-        if (sale.collectedUsd > 0) {
-          totalParts.add(formatUsd(sale.collectedUsd));
-        }
-        final totalLabel =
-            totalParts.isEmpty ? 'Sin importe' : totalParts.join(' · ');
-        final anulada = sale.anulada;
-
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: anulada
-                  ? AppColors.danger.withValues(alpha: 0.06)
-                  : AppColors.surface,
-              borderRadius: AppDecorations.radiusMd,
-              border: Border.all(
-                color: anulada
-                    ? AppColors.danger.withValues(alpha: 0.4)
-                    : AppColors.border,
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              client,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                decoration: anulada
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                                color: anulada
-                                    ? AppColors.textSecondary
-                                    : AppColors.textPrimary,
-                              ),
-                            ),
-                          ),
-                          if (anulada) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.danger,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Text(
-                                'ANULADA',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      Text(
-                        '$timeLabel · $totalLabel',
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 13,
-                        ),
-                      ),
-                      if (anulada && sale.anuladaMotivo.trim().isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            'Motivo: ${sale.anuladaMotivo.trim()}'
-                            '${sale.anuladaPor.trim().isEmpty ? '' : ' · ${sale.anuladaPor.trim()}'}',
-                            style: const TextStyle(
-                              color: AppColors.danger,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                if (sale.hasPdf) ...[
-                  IconButton(
-                    tooltip: 'Ver PDF',
-                    onPressed: () => _viewPdf(context, sale.pdfPath!),
-                    icon: const Icon(Icons.picture_as_pdf_outlined),
-                  ),
-                  IconButton(
-                    tooltip: 'Compartir PDF',
-                    onPressed: () => _sharePdf(context, sale.pdfPath!),
-                    icon: const Icon(Icons.ios_share_rounded),
-                  ),
-                ],
-                if (!anulada)
-                  IconButton(
-                    tooltip: 'Anular venta',
-                    onPressed: () => onVoid(sale),
-                    icon: const Icon(
-                      Icons.block_rounded,
-                      color: AppColors.danger,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Future<void> _viewPdf(BuildContext context, String pdfPath) async {
-    try {
-      await ComprobantePdfService.viewStoredPdf(pdfPath);
-    } catch (error) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo abrir el PDF: $error')),
-      );
-    }
-  }
-
-  Future<void> _sharePdf(BuildContext context, String pdfPath) async {
-    try {
-      await ComprobantePdfService.shareStoredPdf(pdfPath);
-    } catch (error) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo compartir el PDF: $error')),
-      );
-    }
-  }
-}
-
-class _VoidReasonDialog extends StatefulWidget {
-  const _VoidReasonDialog();
-
-  @override
-  State<_VoidReasonDialog> createState() => _VoidReasonDialogState();
-}
-
-class _VoidReasonDialogState extends State<_VoidReasonDialog> {
-  final _controller = TextEditingController();
-  bool _valid = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller.addListener(() {
-      final next = _controller.text.trim().isNotEmpty;
-      if (next != _valid) setState(() => _valid = next);
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Anular venta'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Se restituirá el stock y quedará registrado en la auditoría. '
-            'Esta acción no se puede deshacer.',
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _controller,
-            autofocus: true,
-            maxLines: 2,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              labelText: 'Motivo',
-              hintText: 'Ej: carga errónea, cliente se arrepintió…',
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          onPressed: _valid
-              ? () => Navigator.of(context).pop(_controller.text.trim())
-              : null,
-          style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-          child: const Text('Anular venta'),
-        ),
-      ],
     );
   }
 }

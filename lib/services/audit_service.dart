@@ -39,11 +39,16 @@ class AuditService {
     String? actorNombre,
   }) async {
     if (!SupabaseService.isConfigured) return;
+    var nombre = (actorNombre ?? _actorNombre).trim();
+    if (nombre.isEmpty) {
+      nombre =
+          SupabaseService.client.auth.currentUser?.email?.trim() ?? 'Sistema';
+    }
     try {
       await _repo.insert(
         accion: accion,
         actorId: actorId ?? _actorId,
-        actorNombre: actorNombre ?? _actorNombre,
+        actorNombre: nombre,
         entidad: entidad,
         entidadId: entidadId,
         detalle: detalle,

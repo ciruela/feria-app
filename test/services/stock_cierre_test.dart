@@ -104,6 +104,23 @@ void main() {
     });
   });
 
+  group('StockAlCierre', () {
+    test('suma totales del catálogo', () {
+      final products = [
+        _municion('m1', rpb: 50, stock: 10),
+        _municion('m2', rpb: 20, stock: 5),
+        _arma('a1'),
+        _municion('m3', rpb: 50, stock: 0),
+        _municion('m4', rpb: 50),
+      ];
+      final totals = StockCierreService().stockAlCierre(products);
+      expect(totals.productosConStock, 3);
+      expect(totals.cajasMunicion, 15);
+      expect(totals.balasMunicion, 600);
+      expect(totals.unidadesArmas, 1);
+    });
+  });
+
   group('exportToExcel', () {
     test('genera bytes no vacíos', () {
       final resumen = CierreResumen(
@@ -117,6 +134,32 @@ void main() {
         ],
       );
       final bytes = StockCierreService().exportToExcel(resumen);
+      expect(bytes.length, greaterThan(0));
+    });
+
+    test('exportCierreCompleto genera bytes con ventas y stock', () {
+      final resumen = CierreResumen(
+        day: DateTime(2026, 1, 1),
+        lines: [
+          _line(
+            product: _municion('m1', rpb: 50),
+            apertura: 5,
+            vendido: 2,
+            cierre: 3,
+          ),
+        ],
+      );
+      final stock = const StockAlCierre(
+        cajasMunicion: 100,
+        balasMunicion: 5000,
+        unidadesArmas: 12,
+        productosConStock: 50,
+      );
+      final bytes = StockCierreService().exportCierreCompleto(
+        resumen: resumen,
+        ventas: const [],
+        stockAlCierre: stock,
+      );
       expect(bytes.length, greaterThan(0));
     });
   });

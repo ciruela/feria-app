@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../services/admin_service.dart';
-import '../../services/catalog_service.dart';
-import '../../services/exchange_rate_service.dart';
-import '../../services/seller_service.dart';
 import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/feria_shell.dart';
@@ -22,44 +18,44 @@ class WorkspaceSelectorScreen extends StatefulWidget {
 }
 
 class _WorkspaceSelectorScreenState extends State<WorkspaceSelectorScreen> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<TenantSessionService>().loadMemberships();
-    });
-  }
+  String? _enteringTenantId;
 
   Future<void> _enterTenant(TenantOption tenant) async {
+    if (_enteringTenantId != null) return;
+
+    setState(() => _enteringTenantId = tenant.id);
     final session = context.read<TenantSessionService>();
-    final catalog = context.read<CatalogService>();
-    final sellers = context.read<SellerService>();
-    final admins = context.read<AdminService>();
-    final exchangeRate = context.read<ExchangeRateService>();
 
-    final ok = await session.enterTenant(tenant.id);
-    if (!mounted) return;
-    if (!ok) {
+    try {
+      final ok = await session.enterTenant(tenant.id);
+      if (!mounted) return;
+      if (!ok) {
+        setState(() => _enteringTenantId = null);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              session.error ?? 'No se pudo entrar a ${tenant.nombre}',
+            ),
+          ),
+        );
+        return;
+      }
+      setState(() => _enteringTenantId = null);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _enteringTenantId = null);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(session.error ?? 'No se pudo entrar a ${tenant.nombre}'),
-        ),
+        SnackBar(content: Text('Error al entrar: $e')),
       );
-      return;
     }
-
-    await Future.wait([
-      catalog.load(),
-      sellers.load(),
-      admins.load(),
-      exchangeRate.load(),
-    ]);
   }
 
   @override
   Widget build(BuildContext context) {
     final session = context.watch<TenantSessionService>();
-    final loading = !session.membershipsLoaded || session.busy;
+    final loading = !session.membershipsLoaded ||
+        session.busy ||
+        _enteringTenantId != null;
     final loadError = session.membershipsLoaded &&
         session.error != null &&
         session.memberships.isEmpty &&
@@ -117,6 +113,7 @@ class _WorkspaceSelectorScreenState extends State<WorkspaceSelectorScreen> {
                             title: 'Panel de plataforma',
                             subtitle: 'Super admin · todas las armerías',
                             color: AppColors.goldDark,
+                            enabled: _enteringTenantId == null && !session.busy,
                             onTap: () =>
                                 context.read<TenantSessionService>().enterPlatform(),
                           ),
@@ -130,6 +127,8 @@ class _WorkspaceSelectorScreenState extends State<WorkspaceSelectorScreen> {
                                 ? 'Dueño'
                                 : 'Administrador',
                             color: AppColors.accent,
+                            enabled: _enteringTenantId == null,
+                            loading: _enteringTenantId == tenant.id,
                             onTap: () => _enterTenant(tenant),
                           ),
                           const SizedBox(height: 12),
@@ -162,6 +161,8 @@ class _WorkspaceCard extends StatelessWidget {
     required this.subtitle,
     required this.color,
     required this.onTap,
+    this.enabled = true,
+    this.loading = false,
   });
 
   final IconData icon;
@@ -169,6 +170,8 @@ class _WorkspaceCard extends StatelessWidget {
   final String subtitle;
   final Color color;
   final VoidCallback onTap;
+  final bool enabled;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -177,20 +180,30 @@ class _WorkspaceCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
+        onTap: enabled && !loading ? onTap : null,
+        child: Opacity(
+          opacity: enabled ? 1 : 0.5,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: loading
+                      ? Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: color,
+                          ),
+                        )
+                      : Icon(icon, color: color),
                 ),
-                child: Icon(icon, color: color),
-              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -222,6 +235,7 @@ class _WorkspaceCard extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }

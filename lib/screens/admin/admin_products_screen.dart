@@ -12,8 +12,15 @@ import '../../widgets/feria_shell.dart';
 import 'admin_product_create_screen.dart';
 import 'admin_product_edit_screen.dart';
 
+/// Umbral de "stock bajo": productos con esta cantidad o menos se consideran
+/// bajos. Debe coincidir con el usado en el dashboard (admin_home_screen).
+const int kLowStockThreshold = 3;
+
 class AdminProductsScreen extends StatefulWidget {
-  const AdminProductsScreen({super.key});
+  const AdminProductsScreen({super.key, this.lowStockOnly = false});
+
+  /// Si es true, abre mostrando únicamente los productos con stock bajo.
+  final bool lowStockOnly;
 
   @override
   State<AdminProductsScreen> createState() => _AdminProductsScreenState();
@@ -22,6 +29,7 @@ class AdminProductsScreen extends StatefulWidget {
 class _AdminProductsScreenState extends State<AdminProductsScreen> {
   ProductType? _typeFilter;
   String? _marcaFilter;
+  late bool _lowStockOnly = widget.lowStockOnly;
   bool _ioBusy = false;
 
   Future<void> _exportExcel() async {
@@ -122,6 +130,10 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
         : catalog.byType(_typeFilter!);
 
     var products = source.where((product) {
+      if (_lowStockOnly &&
+          !(product.stock != null && product.stock! <= kLowStockThreshold)) {
+        return false;
+      }
       if (_marcaFilter == null) return true;
       return product.marca.toLowerCase() == _marcaFilter!.toLowerCase();
     }).toList();
@@ -162,6 +174,10 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
     setState(() {
       _marcaFilter = _marcaFilter == marca ? null : marca;
     });
+  }
+
+  void _toggleLowStock() {
+    setState(() => _lowStockOnly = !_lowStockOnly);
   }
 
   @override
@@ -222,11 +238,12 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                 ),
               ],
             ),
-          if (_marcaFilter != null || _typeFilter != null)
+          if (_marcaFilter != null || _typeFilter != null || _lowStockOnly)
             TextButton(
               onPressed: () => setState(() {
                 _typeFilter = null;
                 _marcaFilter = null;
+                _lowStockOnly = false;
               }),
               child: const Text(
                 'VER TODOS',
@@ -268,6 +285,11 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                   label: 'MUNICIÓN',
                   selected: _typeFilter == ProductType.municion,
                   onTap: () => _setTypeFilter(ProductType.municion),
+                ),
+                _TypeChip(
+                  label: 'STOCK BAJO',
+                  selected: _lowStockOnly,
+                  onTap: _toggleLowStock,
                 ),
               ],
             ),

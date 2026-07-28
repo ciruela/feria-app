@@ -8,11 +8,13 @@ import '../models/budget_customer_controllers.dart';
 import '../config/app_config.dart';
 import '../services/budget_service.dart';
 import '../services/cart_service.dart';
+import '../services/catalog_service.dart';
 import '../services/dni_ocr_service.dart';
 import '../services/exchange_rate_service.dart';
 import '../services/pricing_settings_service.dart';
 import '../services/seller_service.dart';
 import '../services/supabase_sales_repository.dart';
+import '../services/tenant_session_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/presupuesto_pdf.dart';
 import '../widgets/budget_payment_panel.dart';
@@ -275,26 +277,30 @@ class _BudgetScreenState extends State<BudgetScreen> {
     final snapshot = budget.copyWithCustomer(_customer);
     final sellerId = context.read<SellerService>().selected?.id;
     final exchangeRate = context.read<ExchangeRateService>().rate;
+    final catalog = context.read<CatalogService>();
 
     try {
       if (AppConfig.useSupabase) {
-        try {
-          await SupabaseSalesRepository().insert(
-            snapshot,
-            sellerId: sellerId,
-            exchangeRate: exchangeRate,
+        await context.read<TenantSessionService>().ensureSupabaseWriteContext();
+        if (!mounted) return;
+        await SupabaseSalesRepository(catalog: catalog).insert(
+          snapshot,
+          sellerId: sellerId,
+          exchangeRate: exchangeRate,
+        );
+      } else {
+        final quantities = <String, int>{};
+        for (final line in snapshot.lines) {
+          if (line.productId.isEmpty) continue;
+          quantities.update(
+            line.productId,
+            (value) => value + line.quantity,
+            ifAbsent: () => line.quantity,
           );
-        } catch (error) {
-          if (mounted) {
-            _showMessage(
-              'Comprobante generado, no se pudo guardar en nube: $error',
-            );
-          }
         }
+        await catalog.applySaleStockDecrement(quantities);
       }
 
-      // Siempre vaciar el carrito al confirmar la venta, aunque el usuario
-      // haya salido de esta pantalla mientras se guardaba en la nube.
       cart.clear();
 
       if (!mounted) return;
@@ -303,6 +309,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
           builder: (_) => ComprobanteScreen(budget: snapshot),
         ),
       );
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage('No se pudo confirmar la venta: $error');
     } finally {
       if (mounted) setState(() => _finalizing = false);
     }

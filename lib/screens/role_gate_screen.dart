@@ -3,20 +3,27 @@ import 'package:provider/provider.dart';
 
 import '../models/admin_user.dart';
 import '../models/app_role.dart';
-import '../models/audit_entry.dart';
 import '../services/admin_service.dart';
-import '../services/audit_service.dart';
 import '../services/auth_service.dart';
 import '../services/tenant_session_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/big_action_button.dart';
 import '../widgets/feria_shell.dart';
 import '../widgets/section_header.dart';
-import 'admin/admin_home_screen.dart';
-import 'seller_select_screen.dart';
+import '../widgets/supabase_config_banner.dart';
 
+typedef AdminEntryCallback = void Function(AdminUser admin);
+
+/// Selector empleado / administración. Navegación vía callbacks (declarativa).
 class RoleGateScreen extends StatelessWidget {
-  const RoleGateScreen({super.key});
+  const RoleGateScreen({
+    super.key,
+    required this.onEmployee,
+    required this.onAdmin,
+  });
+
+  final VoidCallback onEmployee;
+  final AdminEntryCallback onAdmin;
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +33,14 @@ class RoleGateScreen extends StatelessWidget {
       appBar: FeriaAppBar(
         title: const Text('Catálogo Feria'),
         showBackButton: false,
+        leading: session.isSignedIn && session.destinationCount > 1
+            ? IconButton(
+                tooltip: 'Elegir otra armería',
+                onPressed: () =>
+                    context.read<TenantSessionService>().backToSelector(),
+                icon: const Icon(Icons.arrow_back_rounded),
+              )
+            : null,
         actions: [
           if (session.isSignedIn && session.destinationCount > 1)
             IconButton(
@@ -45,6 +60,7 @@ class RoleGateScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
         children: [
+          const SupabaseConfigBanner(),
           _HeroHeader(),
           const SizedBox(height: 28),
           const SectionHeader(
@@ -57,7 +73,10 @@ class RoleGateScreen extends StatelessWidget {
             subtitle: 'Consultar precios, stock y carrito',
             icon: Icons.storefront_rounded,
             accentColor: AppColors.accent,
-            onTap: () => _enterAs(context, AppRole.employee),
+            onTap: () {
+              context.read<AuthService>().loginAs(AppRole.employee);
+              onEmployee();
+            },
           ),
           const SizedBox(height: 16),
           BigActionButton(
@@ -72,18 +91,6 @@ class RoleGateScreen extends StatelessWidget {
     );
   }
 
-  void _enterAs(BuildContext context, AppRole role) {
-    context.read<AuthService>().loginAs(role);
-
-    final screen = role == AppRole.admin
-        ? const AdminHomeScreen()
-        : const SellerSelectScreen();
-
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => screen),
-    );
-  }
-
   Future<void> _askAdminPin(BuildContext context) async {
     final admin = await showDialog<AdminUser>(
       context: context,
@@ -91,22 +98,7 @@ class RoleGateScreen extends StatelessWidget {
     );
 
     if (admin == null || !context.mounted) return;
-
-    context.read<AuthService>().loginAs(AppRole.admin);
-    context.read<AdminService>().startSession(admin);
-    AuditService.instance.setActor(
-      id: admin.id == _masterId ? null : admin.id,
-      nombre: admin.nombre,
-    );
-    AuditService.instance.log(
-      accion: 'Ingresó al panel de administración',
-      entidad: AuditEntidad.acceso,
-    );
-
-    final screen = const AdminHomeScreen();
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => screen),
-    );
+    onAdmin(admin);
   }
 }
 
@@ -252,7 +244,7 @@ class _AdminPinDialogState extends State<_AdminPinDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
+          onPressed: () => Navigator.of(context).pop(),
           child: const Text('CANCELAR'),
         ),
         ElevatedButton(
@@ -265,23 +257,6 @@ class _AdminPinDialogState extends State<_AdminPinDialog> {
       ],
     );
   }
-}
-
-void exitToRoleGate(BuildContext context) {
-  final auth = context.read<AuthService>();
-  if (auth.isAdmin) {
-    AuditService.instance.log(
-      accion: 'Salió del panel de administración',
-      entidad: AuditEntidad.acceso,
-    );
-    AuditService.instance.clearActor();
-    context.read<AdminService>().endSession();
-  }
-  auth.logout();
-  Navigator.of(context).pushAndRemoveUntil(
-    MaterialPageRoute(builder: (_) => const RoleGateScreen()),
-    (_) => false,
-  );
 }
 
 Widget roleBadge(AppRole role) {
@@ -302,8 +277,8 @@ Widget roleBadge(AppRole role) {
       role.label.toUpperCase(),
       style: TextStyle(
         color: isAdmin ? AppColors.primaryDark : Colors.white,
-        fontWeight: FontWeight.w800,
         fontSize: 11,
+        fontWeight: FontWeight.w800,
         letterSpacing: 0.8,
       ),
     ),

@@ -37,3 +37,19 @@ create policy "feria_comprobantes_anon_upload" on storage.objects
 drop policy if exists "feria_comprobantes_anon_update" on storage.objects;
 create policy "feria_comprobantes_anon_update" on storage.objects
   for update using (bucket_id = 'feria-comprobantes');
+
+drop policy if exists "feria_comprobantes_auth_upload" on storage.objects;
+create policy "feria_comprobantes_auth_upload" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'feria-comprobantes');
+
+drop policy if exists "feria_comprobantes_auth_update" on storage.objects;
+create policy "feria_comprobantes_auth_update" on storage.objects
+  for update to authenticated
+  using (bucket_id = 'feria-comprobantes')
+  with check (bucket_id = 'feria-comprobantes');
+
+drop policy if exists "feria_comprobantes_auth_read" on storage.objects;
+create policy "feria_comprobantes_auth_read" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'feria-comprobantes');

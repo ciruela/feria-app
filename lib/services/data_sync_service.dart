@@ -46,6 +46,10 @@ class DataSyncService {
 
   Future<void> syncAll({bool silent = false}) async {
     if (_syncing) return;
+    if (AppConfig.useSupabase &&
+        (!_catalog.hasTenantScope || !_sellers.hasTenantScope)) {
+      return;
+    }
 
     _syncing = true;
     try {

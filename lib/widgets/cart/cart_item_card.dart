@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../models/product.dart';
 import '../../models/product_prices.dart';
 import '../../services/cart_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../utils/uppercase_input.dart';
+import '../../widgets/product_seller_visual.dart';
 
 class CartItemCard extends StatelessWidget {
   const CartItemCard({
@@ -33,6 +35,11 @@ class CartItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final product = item.product;
+    final accent = product.isMunicion
+        ? AppColors.municion
+        : product.type == ProductType.armaCorta
+            ? AppColors.armaCorta
+            : AppColors.armaLarga;
     final paysInUsd = displayMethod.isUsdPayment;
     final primaryLabel = paysInUsd ? 'TOTAL USD' : 'TOTAL ARS';
     final primaryValue = paysInUsd ? formatUsd(lineUsd) : formatArs(lineArs);
@@ -55,18 +62,52 @@ class CartItemCard extends StatelessWidget {
             product.marcaUpper,
             style: Theme.of(context).textTheme.titleMedium,
           ),
-          const SizedBox(height: 4),
-          Text(
-            product.isArma ? product.modeloDisplay : product.codigo,
-            style: Theme.of(context).textTheme.bodyMedium,
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ProductSellerThumb(
+                product: product,
+                accent: accent,
+                size: 72,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (product.cartDisplayCode.isNotEmpty)
+                      Text(
+                        product.cartDisplayCode,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 18,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    const SizedBox(height: 4),
+                    Text(
+                      product.sellerShortTitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        height: 1.2,
+                      ),
+                    ),
+                    if (product.sellerTagLabels.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      ProductSellerTags(
+                        labels: product.sellerTagLabels,
+                        accent: accent,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
-          if (product.isArma) ...[
-            const SizedBox(height: 4),
-            Text(
-              'Cal. ${product.calibre}',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ],
           if (onSerialChanged != null) ...[
             const SizedBox(height: 10),
             CartSerialField(

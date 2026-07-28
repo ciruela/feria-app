@@ -21,6 +21,15 @@ void main() {
     expect(cart.items.first.quantity, 2);
   });
 
+  test('addProductQuantity respects stock limit', () {
+    final product = testProduct(id: 'p1', stock: 3);
+
+    expect(cart.addProductQuantity(product, 2), CartAddResult.added);
+    expect(cart.items.first.quantity, 2);
+    expect(cart.addProductQuantity(product, 2), CartAddResult.stockLimitReached);
+    expect(cart.items.first.quantity, 2);
+  });
+
   test('clears checkout payment when cart is cleared', () {
     cart.addProduct(testProduct());
     cart.setCheckoutPayment(

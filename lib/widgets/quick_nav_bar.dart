@@ -1,14 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../screens/employee/employee_home_screen.dart';
+import '../screens/auth/tenant_app_shell.dart';
 import '../theme/app_theme.dart';
-
-void goToEmployeeHome(BuildContext context) {
-  Navigator.of(context).pushAndRemoveUntil(
-    MaterialPageRoute(builder: (_) => const EmployeeHomeScreen()),
-    (route) => false,
-  );
-}
 
 class QuickNavBar extends StatelessWidget {
   const QuickNavBar({

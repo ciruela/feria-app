@@ -251,8 +251,8 @@ class _AdminAdminsScreenState extends State<AdminAdminsScreen> {
               icon: Icons.vpn_key_rounded,
               color: AppColors.goldDark,
               message:
-                  'El PIN maestro (Cambiar PIN admin) siempre funciona como respaldo. '
-                  'Cada administrador con nombre queda registrado en la actividad.',
+                  'Estos PIN identifican quién opera en el panel y en la auditoría. '
+                  'Para dar acceso con email a la armería, usá Equipo de la armería.',
             ),
             const SizedBox(height: 16),
             if (current != null)

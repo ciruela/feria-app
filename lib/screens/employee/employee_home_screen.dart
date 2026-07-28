@@ -6,18 +6,21 @@ import '../../models/app_role.dart';
 import '../../models/product.dart';
 import '../../services/cart_service.dart';
 import '../../services/catalog_service.dart';
+import '../../services/auth_service.dart';
 import '../../services/exchange_rate_service.dart';
 import '../../services/seller_service.dart';
+import '../../services/in_tenant_flow_service.dart';
+import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/big_action_button.dart';
 import '../../widgets/feria_shell.dart';
 import '../../widgets/quick_nav_bar.dart';
 import '../../widgets/section_header.dart';
+import '../auth/tenant_app_shell.dart';
 import '../cart_screen.dart';
 import '../category_catalog_screen.dart';
 import '../role_gate_screen.dart';
-import '../seller_select_screen.dart';
 
 class EmployeeHomeScreen extends StatelessWidget {
   const EmployeeHomeScreen({super.key});
@@ -56,13 +59,15 @@ class EmployeeHomeScreen extends StatelessWidget {
             onSelected: (value) {
               switch (value) {
                 case 'seller':
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (_) => const SellerSelectScreen(),
-                    ),
-                  );
+                  context.read<InTenantFlowService>().openSellerSelect();
                 case 'logout':
-                  exitToRoleGate(context);
+                  final session = context.read<TenantSessionService>();
+                  if (session.isSellerPortalSession) {
+                    context.read<AuthService>().logout();
+                    session.signOut();
+                  } else {
+                    exitInTenantFlow(context);
+                  }
               }
             },
             itemBuilder: (context) => const [

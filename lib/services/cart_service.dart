@@ -77,8 +77,16 @@ class CartService extends ChangeNotifier {
     return (stock - othersInCart).clamp(0, stock);
   }
 
-  CartAddResult addProduct(Product product) {
-    if (!canAddMore(product)) {
+  CartAddResult addProduct(Product product) =>
+      addProductQuantity(product, 1);
+
+  CartAddResult addProductQuantity(Product product, int quantity) {
+    if (quantity <= 0 || !product.inStock) {
+      return CartAddResult.stockLimitReached;
+    }
+
+    final remaining = remainingStock(product);
+    if (remaining != null && quantity > remaining) {
       return CartAddResult.stockLimitReached;
     }
 
@@ -87,12 +95,13 @@ class CartService extends ChangeNotifier {
 
     if (existing != null) {
       final max = maxQuantityForLine(existing);
-      if (max != null && existing.quantity >= max) {
+      final newQuantity = existing.quantity + quantity;
+      if (max != null && newQuantity > max) {
         return CartAddResult.stockLimitReached;
       }
-      existing.quantity++;
+      existing.quantity = newQuantity;
     } else {
-      _items.add(CartItem(product: product));
+      _items.add(CartItem(product: product, quantity: quantity));
     }
     notifyListeners();
     return CartAddResult.added;

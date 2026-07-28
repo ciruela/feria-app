@@ -9,6 +9,7 @@ import '../services/pricing_service.dart';
 import '../services/pricing_settings_service.dart';
 import '../services/product_photo_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/add_to_cart_sheet.dart';
 import '../widgets/added_to_cart_sheet.dart';
 import '../widgets/feria_shell.dart';
 import '../widgets/product_prices_panel.dart';
@@ -72,25 +73,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Future<void> _addToCart() async {
-    final cart = context.read<CartService>();
-    if (!cart.canAddMore(product)) {
-      showStockLimitMessage(context, product);
-      return;
-    }
-
-    final result = cart.addProduct(product);
-    if (!mounted) return;
-
-    if (result == CartAddResult.stockLimitReached) {
-      showStockLimitMessage(context, product);
-      return;
-    }
-
-    final label = product.isArma ? product.modeloDisplay : product.codigo;
-    final action = await showAddedToCartSheet(
-      context,
-      productLabel: label,
-    );
+    final action = await promptAddToCart(context, product);
     if (!mounted) return;
     await handleAddedToCartNavigation(context, action);
   }

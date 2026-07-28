@@ -63,6 +63,100 @@ class Product {
 
   String get modeloDisplay => modelo.isNotEmpty ? modelo : codigo;
 
+  /// Texto para que el vendedor identifique el ítem en carrito / venta.
+  String get cartDisplayDescription {
+    if (descripcion.trim().isNotEmpty) return descripcion.trim();
+    if (isArma) {
+      final parts = <String>[modeloDisplay];
+      if (calibre.isNotEmpty) parts.add('Cal. $calibre');
+      return parts.join(' · ');
+    }
+    return codigo;
+  }
+
+  /// Código corto secundario en carrito (munición).
+  String get cartDisplayCode =>
+      isMunicion && codigo.isNotEmpty ? codigo : '';
+
+  /// Unidad al elegir cantidad en carrito.
+  String get cartQuantityUnit => isMunicion ? 'cajas' : 'unidades';
+
+  /// Nombre corto para identificar rápido en catálogo / carrito.
+  /// Ej: "Varmit V-Max" en lugar del texto CCI completo.
+  String get sellerShortTitle {
+    if (isArma) {
+      return modelo.isNotEmpty ? modelo : modeloDisplay;
+    }
+    if (descripcion.trim().isEmpty) {
+      return [
+        if (calibre.isNotEmpty) calibre,
+        if (granos.isNotEmpty) granos,
+      ].join(' · ');
+    }
+    final parsed = _extractSellerShortTitle(descripcion);
+    return parsed.isNotEmpty ? parsed : descripcion.trim();
+  }
+
+  /// Chips visuales para escaneo rápido (calibre, grains, caja, modelo).
+  List<String> get sellerTagLabels {
+    if (isArma) {
+      return [
+        if (calibre.isNotEmpty) calibre,
+      ];
+    }
+
+    final tags = <String>[];
+    void add(String value) {
+      final v = value.trim();
+      if (v.isEmpty) return;
+      if (!tags.any((t) => t.toLowerCase() == v.toLowerCase())) {
+        tags.add(v);
+      }
+    }
+
+    add(calibre);
+    add(granos);
+    if (roundsPerBox != null && roundsPerBox! > 0) {
+      add('$roundsPerBox/caja');
+    }
+    add(modelo);
+    return tags;
+  }
+
+  static String _extractSellerShortTitle(String raw) {
+    var text = raw.toUpperCase().replaceAll('\u00a0', ' ');
+    text = text.replaceAll(RegExp(r'C\.?\s*\d{1,3}(?:\.\d{1,3})?\s*'), '');
+    text = text.replaceAll(RegExp(r'\b\d{2,3}\s*G(R)?\b'), '');
+    text = text.replaceAll(RegExp(r'\b\d{3,4}\s*FPS\b'), '');
+    text = text.replaceAll(RegExp(r'\bLR\b'), '');
+    text = text.replaceAll(RegExp(r'\bWMG\b'), '');
+    text = text.replaceAll(RegExp(r'\bM\.\s*[A-Z0-9]+\b'), '');
+    text = text.replaceAll(RegExp(r'\(\d+\)'), '');
+    text = text.replaceAll(RegExp(r'\bCCI\b'), '');
+    text = text.replaceAll(RegExp(r'[/\\]+'), ' ');
+    text = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    if (text.isEmpty) return '';
+
+    return text
+        .split(' ')
+        .where((part) => part.isNotEmpty)
+        .map(_titleCaseToken)
+        .join(' ');
+  }
+
+  static String _titleCaseToken(String token) {
+    if (token.isEmpty) return token;
+    if (token.contains('-')) {
+      return token
+          .split('-')
+          .where((part) => part.isNotEmpty)
+          .map(_titleCaseToken)
+          .join('-');
+    }
+    return token[0] + token.substring(1).toLowerCase();
+  }
+
   /// Peso de la punta (grains) para munición. Se deriva de la descripción
   /// estilo CCI ("C.22 40G LR...") -> "40 gr". Vacío si no se detecta.
   String get granos {

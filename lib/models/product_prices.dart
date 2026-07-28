@@ -85,6 +85,13 @@ enum PaymentMethod {
 
   /// Monto en dólares del producto (siempre el precio catálogo).
   double totalUsdFor(ProductPrices prices) => prices.usd;
+
+  static PaymentMethod fromKey(String key) {
+    for (final method in PaymentMethod.values) {
+      if (method.key == key) return method;
+    }
+    return PaymentMethod.lista;
+  }
 }
 
 /// Formas de pago que se preguntan al agregar un arma al carrito.

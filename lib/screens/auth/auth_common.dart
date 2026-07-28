@@ -5,11 +5,16 @@ import '../../services/admin_service.dart';
 import '../../services/catalog_service.dart';
 import '../../services/exchange_rate_service.dart';
 import '../../services/seller_service.dart';
+import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/tenant_slug.dart';
 
 /// Recarga datos del tenant activo tras autenticación.
 Future<void> reloadTenantData(BuildContext context) async {
+  final tenantId = context.read<TenantSessionService>().effectiveTenantId;
+  context.read<CatalogService>().bindTenant(tenantId);
+  context.read<SellerService>().bindTenant(tenantId);
+
   await Future.wait([
     context.read<CatalogService>().load(),
     context.read<SellerService>().load(),

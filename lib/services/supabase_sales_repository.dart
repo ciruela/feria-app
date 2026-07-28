@@ -2,15 +2,20 @@ import '../models/audit_entry.dart';
 import '../models/budget.dart';
 import '../models/sale_record.dart';
 import '../utils/app_logger.dart';
+import '../utils/jwt.dart';
 import 'audit_service.dart';
+import 'catalog_service.dart';
 import 'supabase_catalog_repository.dart';
 import 'supabase_service.dart';
 import 'comprobante_pdf_service.dart';
 
 class SupabaseSalesRepository {
+  SupabaseSalesRepository({CatalogService? catalog}) : _catalog = catalog;
+
   static const _table = 'ventas';
 
-  final SupabaseCatalogRepository _catalog = SupabaseCatalogRepository();
+  final CatalogService? _catalog;
+  final SupabaseCatalogRepository _catalogRepo = SupabaseCatalogRepository();
   final ComprobantePdfService _pdfService = ComprobantePdfService();
 
   Future<List<SaleRecord>> fetchForDay(DateTime day) async {
@@ -56,20 +61,19 @@ class SupabaseSalesRepository {
         .single();
 
     final saleId = row['id'] as String;
+    final tenantId = _currentTenantId();
 
-    try {
-      final pdfPath = await _pdfService.uploadForSale(saleId, budget);
-      await SupabaseService.client
-          .from(_table)
-          .update({'pdf_path': pdfPath})
-          .eq('id', saleId);
-    } catch (e, s) {
-      // La venta queda guardada aunque falle el PDF.
-      AppLogger.warn('No se pudo generar/subir el PDF de la venta $saleId',
-          error: e, stackTrace: s);
-    }
+    await _uploadPdfWithRetry(
+      saleId: saleId,
+      budget: budget,
+      tenantId: tenantId,
+    );
 
-    await _decrementStock(budget, saleId: saleId, sellerId: sellerId);
+    await _applyStockDecrement(
+      budget,
+      saleId: saleId,
+      sellerId: sellerId,
+    );
 
     final itemsCount = budget.lines.fold<int>(0, (sum, l) => sum + l.quantity);
     AuditService.instance.log(
@@ -83,16 +87,12 @@ class SupabaseSalesRepository {
     );
   }
 
-  /// Anula una venta (soft-delete): conserva la fila para auditoría, restituye
-  /// el stock de cada producto y registra la acción. Devuelve `true` si la
-  /// anulación se aplicó (o `false` si la venta ya estaba anulada).
   Future<bool> voidSale(
     SaleRecord sale, {
     required String motivo,
     String? actorId,
     String? actorNombre,
   }) async {
-    // Evita doble anulación (y doble restitución de stock).
     final existing = await SupabaseService.client
         .from(_table)
         .select('anulada')
@@ -108,23 +108,23 @@ class SupabaseSalesRepository {
       'anulada_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', sale.id);
 
-    final quantities = <String, int>{};
-    for (final line in sale.lines) {
-      if (line.productId.isEmpty) continue;
-      quantities.update(
-        line.productId,
-        (value) => value + line.quantity,
-        ifAbsent: () => line.quantity,
-      );
-    }
+    final quantities = _quantitiesFromSaleLines(sale.lines);
 
-    for (final entry in quantities.entries) {
-      await _catalog.restoreStock(
-        entry.key,
-        entry.value,
-        ventaId: sale.id,
-        vendedorId: sale.vendedorId,
+    if (_catalog != null) {
+      await _catalog.applySaleStockRestore(
+        quantities,
+        saleId: sale.id,
+        sellerId: sale.vendedorId,
       );
+    } else {
+      for (final entry in quantities.entries) {
+        await _catalogRepo.restoreStock(
+          entry.key,
+          entry.value,
+          ventaId: sale.id,
+          vendedorId: sale.vendedorId,
+        );
+      }
     }
 
     AuditService.instance.log(
@@ -138,6 +138,67 @@ class SupabaseSalesRepository {
     );
 
     return true;
+  }
+
+  Future<void> _uploadPdfWithRetry({
+    required String saleId,
+    required Budget budget,
+    String? tenantId,
+  }) async {
+    Object? lastError;
+    StackTrace? lastStack;
+
+    for (var attempt = 1; attempt <= 2; attempt++) {
+      try {
+        final pdfPath = await _pdfService.uploadForSale(
+          saleId,
+          budget,
+          tenantId: tenantId,
+        );
+        await SupabaseService.client
+            .from(_table)
+            .update({'pdf_path': pdfPath})
+            .eq('id', saleId);
+        return;
+      } catch (error, stackTrace) {
+        lastError = error;
+        lastStack = stackTrace;
+        AppLogger.warn(
+          'Intento $attempt: no se pudo subir PDF de venta $saleId',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
+    }
+
+    try {
+      await SupabaseService.client.from(_table).delete().eq('id', saleId);
+    } catch (deleteError, deleteStack) {
+      AppLogger.error(
+        'No se pudo revertir venta $saleId tras fallo de PDF',
+        error: deleteError,
+        stackTrace: deleteStack,
+      );
+    }
+
+    AppLogger.error(
+      'PDF no guardado para venta $saleId',
+      error: lastError,
+      stackTrace: lastStack,
+    );
+    throw StateError(
+      'No se pudo guardar el PDF del comprobante en la nube. '
+      'Revisá la conexión y que el bucket feria-comprobantes tenga permisos '
+      '(migración 010). La venta no se confirmó.',
+    );
+  }
+
+  String? _currentTenantId() {
+    final session = SupabaseService.client.auth.currentSession;
+    if (session == null) return null;
+    final claim = decodeJwtPayload(session.accessToken)['tenant_id'];
+    final tenantId = (claim is String ? claim : claim?.toString())?.trim();
+    return tenantId == null || tenantId.isEmpty ? null : tenantId;
   }
 
   Map<String, dynamic> _itemsPayload(Budget budget) {
@@ -177,14 +238,36 @@ class SupabaseSalesRepository {
     };
   }
 
-  Future<void> _decrementStock(
+  Future<void> _applyStockDecrement(
     Budget budget, {
     String? saleId,
     String? sellerId,
   }) async {
-    final quantities = <String, int>{};
+    final quantities = _quantitiesFromBudgetLines(budget.lines);
+    if (quantities.isEmpty) return;
 
-    for (final line in budget.lines) {
+    if (_catalog != null) {
+      await _catalog.applySaleStockDecrement(
+        quantities,
+        saleId: saleId,
+        sellerId: sellerId,
+      );
+      return;
+    }
+
+    for (final entry in quantities.entries) {
+      await _catalogRepo.decrementStock(
+        entry.key,
+        entry.value,
+        ventaId: saleId,
+        vendedorId: sellerId,
+      );
+    }
+  }
+
+  Map<String, int> _quantitiesFromBudgetLines(List<BudgetLine> lines) {
+    final quantities = <String, int>{};
+    for (final line in lines) {
       if (line.productId.isEmpty) continue;
       quantities.update(
         line.productId,
@@ -192,14 +275,19 @@ class SupabaseSalesRepository {
         ifAbsent: () => line.quantity,
       );
     }
+    return quantities;
+  }
 
-    for (final entry in quantities.entries) {
-      await _catalog.decrementStock(
-        entry.key,
-        entry.value,
-        ventaId: saleId,
-        vendedorId: sellerId,
+  Map<String, int> _quantitiesFromSaleLines(List<SaleLineRecord> lines) {
+    final quantities = <String, int>{};
+    for (final line in lines) {
+      if (line.productId.isEmpty) continue;
+      quantities.update(
+        line.productId,
+        (value) => value + line.quantity,
+        ifAbsent: () => line.quantity,
       );
     }
+    return quantities;
   }
 }

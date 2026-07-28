@@ -14,13 +14,16 @@ import '../../utils/formatters.dart';
 import '../../widgets/big_action_button.dart';
 import '../../widgets/feria_shell.dart';
 import '../../widgets/section_header.dart';
+import '../../widgets/supabase_config_banner.dart';
 import '../employee/employee_home_screen.dart';
 import '../exchange_rate_screen.dart';
+import '../auth/tenant_app_shell.dart';
 import '../role_gate_screen.dart';
 import 'admin_activity_screen.dart';
 import 'admin_admins_screen.dart';
 import 'admin_change_pin_screen.dart';
 import 'admin_cierre_screen.dart';
+import 'admin_comprobantes_screen.dart';
 import 'admin_excel_screen.dart';
 import 'admin_export_screen.dart';
 import 'admin_metrics_screen.dart';
@@ -28,6 +31,7 @@ import 'admin_pricing_screen.dart';
 import 'admin_products_screen.dart';
 import 'admin_sellers_screen.dart';
 import 'admin_stock_movimientos_screen.dart';
+import 'admin_team_screen.dart';
 
 class AdminHomeScreen extends StatelessWidget {
   const AdminHomeScreen({super.key});
@@ -43,7 +47,7 @@ class AdminHomeScreen extends StatelessWidget {
         actions: [
           IconButton(
             tooltip: 'Salir',
-            onPressed: () => exitToRoleGate(context),
+            onPressed: () => exitInTenantFlow(context),
             icon: const Icon(Icons.logout),
           ),
         ],
@@ -56,6 +60,7 @@ class AdminHomeScreen extends StatelessWidget {
             child: roleBadge(AppRole.admin),
           ),
           const SizedBox(height: 12),
+          const SupabaseConfigBanner(),
           if (AppConfig.useSupabase) ...[
             const _TodayDashboard(),
             const SizedBox(height: 16),
@@ -134,72 +139,6 @@ class AdminHomeScreen extends StatelessWidget {
               );
             },
           ),
-          if (AppConfig.usesRemoteSellers && !AppConfig.useSupabase) ...[
-            const SizedBox(height: 14),
-            BigActionButton(
-              label: 'Sincronizar vendedores',
-              subtitle: 'Bajar lista desde la nube',
-              icon: Icons.cloud_download_outlined,
-              accentColor: AppColors.armaCorta,
-              onTap: sellers.isSyncing
-                  ? () {}
-                  : () async {
-                      await context.read<SellerService>().syncFromCloud();
-                      if (!context.mounted) return;
-                      final error = context.read<SellerService>().lastError;
-                      if (error != null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(error)),
-                        );
-                      }
-                    },
-            ),
-          ],
-          if (AppConfig.usesRemoteCatalog) ...[
-            const SizedBox(height: 14),
-            BigActionButton(
-              label: AppConfig.useSupabase
-                  ? 'Bajar catálogo de Supabase'
-                  : 'Bajar catálogo de la nube',
-              subtitle: 'Traer última versión publicada',
-              icon: Icons.cloud_download_outlined,
-              accentColor: AppColors.armaCorta,
-              onTap: catalog.isSyncing ? () {} : () => catalog.syncFromCloud(),
-            ),
-          ],
-          if (AppConfig.useSupabase) ...[
-            const SizedBox(height: 14),
-            BigActionButton(
-              label: 'Publicar catálogo a Supabase',
-              subtitle: 'Subir todos los productos locales',
-              icon: Icons.cloud_upload_outlined,
-              accentColor: AppColors.municion,
-              onTap: catalog.isSyncing
-                  ? () {}
-                  : () async {
-                      try {
-                        await catalog.publishAllToSupabase();
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Catálogo publicado en Supabase'),
-                          ),
-                        );
-                      } catch (e, s) {
-                        AppLogger.error('Error al publicar catálogo en Supabase',
-                            error: e, stackTrace: s);
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              catalog.lastError ?? 'Error al publicar',
-                            ),
-                          ),
-                        );
-                      }
-                    },
-            ),
-          ],
           const SizedBox(height: 14),
           BigActionButton(
             label: 'Métricas del día',
@@ -266,8 +205,24 @@ class AdminHomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           BigActionButton(
+            label: 'Equipo de la armería',
+            subtitle: AppConfig.useSupabase
+                ? 'Invitar personas por email a tu organización'
+                : 'Requiere Supabase configurado',
+            icon: Icons.groups_3_rounded,
+            accentColor: AppColors.primaryLight,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const AdminTeamScreen(),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          BigActionButton(
             label: 'Administradores',
-            subtitle: 'Gestionar accesos y PIN por admin',
+            subtitle: 'PIN local para identificar quién opera en el panel',
             icon: Icons.admin_panel_settings_rounded,
             accentColor: AppColors.gold,
             onTap: () {
@@ -392,7 +347,7 @@ class _TodayDashboardState extends State<_TodayDashboard> {
   int get _lowStockCount {
     final products = context.read<CatalogService>().products;
     return products
-        .where((p) => p.stock != null && p.stock! <= 3)
+        .where((p) => p.stock != null && p.stock! <= kLowStockThreshold)
         .length;
   }
 
@@ -454,7 +409,7 @@ class _TodayDashboardState extends State<_TodayDashboard> {
                 label: 'Ventas',
                 value: '${metrics?.saleCount ?? 0}',
                 icon: Icons.receipt_long_rounded,
-                onTap: () => _go(const AdminMetricsScreen()),
+                onTap: () => _go(const AdminComprobantesScreen()),
               ),
               const SizedBox(width: 10),
               _DashTile(
@@ -480,7 +435,8 @@ class _TodayDashboardState extends State<_TodayDashboard> {
                 value: '$_lowStockCount',
                 icon: Icons.warning_amber_rounded,
                 highlight: _lowStockCount > 0,
-                onTap: () => _go(const AdminProductsScreen()),
+                onTap: () =>
+                    _go(const AdminProductsScreen(lowStockOnly: true)),
               ),
             ],
           ),

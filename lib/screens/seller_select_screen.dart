@@ -6,10 +6,14 @@ import '../services/seller_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/feria_shell.dart';
 import '../widgets/section_header.dart';
-import 'employee/employee_home_screen.dart';
 
 class SellerSelectScreen extends StatelessWidget {
-  const SellerSelectScreen({super.key});
+  const SellerSelectScreen({
+    super.key,
+    required this.onSellerSelected,
+  });
+
+  final ValueChanged<Seller> onSellerSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +44,10 @@ class SellerSelectScreen extends StatelessWidget {
                 childAspectRatio: 1.35,
               ),
               delegate: SliverChildBuilderDelegate(
-                (context, index) => _SellerTile(seller: sellers[index]),
+                (context, index) => _SellerTile(
+                  seller: sellers[index],
+                  onSelected: onSellerSelected,
+                ),
                 childCount: sellers.length,
               ),
             ),
@@ -52,9 +59,13 @@ class SellerSelectScreen extends StatelessWidget {
 }
 
 class _SellerTile extends StatelessWidget {
-  const _SellerTile({required this.seller});
+  const _SellerTile({
+    required this.seller,
+    required this.onSelected,
+  });
 
   final Seller seller;
+  final ValueChanged<Seller> onSelected;
 
   String get _initials {
     final parts = seller.nombre.trim().split(RegExp(r'\s+'));
@@ -72,9 +83,7 @@ class _SellerTile extends StatelessWidget {
         onTap: () async {
           await context.read<SellerService>().selectSeller(seller);
           if (!context.mounted) return;
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const EmployeeHomeScreen()),
-          );
+          onSelected(seller);
         },
         borderRadius: AppDecorations.radiusLg,
         child: Ink(

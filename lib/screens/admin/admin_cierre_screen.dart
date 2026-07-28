@@ -3,12 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_config.dart';
+import '../../models/sale_record.dart';
+import '../../models/sales_metrics.dart';
 import '../../services/catalog_service.dart';
+import '../../services/sales_metrics_service.dart';
 import '../../services/stock_cierre_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/feria_shell.dart';
 import '../../widgets/section_header.dart';
+import 'admin_comprobantes_screen.dart';
 
 class AdminCierreScreen extends StatefulWidget {
   const AdminCierreScreen({super.key});
@@ -18,17 +22,26 @@ class AdminCierreScreen extends StatefulWidget {
 }
 
 class _AdminCierreScreenState extends State<AdminCierreScreen> {
-  final _service = StockCierreService();
+  final _cierreService = StockCierreService();
+  SalesMetricsService? _salesService;
+
   DateTime _selectedDay = DateTime.now();
   CierreResumen? _resumen;
+  DaySalesMetrics? _ventas;
+  StockAlCierre? _stockAlCierre;
   bool _loading = false;
   bool _exporting = false;
+  bool _didInitialLoad = false;
   String? _error;
 
   @override
-  void initState() {
-    super.initState();
-    if (AppConfig.useSupabase) {
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _salesService ??= SalesMetricsService(
+      catalog: context.read<CatalogService>(),
+    );
+    if (!_didInitialLoad && AppConfig.useSupabase) {
+      _didInitialLoad = true;
       _load();
     }
   }
@@ -40,10 +53,23 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
     });
     try {
       final products = context.read<CatalogService>().products;
-      final resumen = await _service.cierreForDay(_selectedDay, products);
+      final salesService = _salesService;
+      if (salesService == null) {
+        if (!mounted) return;
+        setState(() => _loading = false);
+        return;
+      }
+
+      final results = await Future.wait([
+        _cierreService.cierreForDay(_selectedDay, products),
+        salesService.metricsForDay(_selectedDay),
+      ]);
+
       if (!mounted) return;
       setState(() {
-        _resumen = resumen;
+        _resumen = results[0] as CierreResumen;
+        _ventas = results[1] as DaySalesMetrics;
+        _stockAlCierre = _cierreService.stockAlCierre(products);
         _loading = false;
       });
     } catch (error) {
@@ -69,21 +95,27 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
 
   Future<void> _export() async {
     final resumen = _resumen;
-    if (resumen == null) return;
+    final ventas = _ventas;
+    final stock = _stockAlCierre;
+    if (resumen == null || ventas == null || stock == null) return;
 
     setState(() => _exporting = true);
     try {
-      final bytes = _service.exportToExcel(resumen);
+      final bytes = _cierreService.exportCierreCompleto(
+        resumen: resumen,
+        ventas: ventas.sales,
+        stockAlCierre: stock,
+      );
       final stamp = DateFormatCompat.file(_selectedDay);
       await FilePicker.saveFile(
-        fileName: 'cierre_$stamp.xlsx',
+        fileName: 'cierre_completo_$stamp.xlsx',
         bytes: bytes,
         type: FileType.custom,
         allowedExtensions: ['xlsx'],
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cierre exportado')),
+        const SnackBar(content: Text('Cierre completo exportado')),
       );
     } catch (error) {
       if (!mounted) return;
@@ -93,6 +125,14 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
+  }
+
+  void _openComprobantes() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AdminComprobantesScreen(initialDate: _selectedDay),
+      ),
+    );
   }
 
   @override
@@ -122,7 +162,7 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
                       ),
                     )
                   : const Icon(Icons.download_rounded),
-              label: const Text('EXPORTAR'),
+              label: const Text('EXPORTAR CIERRE'),
             ),
       body: !AppConfig.useSupabase
           ? const Center(
@@ -147,23 +187,40 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
                         const SizedBox(height: 16),
                         _Banner(message: _error!),
                       ],
-                      if (_resumen != null) ...[
+                      if (_resumen != null &&
+                          _ventas != null &&
+                          _stockAlCierre != null) ...[
                         const SizedBox(height: 20),
-                        _TotalsCard(resumen: _resumen!),
+                        _ResumenEjecutivo(
+                          resumen: _resumen!,
+                          ventas: _ventas!,
+                          stock: _stockAlCierre!,
+                        ),
                         const SizedBox(height: 24),
                         const SectionHeader(
-                          title: 'Munición',
-                          subtitle: 'Apertura → vendido → cierre (cajas y balas)',
+                          title: 'Ventas del día',
+                          subtitle: 'Comprobantes emitidos y cobros',
                         ),
                         const SizedBox(height: 12),
-                        ..._municionLines(_resumen!),
+                        _VentasSection(
+                          metrics: _ventas!,
+                          onVerTodos: _openComprobantes,
+                        ),
                         const SizedBox(height: 24),
                         const SectionHeader(
-                          title: 'Armas',
-                          subtitle: 'Apertura → vendido → cierre (unidades)',
+                          title: 'Stock al cierre',
+                          subtitle: 'Totales actuales del inventario',
                         ),
                         const SizedBox(height: 12),
-                        ..._armasLines(_resumen!),
+                        _StockAlCierreCard(stock: _stockAlCierre!),
+                        const SizedBox(height: 24),
+                        const SectionHeader(
+                          title: 'Movimientos de stock',
+                          subtitle:
+                              'Solo productos con ventas, cargas o ajustes hoy',
+                        ),
+                        const SizedBox(height: 12),
+                        ..._movimientoLines(_resumen!),
                       ],
                     ],
                   ),
@@ -171,30 +228,40 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
     );
   }
 
-  List<Widget> _municionLines(CierreResumen resumen) {
-    final lines = resumen.municion.toList();
-    if (lines.isEmpty) {
-      return [const _EmptyRow('Sin munición con stock')];
+  List<Widget> _movimientoLines(CierreResumen resumen) {
+    final activos = resumen.conActividad.toList();
+    if (activos.isEmpty) {
+      return const [
+        _EmptyRow('Sin movimientos de stock en este día'),
+      ];
     }
-    return lines
-        .map((line) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _CierreLineCard(line: line),
-            ))
-        .toList();
-  }
 
-  List<Widget> _armasLines(CierreResumen resumen) {
-    final lines = resumen.armas.toList();
-    if (lines.isEmpty) {
-      return [const _EmptyRow('Sin armas con stock')];
-    }
-    return lines
-        .map((line) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _CierreLineCard(line: line),
-            ))
-        .toList();
+    final muni = activos.where((l) => l.isMunicion).toList();
+    final armas = activos.where((l) => !l.isMunicion).toList();
+
+    return [
+      if (muni.isNotEmpty) ...[
+        const _SubsectionLabel('Munición'),
+        const SizedBox(height: 8),
+        ...muni.map(
+          (line) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _CierreLineCard(line: line),
+          ),
+        ),
+      ],
+      if (armas.isNotEmpty) ...[
+        if (muni.isNotEmpty) const SizedBox(height: 8),
+        const _SubsectionLabel('Armas'),
+        const SizedBox(height: 8),
+        ...armas.map(
+          (line) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _CierreLineCard(line: line),
+          ),
+        ),
+      ],
+    ];
   }
 }
 
@@ -248,10 +315,16 @@ class _DateSelector extends StatelessWidget {
   }
 }
 
-class _TotalsCard extends StatelessWidget {
-  const _TotalsCard({required this.resumen});
+class _ResumenEjecutivo extends StatelessWidget {
+  const _ResumenEjecutivo({
+    required this.resumen,
+    required this.ventas,
+    required this.stock,
+  });
 
   final CierreResumen resumen;
+  final DaySalesMetrics ventas;
+  final StockAlCierre stock;
 
   @override
   Widget build(BuildContext context) {
@@ -266,7 +339,7 @@ class _TotalsCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'VENDIDO EN EL DÍA',
+            'RESUMEN DEL DÍA',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w800,
@@ -274,33 +347,296 @@ class _TotalsCard extends StatelessWidget {
               letterSpacing: 0.5,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Row(
             children: [
               _TotalCell(
-                label: 'Balas',
-                value: '${resumen.totalBalasVendidas}',
+                label: 'Comprobantes',
+                value: '${ventas.saleCount}',
               ),
               _TotalCell(
-                label: 'Cajas',
+                label: 'Cajas vend.',
                 value: '${resumen.totalCajasVendidas}',
               ),
               _TotalCell(
-                label: 'Armas',
+                label: 'Armas vend.',
                 value: '${resumen.totalArmasVendidas}',
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Cobrado: ${formatArs(ventas.totalArs)} · ${formatUsd(ventas.totalUsd)}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
           Text(
-            'Quedan en munición: ${resumen.totalBalasCierre} balas',
+            'Stock actual: ${stock.productosConStock} productos · '
+            '${stock.cajasMunicion} cajas · ${stock.balasMunicion} balas · '
+            '${stock.unidadesArmas} armas',
             style: const TextStyle(
-              fontSize: 13,
+              fontSize: 12,
               color: AppColors.textSecondary,
               fontWeight: FontWeight.w600,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _VentasSection extends StatelessWidget {
+  const _VentasSection({
+    required this.metrics,
+    required this.onVerTodos,
+  });
+
+  final DaySalesMetrics metrics;
+  final VoidCallback onVerTodos;
+
+  @override
+  Widget build(BuildContext context) {
+    if (metrics.saleCount == 0) {
+      return const _EmptyRow('Sin ventas en este día');
+    }
+
+    final activas = metrics.sales.where((s) => !s.anulada).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final preview = activas.take(5).toList();
+
+    return Column(
+      children: [
+        ...preview.map(
+          (sale) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _VentaTile(sale: sale),
+          ),
+        ),
+        if (activas.length > preview.length)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'y ${activas.length - preview.length} más…',
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: onVerTodos,
+            icon: const Icon(Icons.receipt_long_rounded, size: 18),
+            label: Text(
+              'Ver comprobantes (${metrics.saleCount})',
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _VentaTile extends StatelessWidget {
+  const _VentaTile({required this.sale});
+
+  final SaleRecord sale;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = sale.createdAt;
+    final hora =
+        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Text(
+            hora,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  sale.clienteNombre,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (sale.sellerName?.isNotEmpty ?? false)
+                  Text(
+                    sale.sellerName!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (sale.collectedArs > 0)
+                Text(
+                  formatArs(sale.collectedArs),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              if (sale.collectedUsd > 0)
+                Text(
+                  formatUsd(sale.collectedUsd),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StockAlCierreCard extends StatelessWidget {
+  const _StockAlCierreCard({required this.stock});
+
+  final StockAlCierre stock;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              _StockStat(
+                label: 'Productos',
+                value: '${stock.productosConStock}',
+                icon: Icons.inventory_2_outlined,
+              ),
+              _StockStat(
+                label: 'Cajas',
+                value: '${stock.cajasMunicion}',
+                icon: Icons.inventory_outlined,
+              ),
+              _StockStat(
+                label: 'Balas',
+                value: '${stock.balasMunicion}',
+                icon: Icons.local_fire_department_outlined,
+              ),
+              _StockStat(
+                label: 'Armas',
+                value: '${stock.unidadesArmas}',
+                icon: Icons.shield_outlined,
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Totales del inventario actual, sin listar cada producto.',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StockStat extends StatelessWidget {
+  const _StockStat({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Icon(icon, size: 20, color: AppColors.primary),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: AppColors.primary,
+            ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubsectionLabel extends StatelessWidget {
+  const _SubsectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text.toUpperCase(),
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        color: AppColors.textSecondary,
+        letterSpacing: 0.6,
       ),
     );
   }
@@ -327,8 +663,9 @@ class _TotalCell extends StatelessWidget {
           ),
           Text(
             label,
+            textAlign: TextAlign.center,
             style: const TextStyle(
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
               color: AppColors.textSecondary,
             ),
@@ -363,9 +700,7 @@ class _CierreLineCard extends StatelessWidget {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: line.tieneActividad
-              ? AppColors.primary.withValues(alpha: 0.4)
-              : AppColors.border,
+          color: AppColors.primary.withValues(alpha: 0.4),
         ),
       ),
       child: Column(
@@ -388,7 +723,10 @@ class _CierreLineCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              _MiniCell(label: 'Apertura', value: cell(line.aperturaCajas, line.aperturaBalas)),
+              _MiniCell(
+                label: 'Apertura',
+                value: cell(line.aperturaCajas, line.aperturaBalas),
+              ),
               _arrow(),
               _MiniCell(
                 label: 'Vendido',
@@ -396,7 +734,10 @@ class _CierreLineCard extends StatelessWidget {
                 highlight: true,
               ),
               _arrow(),
-              _MiniCell(label: 'Cierre', value: cell(line.cierreCajas, line.cierreBalas)),
+              _MiniCell(
+                label: 'Cierre',
+                value: cell(line.cierreCajas, line.cierreBalas),
+              ),
             ],
           ),
           if (line.cargaCajas != 0 || line.ajusteCajas != 0) ...[

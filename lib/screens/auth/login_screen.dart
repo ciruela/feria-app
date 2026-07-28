@@ -43,7 +43,6 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    await reloadTenantData(context);
     if (!mounted) return;
     Navigator.of(context).popUntil((route) => route.isFirst);
   }

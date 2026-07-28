@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../auth/workspace_resolution.dart';
+import '../../services/in_tenant_flow_service.dart';
 import '../../services/tenant_session_service.dart';
-import '../role_gate_screen.dart';
+import '../employee/employee_home_screen.dart';
 import '../super_admin/super_admin_home_screen.dart';
 import 'auth_landing_screen.dart';
 import 'email_confirmation_screen.dart';
 import 'no_organization_screen.dart';
+import 'seller_portal_scope_loader.dart';
+import 'tenant_app_shell.dart';
+import 'tenant_scope_loader.dart';
 import 'workspace_selector_screen.dart';
 
-/// Decide la pantalla inicial segun autenticacion, confirmacion de email y tenant.
+/// Raíz de la app: una sola fuente de verdad para auth + workspace + tenant.
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
@@ -18,104 +23,73 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
-  bool _bootstrapped = false;
-  bool _bootstrapping = false;
-  TenantSessionService? _session;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _session ??= context.read<TenantSessionService>();
-  }
-
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _session?.addListener(_onSessionChanged);
-      _bootstrap();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureSessionReady());
   }
 
-  @override
-  void dispose() {
-    _session?.removeListener(_onSessionChanged);
-    super.dispose();
-  }
-
-  void _onSessionChanged() {
-    final session = _session;
-    if (session == null) return;
-    if (!session.isSignedIn) {
-      if (_bootstrapped || _bootstrapping) {
-        setState(() {
-          _bootstrapped = false;
-          _bootstrapping = false;
-        });
-      }
-      return;
-    }
-    if (session.isEmailConfirmed && !_bootstrapped && !_bootstrapping) {
-      _bootstrap();
-    }
-  }
-
-  Future<void> _bootstrap() async {
-    final session = _session;
-    if (session == null ||
-        !session.isConfigured ||
-        !session.isSignedIn ||
-        !session.isEmailConfirmed ||
-        _bootstrapping) {
-      return;
-    }
-
-    _bootstrapping = true;
-    await session.bootstrapSession();
+  void _ensureSessionReady() {
     if (!mounted) return;
-    setState(() {
-      _bootstrapped = true;
-      _bootstrapping = false;
-    });
+    context.read<TenantSessionService>().ensureSessionReady();
   }
 
   @override
   Widget build(BuildContext context) {
     final session = context.watch<TenantSessionService>();
 
-    if (!session.isConfigured) {
-      return const RoleGateScreen();
-    }
-
-    if (session.awaitingEmailConfirmation) {
-      return const EmailConfirmationScreen();
-    }
-
     if (!session.isSignedIn) {
-      return const AuthLandingScreen();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.read<InTenantFlowService>().reset();
+      });
+    } else if (session.needsSessionBootstrap) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _ensureSessionReady());
     }
 
-    if (!session.isEmailConfirmed) {
-      return const EmailConfirmationScreen();
-    }
+    final route = resolveAuthShellRoute(
+      isConfigured: session.isConfigured,
+      awaitingEmailConfirmation: session.awaitingEmailConfirmation,
+      isSignedIn: session.isSignedIn,
+      isEmailConfirmed: session.isEmailConfirmed,
+      isAnonymous: session.isAnonymous,
+      isSellerPortalSession: session.isSellerPortalSession,
+      sessionReady: session.sessionReady,
+      bootstrapping: session.bootstrapping,
+      provisioning: session.provisioning,
+      hasNoOrganizationAccess: session.hasNoOrganizationAccess,
+      view: session.view,
+      effectiveTenantId: session.effectiveTenantId,
+      destinationCount: session.destinationCount,
+    );
 
-    if (!_bootstrapped || session.provisioning || _bootstrapping) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
+    return switch (route) {
+      AuthShellRoute.offlineRoleGate => const TenantAppShell(),
+      AuthShellRoute.authLanding => const AuthLandingScreen(),
+      AuthShellRoute.emailPending => const EmailConfirmationScreen(),
+      AuthShellRoute.bootstrapping => const _BootLoading(),
+      AuthShellRoute.noOrganization => const NoOrganizationScreen(),
+      AuthShellRoute.workspacePicker => const WorkspaceSelectorScreen(),
+      AuthShellRoute.platformAdmin => const SuperAdminHomeScreen(),
+      AuthShellRoute.sellerPortal => SellerPortalScopeLoader(
+          key: ValueKey(session.effectiveTenantId ?? 'seller'),
+          child: const EmployeeHomeScreen(),
+        ),
+      AuthShellRoute.tenantApp => TenantScopeLoader(
+          key: ValueKey(session.effectiveTenantId ?? 'tenant'),
+          child: const TenantAppShell(),
+        ),
+    };
+  }
+}
 
-    if (session.hasNoOrganizationAccess) {
-      return const NoOrganizationScreen();
-    }
+class _BootLoading extends StatelessWidget {
+  const _BootLoading();
 
-    switch (session.view) {
-      case WorkspaceView.platform:
-        return const SuperAdminHomeScreen();
-      case WorkspaceView.tenant:
-        return const RoleGateScreen();
-      case WorkspaceView.none:
-        return const WorkspaceSelectorScreen();
-    }
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
+    );
   }
 }

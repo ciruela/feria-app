@@ -5,6 +5,7 @@ import '../../widgets/feria_shell.dart';
 import 'auth_common.dart';
 import 'login_screen.dart';
 import 'register_organization_screen.dart';
+import 'seller_portal_screen.dart';
 
 /// Pantalla inicial: separa iniciar sesion de registrar una armeria nueva.
 class AuthLandingScreen extends StatelessWidget {
@@ -49,6 +50,39 @@ class AuthLandingScreen extends StatelessWidget {
                         SizedBox(height: 4),
                         Text(
                           'Ya tengo una cuenta',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const SellerPortalScreen(),
+                        ),
+                      );
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: const Column(
+                      children: [
+                        Text(
+                          'ENTRAR COMO VENDEDOR',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Dominio + clave · sin registrarte',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,

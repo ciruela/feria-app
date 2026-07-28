@@ -10,19 +10,21 @@ import '../config/app_config.dart';
 import '../models/audit_entry.dart';
 import '../models/seller.dart';
 import '../utils/ids.dart';
+import '../utils/tenant_cache.dart';
 import 'audit_service.dart';
 import 'supabase_seller_repository.dart';
 import 'supabase_service.dart';
 
 class SellerService extends ChangeNotifier {
-  static const _cacheKey = 'sellers_cache_json';
-  static const _selectedKey = 'selected_seller_id';
+  static const _cacheKeyBase = 'sellers_cache_json';
+  static const _selectedKeyBase = 'selected_seller_id';
 
   List<Seller> _sellers = [];
   Seller? _selected;
   bool _isSyncing = false;
   String? _lastError;
   RealtimeChannel? _realtimeChannel;
+  String? _tenantScope;
 
   List<Seller> get sellers =>
       _sellers.where((seller) => seller.activo).toList();
@@ -42,12 +44,31 @@ class SellerService extends ChangeNotifier {
   Seller? get selected => _selected;
   bool get isSyncing => _isSyncing;
   String? get lastError => _lastError;
+  bool get hasTenantScope =>
+      !AppConfig.useSupabase ||
+      (_tenantScope != null && _tenantScope!.isNotEmpty);
+
+  String get _cacheKey => tenantCacheKey(_cacheKeyBase, _tenantScope);
+  String get _selectedKey => tenantCacheKey(_selectedKeyBase, _tenantScope);
 
   final SupabaseSellerRepository _supabaseSellers = SupabaseSellerRepository();
 
+  void bindTenant(String? tenantId) {
+    final next = tenantId?.trim();
+    if (_tenantScope == next) return;
+    _tenantScope = next;
+    _sellers = [];
+    _selected = null;
+    _lastError = null;
+    _realtimeChannel?.unsubscribe();
+    _realtimeChannel = null;
+  }
+
   Future<void> load() async {
+    if (AppConfig.useSupabase && !hasTenantScope) return;
+
     final loaded = await _loadFromCache();
-    if (!loaded) {
+    if (!loaded && !AppConfig.useSupabase) {
       await _loadFromAssets();
     }
     await _loadSelected();
@@ -112,7 +133,7 @@ class SellerService extends ChangeNotifier {
         debugPrint('SellerService silent sync: $error');
       } else {
         _lastError = error.toString();
-        if (_sellers.isEmpty) {
+        if (_sellers.isEmpty && !AppConfig.useSupabase) {
           await _loadFromAssets();
         }
       }

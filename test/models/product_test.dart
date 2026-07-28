@@ -52,6 +52,23 @@ void main() {
       expect(_municion(stock: 2).inStock, isTrue);
     });
 
+    test('sellerShortTitle simplifica descripciones CCI', () {
+      const m = Product(
+        id: 'm',
+        type: ProductType.municion,
+        marca: 'CCI',
+        calibre: '.22 LR',
+        codigo: '20732',
+        descripcion: 'C.22 30G LR VARMIT V-MAX (50)',
+        precioUsd: 10,
+        roundsPerBox: 50,
+      );
+      expect(m.sellerShortTitle, 'Varmit V-Max');
+      expect(m.sellerTagLabels, contains('.22 LR'));
+      expect(m.sellerTagLabels, contains('30 gr'));
+      expect(m.sellerTagLabels, contains('50/caja'));
+    });
+
     test('granos (peso de la punta) se deriva de la descripción', () {
       const m = Product(
         id: 'm',

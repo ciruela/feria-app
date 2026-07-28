@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../config/app_config.dart';
 import '../../models/seller.dart';
+import '../../services/seller_portal_service.dart';
 import '../../services/seller_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/uppercase_input.dart';
@@ -236,6 +237,8 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
               _ErrorBanner(message: service.lastError!),
               const SizedBox(height: 16),
             ],
+            if (AppConfig.useSupabase) const _SellerPortalAccessCard(),
+            if (AppConfig.useSupabase) const SizedBox(height: 20),
             StatCard(
               icon: Icons.groups_rounded,
               label: 'Equipo de ventas',
@@ -253,7 +256,7 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
                 const Expanded(
                   child: SectionHeader(
                     title: 'Lista del equipo',
-                    subtitle: 'Los activos aparecen al iniciar sesión',
+                    subtitle: 'Aparecen al entrar como vendedor',
                   ),
                 ),
                 FilterChip(
@@ -450,6 +453,165 @@ class _ErrorBanner extends StatelessWidget {
         border: Border.all(color: AppColors.danger.withValues(alpha: 0.35)),
       ),
       child: Text(message, style: const TextStyle(color: AppColors.danger)),
+    );
+  }
+}
+
+class _SellerPortalAccessCard extends StatefulWidget {
+  const _SellerPortalAccessCard();
+
+  @override
+  State<_SellerPortalAccessCard> createState() =>
+      _SellerPortalAccessCardState();
+}
+
+class _SellerPortalAccessCardState extends State<_SellerPortalAccessCard> {
+  final _portal = SellerPortalService();
+  final _codeController = TextEditingController();
+  String? _slug;
+  bool _loading = true;
+  bool _saving = false;
+  String? _message;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSlug();
+  }
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadSlug() async {
+    try {
+      final slug = await _portal.fetchCurrentTenantSlug();
+      if (!mounted) return;
+      setState(() {
+        _slug = slug;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _saveCode() async {
+    final code = _codeController.text.trim();
+    if (code.length < 4) {
+      setState(() => _message = 'Usá al menos 4 caracteres');
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _message = null;
+    });
+
+    try {
+      await _portal.setPortalCode(code);
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _message = 'Código actualizado. Compartilo con tu equipo de ventas.';
+        _codeController.clear();
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _message = error.toString();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.08),
+        borderRadius: AppDecorations.radiusMd,
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.storefront_rounded, color: AppColors.accent),
+              SizedBox(width: 8),
+              Text(
+                'Acceso de vendedores (sin registro)',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _loading
+                ? 'Cargando dominio…'
+                : 'Dominio: ${_slug ?? '—'}',
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'En la pantalla de inicio tus vendedores eligen '
+            '“Entrar como vendedor”, ponen este dominio y la clave que definas acá.',
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _codeController,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: 'Nueva clave de vendedores',
+              hintText: 'Mínimo 4 caracteres',
+              border: OutlineInputBorder(),
+              filled: true,
+              fillColor: AppColors.surface,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton(
+              onPressed: _saving ? null : _saveCode,
+              style: FilledButton.styleFrom(backgroundColor: AppColors.accent),
+              child: _saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('GUARDAR CLAVE'),
+            ),
+          ),
+          if (_message != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _message!,
+              style: TextStyle(
+                fontSize: 13,
+                color: _message!.startsWith('Código')
+                    ? AppColors.success
+                    : AppColors.danger,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

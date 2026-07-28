@@ -99,5 +99,35 @@ void main() {
       expect(s.hasPdf, isTrue);
       expect(s.anuladaAt, isNotNull);
     });
+    test('toBudget reconstruye presupuesto desde items', () {
+      final s = SaleRecord.fromRow({
+        ...baseRow(),
+        'cliente_nombre': 'Juan',
+        'cliente_dni': '123',
+        'items': {
+          'sellerName': 'Ana',
+          'date': '2026-01-15T15:30:00Z',
+          'customer': {
+            'fullName': 'Juan Pérez',
+            'dni': '12345678',
+          },
+          'lines': [
+            {
+              'productId': 'p1',
+              'detail': 'CCI 22',
+              'quantity': 2,
+              'lineArs': 600,
+              'unitArs': 300,
+              'paymentMethod': 'lista',
+            },
+          ],
+        },
+      });
+      final budget = s.toBudget();
+      expect(budget.customer.fullName, 'Juan Pérez');
+      expect(budget.lines.length, 1);
+      expect(budget.lines.first.lineArs, 600);
+      expect(budget.sellerName, 'Ana');
+    });
   });
 }

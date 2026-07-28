@@ -13,6 +13,7 @@ import 'package:app_feria/services/invoice_service.dart';
 import 'package:app_feria/services/pricing_service.dart';
 import 'package:app_feria/services/pricing_settings_service.dart';
 import 'package:app_feria/services/seller_service.dart';
+import 'package:app_feria/services/in_tenant_flow_service.dart';
 import 'package:app_feria/services/tenant_session_service.dart';
 
 void main() {
@@ -53,6 +54,9 @@ void main() {
           ChangeNotifierProvider<AuthService>.value(value: authService),
           ChangeNotifierProvider<TenantSessionService>.value(
             value: TenantSessionService(),
+          ),
+          ChangeNotifierProvider<InTenantFlowService>.value(
+            value: InTenantFlowService(),
           ),
           ChangeNotifierProvider<SellerService>.value(value: sellerService),
           ChangeNotifierProvider<CartService>.value(value: cartService),
