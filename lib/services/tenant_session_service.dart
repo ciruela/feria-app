@@ -166,11 +166,11 @@ class TenantSessionService extends ChangeNotifier {
     notifyListeners();
     try {
       await bootstrapSession();
-      _sessionReady = true;
     } catch (e, s) {
       AppLogger.error('Bootstrap de sesión falló', error: e, stackTrace: s);
       _error = e.toString();
     } finally {
+      _sessionReady = true;
       _bootstrapping = false;
       notifyListeners();
     }

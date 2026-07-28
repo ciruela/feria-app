@@ -171,7 +171,8 @@ class EmployeeHomeScreen extends StatelessWidget {
 
   void _openCatalog(BuildContext context, ProductType type) {
     Navigator.of(context).push(
-      MaterialPageRoute(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: CategoryCatalogScreen.routeName),
         builder: (_) => CategoryCatalogScreen(type: type),
       ),
     );

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../auth/workspace_resolution.dart';
 import '../../services/in_tenant_flow_service.dart';
+import '../../theme/app_theme.dart';
 import '../../services/tenant_session_service.dart';
 import '../employee/employee_home_screen.dart';
 import '../super_admin/super_admin_home_screen.dart';
@@ -89,6 +90,7 @@ class _BootLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
+      backgroundColor: AppColors.background,
       body: Center(child: CircularProgressIndicator()),
     );
   }

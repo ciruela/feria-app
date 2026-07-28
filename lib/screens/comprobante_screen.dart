@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/budget.dart';
 import '../models/budget_customer_controllers.dart';
+import '../screens/category_catalog_screen.dart';
 import '../services/cart_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/presupuesto_exporter.dart';
@@ -70,26 +71,31 @@ class _ComprobanteScreenState extends State<ComprobanteScreen> {
     );
   }
 
-  void _leaveComprobante() {
+  void _returnToCatalog() {
     context.read<CartService>().clear();
-    Navigator.of(context).pop();
+    final navigator = Navigator.of(context);
+    navigator.popUntil(
+      (route) =>
+          route.settings.name == CategoryCatalogScreen.routeName ||
+          route.isFirst,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return PopScope(
+      canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (didPop) {
-          context.read<CartService>().clear();
-        }
+        if (didPop) return;
+        _returnToCatalog();
       },
       child: FeriaScaffold(
       appBar: FeriaAppBar(
         title: const Text('Comprobante'),
         leading: IconButton(
-          tooltip: 'Volver al carrito',
+          tooltip: 'Volver al catálogo',
           icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: _leaveComprobante,
+          onPressed: _returnToCatalog,
         ),
         actions: [
           IconButton(
@@ -215,10 +221,14 @@ class _ComprobanteScreenState extends State<ComprobanteScreen> {
                   const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _leaveComprobante,
-                      icon: const Icon(Icons.shopping_cart_outlined),
-                      label: const Text('NUEVA VENTA'),
+                    child: FilledButton.icon(
+                      onPressed: _returnToCatalog,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      icon: const Icon(Icons.storefront_outlined),
+                      label: const Text('VOLVER AL CATÁLOGO'),
                     ),
                   ),
                 ],

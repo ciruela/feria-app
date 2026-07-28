@@ -186,10 +186,11 @@ class SupabaseSalesRepository {
       error: lastError,
       stackTrace: lastStack,
     );
+    final detail = lastError?.toString().trim();
     throw StateError(
       'No se pudo guardar el PDF del comprobante en la nube. '
-      'Revisá la conexión y que el bucket feria-comprobantes tenga permisos '
-      '(migración 010). La venta no se confirmó.',
+      '${detail != null && detail.isNotEmpty ? 'Detalle: $detail. ' : ''}'
+      'La venta no se confirmó.',
     );
   }
 

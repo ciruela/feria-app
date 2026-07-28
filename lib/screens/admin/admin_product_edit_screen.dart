@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -82,7 +83,7 @@ class _AdminProductEditScreenState extends State<AdminProductEditScreen> {
     super.dispose();
   }
 
-  Future<void> _pickAndUploadPhoto(ImageSource source) async {
+  Future<void> _pickAndUploadPhoto({ImageSource? source}) async {
     if (!AppConfig.useSupabase) {
       _showError('Conectá Supabase para subir fotos a la nube');
       return;
@@ -91,13 +92,14 @@ class _AdminProductEditScreenState extends State<AdminProductEditScreen> {
     final product = _product;
     if (product == null) return;
 
-    final file = await _photos.pickPhoto(source);
-    if (file == null || !mounted) return;
+    final bytes = await _photos.pickPhotoBytes(source: source);
+    if (bytes == null || !mounted) return;
 
     setState(() => _uploadingPhoto = true);
     try {
-      final updated =
-          await context.read<CatalogService>().uploadProductPhoto(product.id, file);
+      final updated = await context
+          .read<CatalogService>()
+          .uploadProductPhoto(product.id, bytes);
       if (!mounted) return;
 
       setState(() => _product = updated);
@@ -212,6 +214,11 @@ class _AdminProductEditScreenState extends State<AdminProductEditScreen> {
   }
 
   Future<void> _showPhotoOptions() async {
+    if (kIsWeb) {
+      await _pickAndUploadPhoto();
+      return;
+    }
+
     await showModalBottomSheet<void>(
       context: context,
       builder: (context) => SafeArea(
@@ -222,7 +229,7 @@ class _AdminProductEditScreenState extends State<AdminProductEditScreen> {
               title: const Text('Sacar foto'),
               onTap: () {
                 Navigator.pop(context);
-                _pickAndUploadPhoto(ImageSource.camera);
+                _pickAndUploadPhoto(source: ImageSource.camera);
               },
             ),
             ListTile(
@@ -230,7 +237,7 @@ class _AdminProductEditScreenState extends State<AdminProductEditScreen> {
               title: const Text('Elegir de galería'),
               onTap: () {
                 Navigator.pop(context);
-                _pickAndUploadPhoto(ImageSource.gallery);
+                _pickAndUploadPhoto(source: ImageSource.gallery);
               },
             ),
           ],

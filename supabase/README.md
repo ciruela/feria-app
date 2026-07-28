@@ -40,7 +40,8 @@ Verificar con `./scripts/verify_supabase.sh`.
 | `007_close_rls.sql` | RLS estricta por tenant (reemplaza policies abiertas). |
 | `008_provision_guard.sql` | Refuerzo del guard de provisioning. **Opcional** — no aplicada en prod actual. |
 | `009_auth_hook_rls.sql` | RLS alineada con el auth hook. |
-| `010_storage_comprobantes_auth.sql` | Buckets `feria-fotos` y `comprobantes` con policies. |
+| `014_storage_buckets.sql` | Buckets `feria-comprobantes` + `feria-fotos` y policies (obligatorio para ventas PDF). |
+| `015_ventas_pdf_path.sql` | Columna `ventas.pdf_path` para guardar la ruta del comprobante en Storage. |
 | `011_team_members.sql` | Invitar miembros, listar equipo con email. |
 | `012_seller_portal.sql` | Portal vendedores (slug + clave, `pgcrypto`). |
 

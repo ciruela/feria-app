@@ -115,6 +115,7 @@ class _TenantScopeLoaderState extends State<TenantScopeLoader> {
     }
 
     return const Scaffold(
+      backgroundColor: AppColors.background,
       body: Center(child: CircularProgressIndicator()),
     );
   }

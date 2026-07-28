@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -243,7 +242,10 @@ class CatalogService extends ChangeNotifier {
     }
   }
 
-  Future<Product> uploadProductPhoto(String productId, File photoFile) async {
+  Future<Product> uploadProductPhoto(
+    String productId,
+    Uint8List photoBytes,
+  ) async {
     if (!SupabaseService.isConfigured) {
       throw StateError('Supabase no configurado — no se pueden subir fotos');
     }
@@ -253,7 +255,7 @@ class CatalogService extends ChangeNotifier {
       throw ArgumentError('Producto no encontrado');
     }
 
-    final storagePath = await _productPhotos.upload(product, photoFile);
+    final storagePath = await _productPhotos.uploadBytes(product, photoBytes);
     final updated = product.copyWith(
       fotoUrls: [...product.fotoUrls, storagePath],
       foto: '',

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
@@ -71,6 +72,34 @@ class _GlowCircle extends StatelessWidget {
   }
 }
 
+class FeriaPageConstraint extends StatelessWidget {
+  const FeriaPageConstraint({
+    super.key,
+    required this.child,
+    this.maxWidth = 960,
+  });
+
+  final Widget child;
+  final double maxWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth > maxWidth ? maxWidth : constraints.maxWidth;
+        return Align(
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            width: width,
+            height: constraints.maxHeight,
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+}
+
 class FeriaScaffold extends StatelessWidget {
   const FeriaScaffold({
     super.key,
@@ -87,9 +116,16 @@ class FeriaScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final constrainBody = kIsWeb && width >= 720;
+
     return Scaffold(
       appBar: appBar,
-      body: FeriaBackground(child: body),
+      body: FeriaBackground(
+        child: constrainBody
+            ? FeriaPageConstraint(child: body)
+            : body,
+      ),
       bottomNavigationBar: bottomNavigationBar,
       floatingActionButton: floatingActionButton,
     );

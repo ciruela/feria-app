@@ -18,6 +18,9 @@ class CategoryCatalogScreen extends StatefulWidget {
     required this.type,
   });
 
+  /// Nombre de ruta para volver al catálogo desde comprobante / carrito.
+  static const routeName = '/employee/category-catalog';
+
   final ProductType type;
 
   @override

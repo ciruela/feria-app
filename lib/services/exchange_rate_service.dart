@@ -74,7 +74,9 @@ class ExchangeRateService extends ChangeNotifier {
     try {
       final remote = await _configRepo.fetchExchangeRate();
       if (remote == null) {
-        await _configRepo.upsertExchangeRate(_rate);
+        if (SupabaseService.client.auth.currentSession != null) {
+          await _configRepo.upsertExchangeRate(_rate);
+        }
         return;
       }
 

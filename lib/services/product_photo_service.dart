@@ -1,5 +1,4 @@
-import 'dart:io';
-
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -102,26 +101,32 @@ class ProductPhotoService {
         .toList();
   }
 
-  Future<File?> pickPhoto(ImageSource source) async {
-    if (kIsWeb) return null;
+  Future<Uint8List?> pickPhotoBytes({ImageSource? source}) async {
+    if (kIsWeb) {
+      final picked = await FilePicker.pickFiles(
+        type: FileType.image,
+        withData: true,
+      );
+      if (picked == null || picked.files.isEmpty) return null;
+      return picked.files.single.bytes;
+    }
 
     final photo = await _picker.pickImage(
-      source: source,
+      source: source ?? ImageSource.gallery,
       preferredCameraDevice: CameraDevice.rear,
       imageQuality: 85,
       maxWidth: 1600,
     );
     if (photo == null) return null;
-    return File(photo.path);
+    return photo.readAsBytes();
   }
 
-  Future<String> upload(Product product, File file) async {
+  Future<String> uploadBytes(Product product, Uint8List bytes) async {
     if (!SupabaseService.isConfigured) {
       throw StateError('Supabase no configurado');
     }
 
     final path = newStoragePath(product);
-    final bytes = await file.readAsBytes();
 
     await SupabaseService.client.storage
         .from(AppConfig.productPhotosBucket)

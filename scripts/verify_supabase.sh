@@ -54,6 +54,20 @@ check_table ventas || ok=false
 check_table app_config || ok=false
 
 echo
+echo "Storage buckets:"
+for bucket in feria-comprobantes feria-fotos; do
+  body=$(curl -s "$BASE/storage/v1/object/public/$bucket/.keep" "${HDR[@]}")
+  if echo "$body" | grep -q '"error":"not_found"'; then
+    echo "  ✓ $bucket"
+  elif echo "$body" | grep -qi 'Bucket not found'; then
+    echo "  ✗ $bucket (no existe — aplicá supabase/migrations/014_storage_buckets.sql)"
+    ok=false
+  else
+    echo "  ✓ $bucket"
+  fi
+done
+
+echo
 if $ok; then
   vendedores=$(curl -s "$BASE/rest/v1/vendedores?select=id" "${HDR[@]}" -H "Prefer: count=exact" -I \
     | grep -i content-range | sed 's/.*\///' | tr -d '\r\n')
@@ -64,7 +78,7 @@ if $ok; then
   echo "✓ Supabase listo. Corré la app con:"
   echo "  ./scripts/run_ios_device.sh"
   echo
-  echo "Migraciones pendientes: ver supabase/README.md"
+  echo "Migraciones pendientes: ver supabase/README.md (014_storage_buckets para comprobantes PDF)"
 else
   echo "Faltan tablas. Ejecutá las migraciones en supabase/migrations/ (ver supabase/README.md)."
   exit 1
