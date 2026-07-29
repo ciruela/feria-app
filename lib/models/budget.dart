@@ -63,6 +63,7 @@ class BudgetCustomer {
     this.dni = '',
     this.clu = '',
     this.cluExpiry = '',
+    this.tarjetaConsumo = '',
     this.phone = '',
     this.email = '',
     this.address = '',
@@ -74,6 +75,7 @@ class BudgetCustomer {
   final String dni;
   final String clu;
   final String cluExpiry;
+  final String tarjetaConsumo;
   final String phone;
   final String email;
   final String address;
@@ -85,6 +87,7 @@ class BudgetCustomer {
     String? dni,
     String? clu,
     String? cluExpiry,
+    String? tarjetaConsumo,
     String? phone,
     String? email,
     String? address,
@@ -96,6 +99,7 @@ class BudgetCustomer {
       dni: dni ?? this.dni,
       clu: clu ?? this.clu,
       cluExpiry: cluExpiry ?? this.cluExpiry,
+      tarjetaConsumo: tarjetaConsumo ?? this.tarjetaConsumo,
       phone: phone ?? this.phone,
       email: email ?? this.email,
       address: address ?? this.address,

@@ -42,6 +42,7 @@ Verificar con `./scripts/verify_supabase.sh`.
 | `009_auth_hook_rls.sql` | RLS alineada con el auth hook. |
 | `014_storage_buckets.sql` | Buckets `feria-comprobantes` + `feria-fotos` y policies (obligatorio para ventas PDF). |
 | `015_ventas_pdf_path.sql` | Columna `ventas.pdf_path` para guardar la ruta del comprobante en Storage. |
+| `016_ventas_facturada.sql` | Checklist de facturación AFIP (`facturada`, `factura_numero`, etc.). |
 | `011_team_members.sql` | Invitar miembros, listar equipo con email. |
 | `012_seller_portal.sql` | Portal vendedores (slug + clave, `pgcrypto`). |
 

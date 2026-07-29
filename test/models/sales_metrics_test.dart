@@ -6,6 +6,7 @@ SaleRecord _sale({
   required String id,
   required double ars,
   bool anulada = false,
+  bool facturada = false,
 }) {
   return SaleRecord(
     id: id,
@@ -14,6 +15,7 @@ SaleRecord _sale({
     totalArs: ars,
     clienteNombre: 'Cliente $id',
     anulada: anulada,
+    facturada: facturada,
     lines: [
       SaleLineRecord(
         productId: 'municion_$id',
@@ -50,5 +52,14 @@ void main() {
 
     expect(metrics.sales.length, 2);
     expect(metrics.sales.any((s) => s.anulada), isTrue);
+  });
+
+  test('pendienteFacturacion distingue facturadas', () {
+    final metrics = DaySalesMetrics.fromSales(day, [
+      _sale(id: 'a', ars: 1000),
+      _sale(id: 'b', ars: 500, facturada: true),
+    ]);
+
+    expect(metrics.sales.where((s) => s.pendienteFacturacion).length, 1);
   });
 }

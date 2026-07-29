@@ -17,6 +17,10 @@ class SaleRecord {
     this.anuladaMotivo = '',
     this.anuladaPor = '',
     this.anuladaAt,
+    this.facturada = false,
+    this.facturadaPor = '',
+    this.facturadaAt,
+    this.facturaNumero = '',
     this.customerDetail = const BudgetCustomer(),
     this.saleDate,
   });
@@ -34,6 +38,10 @@ class SaleRecord {
   final String anuladaMotivo;
   final String anuladaPor;
   final DateTime? anuladaAt;
+  final bool facturada;
+  final String facturadaPor;
+  final DateTime? facturadaAt;
+  final String facturaNumero;
   final List<SaleLineRecord> lines;
   final BudgetCustomer customerDetail;
   final DateTime? saleDate;
@@ -47,6 +55,8 @@ class SaleRecord {
       .fold(0.0, (sum, line) => sum + line.lineUsd);
 
   bool get hasPdf => pdfPath != null && pdfPath!.isNotEmpty;
+
+  bool get pendienteFacturacion => !anulada && !facturada;
 
   /// Reconstruye el presupuesto/comprobante a partir de lo guardado en la venta.
   Budget toBudget() {
@@ -94,6 +104,12 @@ class SaleRecord {
       anuladaAt: row['anulada_at'] == null
           ? null
           : DateTime.parse(row['anulada_at'] as String).toLocal(),
+      facturada: row['facturada'] as bool? ?? false,
+      facturadaPor: row['facturada_por'] as String? ?? '',
+      facturadaAt: row['facturada_at'] == null
+          ? null
+          : DateTime.parse(row['facturada_at'] as String).toLocal(),
+      facturaNumero: row['factura_numero'] as String? ?? '',
       customerDetail: _parseCustomer(items['customer'] as Map<String, dynamic>?),
       saleDate: rawSaleDate == null
           ? null
@@ -111,6 +127,7 @@ class SaleRecord {
       dni: raw['dni'] as String? ?? '',
       clu: raw['clu'] as String? ?? '',
       cluExpiry: raw['cluExpiry'] as String? ?? '',
+      tarjetaConsumo: raw['tarjetaConsumo'] as String? ?? '',
       phone: raw['phone'] as String? ?? '',
       email: raw['email'] as String? ?? '',
       address: raw['address'] as String? ?? '',

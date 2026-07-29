@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../models/budget_customer_controllers.dart';
 import '../../utils/uppercase_input.dart';
@@ -11,6 +12,9 @@ class PresupuestoLabeledField extends StatelessWidget {
     required this.readOnly,
     this.onChanged,
     this.minLines = 1,
+    this.maxLength,
+    this.keyboardType,
+    this.inputFormatters,
   });
 
   final String label;
@@ -18,6 +22,9 @@ class PresupuestoLabeledField extends StatelessWidget {
   final bool readOnly;
   final VoidCallback? onChanged;
   final int minLines;
+  final int? maxLength;
+  final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -40,8 +47,13 @@ class PresupuestoLabeledField extends StatelessWidget {
               readOnly: readOnly,
               minLines: minLines,
               maxLines: minLines,
-              textCapitalization: TextCapitalization.characters,
-              inputFormatters: UpperCaseTextFormatter.formatters,
+              maxLength: maxLength,
+              keyboardType: keyboardType,
+              textCapitalization: inputFormatters == null
+                  ? TextCapitalization.characters
+                  : TextCapitalization.none,
+              inputFormatters:
+                  inputFormatters ?? UpperCaseTextFormatter.formatters,
               onChanged: (_) => onChanged?.call(),
               style: const TextStyle(
                 fontSize: 13,
@@ -119,6 +131,15 @@ class PresupuestoCustomerFields extends StatelessWidget {
               ),
             ),
           ],
+        ),
+        PresupuestoLabeledField(
+          label: 'TC:',
+          controller: controllers.tarjetaConsumo,
+          readOnly: readOnly,
+          onChanged: onChanged,
+          maxLength: 7,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         ),
         Row(
           children: [

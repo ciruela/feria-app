@@ -70,6 +70,7 @@ class PresupuestoPdf {
               pw.Expanded(child: _fieldRow('VTO:', customer.cluExpiry)),
             ],
           ),
+          _fieldRow('TC:', customer.tarjetaConsumo),
           pw.Row(
             children: [
               pw.Expanded(child: _fieldRow('TEL:', customer.phone)),
@@ -264,8 +265,9 @@ class PresupuestoPdf {
         0: const pw.FixedColumnWidth(42),
         1: const pw.FixedColumnWidth(28),
         2: const pw.FlexColumnWidth(),
-        3: const pw.FixedColumnWidth(58),
-        4: const pw.FixedColumnWidth(62),
+        3: const pw.FixedColumnWidth(46),
+        4: const pw.FixedColumnWidth(54),
+        5: const pw.FixedColumnWidth(58),
       },
       defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
       children: [
@@ -279,7 +281,7 @@ class PresupuestoPdf {
         ...rows.map((row) {
           if (row.isEmpty) {
             return pw.TableRow(
-              children: List.generate(5, (_) => _bodyCell('')),
+              children: List.generate(6, (_) => _bodyCell('')),
             );
           }
 
@@ -288,6 +290,7 @@ class PresupuestoPdf {
               _bodyCell(row.code, align: pw.TextAlign.center),
               _bodyCell('${row.quantity}', align: pw.TextAlign.center),
               _bodyCell(row.detailWithSerial),
+              _bodyCell(row.tc, align: pw.TextAlign.center),
               _bodyCell(row.unitPrice, align: pw.TextAlign.right),
               _bodyCell(row.lineTotal, align: pw.TextAlign.right),
             ],

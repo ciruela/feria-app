@@ -84,4 +84,26 @@ void main() {
     final row = PresupuestoItemRow.fromLine(budget.lines.first);
     expect(row.detailWithSerial, contains('SERIE: ABC123'));
   });
+
+  test('table headers include TC between detalle and unit price', () {
+    expect(PresupuestoBranding.tableHeaders, [
+      'COD',
+      'CANT',
+      'DETALLE',
+      'TC',
+      'P. UNIT',
+      'IMPORTE',
+    ]);
+  });
+
+  test('TC muestra tarjeta de consumo del cliente en cada fila', () {
+    final budget = _sampleBudget().copyWithCustomer(
+      const BudgetCustomer(tarjetaConsumo: '1234567'),
+    );
+    final row = PresupuestoItemRow.fromLine(
+      budget.lines.first,
+      tarjetaConsumo: budget.customer.tarjetaConsumo,
+    );
+    expect(row.tc, '1234567');
+  });
 }

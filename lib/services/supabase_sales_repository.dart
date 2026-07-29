@@ -21,7 +21,10 @@ class SupabaseSalesRepository {
   Future<List<SaleRecord>> fetchForDay(DateTime day) async {
     final start = DateTime(day.year, day.month, day.day);
     final end = start.add(const Duration(days: 1));
+    return fetchForRange(start, end);
+  }
 
+  Future<List<SaleRecord>> fetchForRange(DateTime start, DateTime end) async {
     final rows = await SupabaseService.client
         .from(_table)
         .select()
@@ -140,6 +143,72 @@ class SupabaseSalesRepository {
     return true;
   }
 
+  Future<bool> setFacturada(
+    SaleRecord sale, {
+    required bool facturada,
+    String? facturaNumero,
+    String? actorNombre,
+  }) async {
+    final existing = await SupabaseService.client
+        .from(_table)
+        .select('anulada, facturada')
+        .eq('id', sale.id)
+        .maybeSingle();
+    if (existing == null) return false;
+    if (existing['anulada'] as bool? ?? false) return false;
+
+    final now = DateTime.now().toUtc().toIso8601String();
+    if (facturada) {
+      await SupabaseService.client.from(_table).update({
+        'facturada': true,
+        'facturada_at': now,
+        'facturada_por': actorNombre ?? '',
+        'factura_numero': facturaNumero?.trim() ?? '',
+      }).eq('id', sale.id);
+    } else {
+      await SupabaseService.client.from(_table).update({
+        'facturada': false,
+        'facturada_at': null,
+        'facturada_por': '',
+        'factura_numero': '',
+      }).eq('id', sale.id);
+    }
+
+    AuditService.instance.log(
+      accion: facturada ? 'Marcó facturada' : 'Desmarcó facturada',
+      entidad: AuditEntidad.venta,
+      entidadId: sale.id,
+      detalle: facturada && (facturaNumero?.trim().isNotEmpty ?? false)
+          ? 'Factura ${facturaNumero!.trim()} · ${sale.clienteNombre.trim().isEmpty ? 'sin cliente' : sale.clienteNombre.trim()}'
+          : sale.clienteNombre.trim().isEmpty
+              ? 'sin cliente'
+              : sale.clienteNombre.trim(),
+      actorNombre: actorNombre,
+    );
+
+    return true;
+  }
+
+  Future<int> setFacturadaBatch(
+    Iterable<SaleRecord> sales, {
+    required bool facturada,
+    String? actorNombre,
+  }) async {
+    var updated = 0;
+    for (final sale in sales) {
+      if (sale.anulada) continue;
+      if (facturada && sale.facturada) continue;
+      if (!facturada && !sale.facturada) continue;
+      final ok = await setFacturada(
+        sale,
+        facturada: facturada,
+        actorNombre: actorNombre,
+      );
+      if (ok) updated++;
+    }
+    return updated;
+  }
+
   Future<void> _uploadPdfWithRetry({
     required String saleId,
     required Budget budget,
@@ -209,6 +278,7 @@ class SupabaseSalesRepository {
         'dni': budget.customer.dni,
         'clu': budget.customer.clu,
         'cluExpiry': budget.customer.cluExpiry,
+        'tarjetaConsumo': budget.customer.tarjetaConsumo,
         'phone': budget.customer.phone,
         'email': budget.customer.email,
         'address': budget.customer.address,

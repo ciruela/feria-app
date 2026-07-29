@@ -99,6 +99,28 @@ void main() {
       expect(s.hasPdf, isTrue);
       expect(s.anuladaAt, isNotNull);
     });
+
+    test('lee campos de facturación', () {
+      final row = baseRow()
+        ..addAll({
+          'facturada': true,
+          'facturada_por': 'María',
+          'facturada_at': '2026-01-16T11:00:00Z',
+          'factura_numero': '0001-00001234',
+        });
+      final s = SaleRecord.fromRow(row);
+      expect(s.facturada, isTrue);
+      expect(s.facturadaPor, 'María');
+      expect(s.facturaNumero, '0001-00001234');
+      expect(s.facturadaAt, isNotNull);
+      expect(s.pendienteFacturacion, isFalse);
+    });
+
+    test('pendienteFacturacion excluye anuladas', () {
+      final row = baseRow()..['anulada'] = true;
+      expect(SaleRecord.fromRow(row).pendienteFacturacion, isFalse);
+    });
+
     test('toBudget reconstruye presupuesto desde items', () {
       final s = SaleRecord.fromRow({
         ...baseRow(),

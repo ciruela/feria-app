@@ -14,6 +14,10 @@ class SalesMetricsService {
     return DaySalesMetrics.fromSales(day, sales);
   }
 
+  Future<List<SaleRecord>> salesForRange(DateTime start, DateTime end) {
+    return _repository.fetchForRange(start, end);
+  }
+
   Future<bool> voidSale(
     SaleRecord sale, {
     required String motivo,
@@ -24,6 +28,32 @@ class SalesMetricsService {
       sale,
       motivo: motivo,
       actorId: actorId,
+      actorNombre: actorNombre,
+    );
+  }
+
+  Future<bool> setFacturada(
+    SaleRecord sale, {
+    required bool facturada,
+    String? facturaNumero,
+    String? actorNombre,
+  }) {
+    return _repository.setFacturada(
+      sale,
+      facturada: facturada,
+      facturaNumero: facturaNumero,
+      actorNombre: actorNombre,
+    );
+  }
+
+  Future<int> setFacturadaBatch(
+    Iterable<SaleRecord> sales, {
+    required bool facturada,
+    String? actorNombre,
+  }) {
+    return _repository.setFacturadaBatch(
+      sales,
+      facturada: facturada,
       actorNombre: actorNombre,
     );
   }

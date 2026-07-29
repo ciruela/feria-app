@@ -15,6 +15,7 @@ class PresupuestoExporter {
         'CLU: ${_value(budget.customer.clu)}   '
         'VTO: ${_value(budget.customer.cluExpiry)}',
       )
+      ..writeln('TC: ${_value(budget.customer.tarjetaConsumo)}')
       ..writeln(
         'TEL: ${_value(budget.customer.phone)}   '
         'MAIL: ${_value(budget.customer.email)}',
@@ -30,18 +31,19 @@ class PresupuestoExporter {
 
     buffer
       ..writeln('')
-      ..writeln('COD\tCANT\tDETALLE\tP. UNIT\tIMPORTE');
+      ..writeln('COD\tCANT\tDETALLE\tTC\tP. UNIT\tIMPORTE');
 
     for (final line in budget.lines) {
       buffer.writeln(
         '${line.code}\t${line.quantity}\t${line.detail}\t'
+        '${budget.customer.tarjetaConsumo}\t'
         '${line.formattedUnit}\t${line.formattedLine}',
       );
     }
 
     final emptyRows = 14 - budget.lines.length;
     for (var i = 0; i < emptyRows; i++) {
-      buffer.writeln('\t\t\t\t');
+      buffer.writeln('\t\t\t\t\t');
     }
 
     buffer.writeln('');

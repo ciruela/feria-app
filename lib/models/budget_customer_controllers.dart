@@ -8,6 +8,7 @@ class BudgetCustomerControllers {
         dni = TextEditingController(),
         clu = TextEditingController(),
         cluExpiry = TextEditingController(),
+        tarjetaConsumo = TextEditingController(),
         phone = TextEditingController(),
         email = TextEditingController(),
         address = TextEditingController(),
@@ -18,6 +19,7 @@ class BudgetCustomerControllers {
   final TextEditingController dni;
   final TextEditingController clu;
   final TextEditingController cluExpiry;
+  final TextEditingController tarjetaConsumo;
   final TextEditingController phone;
   final TextEditingController email;
   final TextEditingController address;
@@ -49,6 +51,7 @@ class BudgetCustomerControllers {
     dni.text = customer.dni;
     clu.text = customer.clu;
     cluExpiry.text = customer.cluExpiry;
+    tarjetaConsumo.text = customer.tarjetaConsumo;
     phone.text = customer.phone;
     email.text = customer.email;
     address.text = customer.address;
@@ -61,6 +64,7 @@ class BudgetCustomerControllers {
     dni.dispose();
     clu.dispose();
     cluExpiry.dispose();
+    tarjetaConsumo.dispose();
     phone.dispose();
     email.dispose();
     address.dispose();

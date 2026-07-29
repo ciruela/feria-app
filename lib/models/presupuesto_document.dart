@@ -19,7 +19,14 @@ abstract final class PresupuestoBranding {
       'Reserva de mercaderia con seña del 30%.';
   static const paymentAllocationTitle = 'FORMA DE PAGO ACORDADA';
   static const creditCardsTitle = 'TARJETAS DE CREDITO';
-  static const tableHeaders = ['COD', 'CANT', 'DETALLE', 'P. UNIT', 'IMPORTE'];
+  static const tableHeaders = [
+    'COD',
+    'CANT',
+    'DETALLE',
+    'TC',
+    'P. UNIT',
+    'IMPORTE',
+  ];
 }
 
 class PresupuestoItemRow {
@@ -28,6 +35,7 @@ class PresupuestoItemRow {
     required this.code,
     required this.quantity,
     required this.detail,
+    required this.tc,
     required this.unitPrice,
     required this.lineTotal,
     required this.isArma,
@@ -39,17 +47,22 @@ class PresupuestoItemRow {
         code = '',
         quantity = 0,
         detail = '',
+        tc = '',
         unitPrice = '',
         lineTotal = '',
         isArma = false,
         serialNumber = '';
 
-  factory PresupuestoItemRow.fromLine(BudgetLine line) {
+  factory PresupuestoItemRow.fromLine(
+    BudgetLine line, {
+    String tarjetaConsumo = '',
+  }) {
     return PresupuestoItemRow(
       lineKey: line.lineKey,
       code: line.code,
       quantity: line.quantity,
       detail: line.detail,
+      tc: tarjetaConsumo.trim(),
       unitPrice: line.formattedUnitPlain,
       lineTotal: line.formattedLinePlain,
       isArma: line.isArma,
@@ -61,6 +74,7 @@ class PresupuestoItemRow {
   final String code;
   final int quantity;
   final String detail;
+  final String tc;
   final String unitPrice;
   final String lineTotal;
   final bool isArma;
@@ -100,7 +114,10 @@ class PresupuestoDocument {
 
   factory PresupuestoDocument.fromBudget(Budget budget) {
     final date = budget.date;
-    final rows = budget.lines.map(PresupuestoItemRow.fromLine).toList();
+    final tc = budget.customer.tarjetaConsumo;
+    final rows = budget.lines
+        .map((line) => PresupuestoItemRow.fromLine(line, tarjetaConsumo: tc))
+        .toList();
     while (rows.length < PresupuestoBranding.paperRows) {
       rows.add(const PresupuestoItemRow.empty());
     }

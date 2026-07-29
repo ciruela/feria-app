@@ -23,8 +23,9 @@ class PresupuestoItemsTable extends StatelessWidget {
         0: FixedColumnWidth(52),
         1: FixedColumnWidth(38),
         2: FlexColumnWidth(),
-        3: FixedColumnWidth(78),
-        4: FixedColumnWidth(86),
+        3: FixedColumnWidth(50),
+        4: FixedColumnWidth(72),
+        5: FixedColumnWidth(82),
       },
       defaultVerticalAlignment: TableCellVerticalAlignment.middle,
       children: [
@@ -44,6 +45,7 @@ class PresupuestoItemsTable extends StatelessWidget {
     if (row.isEmpty) {
       return const TableRow(
         children: [
+          _BodyCell(''),
           _BodyCell(''),
           _BodyCell(''),
           _BodyCell(''),
@@ -81,6 +83,7 @@ class PresupuestoItemsTable extends StatelessWidget {
             ],
           ),
         ),
+        _BodyCell(row.tc, align: TextAlign.center),
         _BodyCell(row.unitPrice, align: TextAlign.right),
         _BodyCell(row.lineTotal, align: TextAlign.right),
       ],

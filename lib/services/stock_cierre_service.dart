@@ -240,16 +240,25 @@ class StockCierreService {
     var ventasArs = 0.0;
     var ventasUsd = 0.0;
     var comprobantes = 0;
+    var facturadas = 0;
+    var pendientes = 0;
     for (final sale in ventas) {
       if (sale.anulada) continue;
       comprobantes++;
       ventasArs += sale.collectedArs;
       ventasUsd += sale.collectedUsd;
+      if (sale.facturada) {
+        facturadas++;
+      } else {
+        pendientes++;
+      }
     }
 
     final rows = <List<String>>[
       ['Fecha', _formatDay(resumen.day)],
       ['Comprobantes', '$comprobantes'],
+      ['Facturadas', '$facturadas'],
+      ['Pendientes facturar', '$pendientes'],
       ['Cobrado ARS', ventasArs.toStringAsFixed(0)],
       ['Cobrado USD', ventasUsd.toStringAsFixed(2)],
       ['', ''],
@@ -280,6 +289,10 @@ class StockCierreService {
       'total_ars',
       'total_usd',
       'anulada',
+      'facturada',
+      'factura_numero',
+      'facturada_por',
+      'facturada_at',
     ];
     for (var col = 0; col < headers.length; col++) {
       _write(sheet, col, 0, headers[col]);
@@ -299,7 +312,32 @@ class StockCierreService {
       _write(sheet, 4, r, sale.collectedArs.toStringAsFixed(0));
       _write(sheet, 5, r, sale.collectedUsd.toStringAsFixed(2));
       _write(sheet, 6, r, sale.anulada ? 'SI' : 'NO');
+      _write(sheet, 7, r, sale.facturada ? 'SI' : 'NO');
+      _write(sheet, 8, r, sale.facturaNumero);
+      _write(sheet, 9, r, sale.facturadaPor);
+      _write(
+        sheet,
+        10,
+        r,
+        sale.facturadaAt == null ? '' : sale.facturadaAt!.toIso8601String(),
+      );
     }
+  }
+
+  Uint8List exportVentasList(List<SaleRecord> ventas) {
+    final excel = Excel.createExcel();
+    final defaultName = excel.sheets.keys.first;
+    excel.rename(defaultName, 'Comprobantes');
+    _writeVentasSheet(excel['Comprobantes'], ventas);
+
+    final detalleSheet = excel['Detalle ventas'];
+    _writeDetalleVentasSheet(detalleSheet, ventas);
+
+    final bytes = excel.encode();
+    if (bytes == null) {
+      throw Exception('No se pudo generar el Excel de comprobantes');
+    }
+    return Uint8List.fromList(bytes);
   }
 
   void _writeDetalleVentasSheet(Sheet sheet, List<SaleRecord> ventas) {
