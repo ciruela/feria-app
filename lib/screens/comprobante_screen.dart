@@ -170,6 +170,7 @@ class _ComprobanteScreenState extends State<ComprobanteScreen> {
                           controllers: _controllers,
                           readOnly: true,
                           onSerialChanged: (_, __) {},
+                          onTcChanged: (_, __) {},
                         ),
                       ),
                     ),

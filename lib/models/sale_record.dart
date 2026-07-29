@@ -127,7 +127,6 @@ class SaleRecord {
       dni: raw['dni'] as String? ?? '',
       clu: raw['clu'] as String? ?? '',
       cluExpiry: raw['cluExpiry'] as String? ?? '',
-      tarjetaConsumo: raw['tarjetaConsumo'] as String? ?? '',
       phone: raw['phone'] as String? ?? '',
       email: raw['email'] as String? ?? '',
       address: raw['address'] as String? ?? '',
@@ -152,6 +151,7 @@ class SaleLineRecord {
     this.unitArs = 0,
     this.unitUsd = 0,
     this.serialNumber = '',
+    this.tarjetaConsumo = '',
   });
 
   final String productId;
@@ -167,6 +167,7 @@ class SaleLineRecord {
   final double unitArs;
   final double unitUsd;
   final String serialNumber;
+  final String tarjetaConsumo;
 
   factory SaleLineRecord.fromJson(Map<String, dynamic> json) {
     final quantity = (json['quantity'] as num?)?.toInt() ?? 1;
@@ -195,6 +196,7 @@ class SaleLineRecord {
       unitArs: unitArs,
       unitUsd: unitUsd,
       serialNumber: json['serialNumber'] as String? ?? '',
+      tarjetaConsumo: json['tarjetaConsumo'] as String? ?? '',
     );
   }
 
@@ -217,6 +219,7 @@ class SaleLineRecord {
       paymentMethod: method,
       isArma: isArma,
       serialNumber: serialNumber,
+      tarjetaConsumo: tarjetaConsumo,
       splitPart: splitPart,
       productType: resolvedProductType,
     );

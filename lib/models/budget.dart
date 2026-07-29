@@ -17,6 +17,7 @@ class BudgetLine {
     required this.paymentMethod,
     required this.isArma,
     this.serialNumber = '',
+    this.tarjetaConsumo = '',
     this.splitPart,
     this.productType = '',
   });
@@ -33,6 +34,7 @@ class BudgetLine {
   final PaymentMethod paymentMethod;
   final bool isArma;
   final String serialNumber;
+  final String tarjetaConsumo;
   final int? splitPart;
   final String productType;
 
@@ -63,7 +65,6 @@ class BudgetCustomer {
     this.dni = '',
     this.clu = '',
     this.cluExpiry = '',
-    this.tarjetaConsumo = '',
     this.phone = '',
     this.email = '',
     this.address = '',
@@ -75,7 +76,6 @@ class BudgetCustomer {
   final String dni;
   final String clu;
   final String cluExpiry;
-  final String tarjetaConsumo;
   final String phone;
   final String email;
   final String address;
@@ -87,7 +87,6 @@ class BudgetCustomer {
     String? dni,
     String? clu,
     String? cluExpiry,
-    String? tarjetaConsumo,
     String? phone,
     String? email,
     String? address,
@@ -99,7 +98,6 @@ class BudgetCustomer {
       dni: dni ?? this.dni,
       clu: clu ?? this.clu,
       cluExpiry: cluExpiry ?? this.cluExpiry,
-      tarjetaConsumo: tarjetaConsumo ?? this.tarjetaConsumo,
       phone: phone ?? this.phone,
       email: email ?? this.email,
       address: address ?? this.address,
@@ -181,6 +179,29 @@ class Budget {
 }
 
 extension ProductBudgetX on Product {
+  /// Detalle completo para presupuesto/comprobante (sin recortar a título corto).
+  String budgetDetailFull() {
+    if (isMunicion) {
+      final desc = descripcion.trim();
+      if (desc.isNotEmpty) return desc.toUpperCase();
+      return budgetDetail();
+    }
+
+    final parts = <String>[
+      marcaUpper,
+      modeloDisplay,
+      if (calibre.isNotEmpty) 'Cal. $calibre',
+    ];
+    final extra = descripcion.trim();
+    if (extra.isNotEmpty) {
+      final joined = parts.join(' · ').toUpperCase();
+      if (!joined.contains(extra.toUpperCase())) {
+        parts.add(extra.toUpperCase());
+      }
+    }
+    return parts.join(' · ');
+  }
+
   String budgetDetail() {
     if (isArma) {
       return [

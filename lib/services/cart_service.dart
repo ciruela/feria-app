@@ -8,11 +8,13 @@ class CartItem {
     required this.product,
     this.quantity = 1,
     this.serialNumber = '',
+    this.tarjetaConsumo = '',
   });
 
   final Product product;
   int quantity;
   String serialNumber;
+  String tarjetaConsumo;
 
   String get lineKey => product.id;
 }
@@ -135,6 +137,14 @@ class CartService extends ChangeNotifier {
     if (item == null) return;
 
     item.serialNumber = serialNumber.trim();
+    notifyListeners();
+  }
+
+  void updateTarjetaConsumo(String lineKey, String tarjetaConsumo) {
+    final item = _items.where((element) => element.lineKey == lineKey).firstOrNull;
+    if (item == null) return;
+
+    item.tarjetaConsumo = tarjetaConsumo.trim();
     notifyListeners();
   }
 

@@ -96,13 +96,24 @@ void main() {
     ]);
   });
 
-  test('TC muestra tarjeta de consumo del cliente en cada fila', () {
-    final budget = _sampleBudget().copyWithCustomer(
-      const BudgetCustomer(tarjetaConsumo: '1234567'),
-    );
+  test('TC muestra tarjeta de consumo por línea', () {
+    final budget = _sampleBudget().copyWithCustomer(const BudgetCustomer());
+    final line = budget.lines.first;
     final row = PresupuestoItemRow.fromLine(
-      budget.lines.first,
-      tarjetaConsumo: budget.customer.tarjetaConsumo,
+      BudgetLine(
+        lineKey: line.lineKey,
+        productId: line.productId,
+        code: line.code,
+        quantity: line.quantity,
+        detail: line.detail,
+        unitArs: line.unitArs,
+        lineArs: line.lineArs,
+        unitUsd: line.unitUsd,
+        lineUsd: line.lineUsd,
+        paymentMethod: line.paymentMethod,
+        isArma: line.isArma,
+        tarjetaConsumo: '1234567',
+      ),
     );
     expect(row.tc, '1234567');
   });

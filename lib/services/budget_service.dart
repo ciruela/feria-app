@@ -52,7 +52,7 @@ class BudgetService {
           productId: item.product.id,
           code: item.product.budgetCode,
           quantity: item.quantity,
-          detail: item.product.budgetDetail(),
+          detail: item.product.budgetDetailFull(),
           unitArs: unitArs,
           lineArs: lineArs,
           unitUsd: unitUsd,
@@ -60,6 +60,7 @@ class BudgetService {
           paymentMethod: method,
           isArma: item.product.isArma,
           serialNumber: item.serialNumber,
+          tarjetaConsumo: item.tarjetaConsumo,
           productType: item.product.type.key,
         ),
       );

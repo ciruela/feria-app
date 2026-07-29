@@ -278,7 +278,6 @@ class SupabaseSalesRepository {
         'dni': budget.customer.dni,
         'clu': budget.customer.clu,
         'cluExpiry': budget.customer.cluExpiry,
-        'tarjetaConsumo': budget.customer.tarjetaConsumo,
         'phone': budget.customer.phone,
         'email': budget.customer.email,
         'address': budget.customer.address,
@@ -300,6 +299,7 @@ class SupabaseSalesRepository {
               'paymentMethod': line.paymentMethod.key,
               'isArma': line.isArma,
               'serialNumber': line.serialNumber,
+              'tarjetaConsumo': line.tarjetaConsumo,
               if (line.splitPart != null) 'splitPart': line.splitPart,
             },
           )

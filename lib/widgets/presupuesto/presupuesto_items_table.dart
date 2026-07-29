@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../models/presupuesto_document.dart';
 import '../../utils/uppercase_input.dart';
@@ -9,11 +10,13 @@ class PresupuestoItemsTable extends StatelessWidget {
     required this.rows,
     required this.readOnly,
     required this.onSerialChanged,
+    required this.onTcChanged,
   });
 
   final List<PresupuestoItemRow> rows;
   final bool readOnly;
   final void Function(String lineKey, String value) onSerialChanged;
+  final void Function(String lineKey, String value) onTcChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +86,15 @@ class PresupuestoItemsTable extends StatelessWidget {
             ],
           ),
         ),
-        _BodyCell(row.tc, align: TextAlign.center),
+        Padding(
+          padding: const EdgeInsets.all(2),
+          child: _TcInlineField(
+            lineKey: row.lineKey,
+            initialValue: row.tc,
+            readOnly: readOnly,
+            onChanged: onTcChanged,
+          ),
+        ),
         _BodyCell(row.unitPrice, align: TextAlign.right),
         _BodyCell(row.lineTotal, align: TextAlign.right),
       ],
@@ -123,6 +134,78 @@ class _BodyCell extends StatelessWidget {
         text,
         textAlign: align,
         style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+}
+
+class _TcInlineField extends StatefulWidget {
+  const _TcInlineField({
+    required this.lineKey,
+    required this.initialValue,
+    required this.readOnly,
+    required this.onChanged,
+  });
+
+  final String lineKey;
+  final String initialValue;
+  final bool readOnly;
+  final void Function(String lineKey, String value) onChanged;
+
+  @override
+  State<_TcInlineField> createState() => _TcInlineFieldState();
+}
+
+class _TcInlineFieldState extends State<_TcInlineField> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void didUpdateWidget(_TcInlineField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialValue != _controller.text &&
+        widget.initialValue != oldWidget.initialValue) {
+      _controller.text = widget.initialValue;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.readOnly) {
+      return Center(
+        child: Text(
+          widget.initialValue,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+        ),
+      );
+    }
+
+    return TextField(
+      controller: _controller,
+      readOnly: widget.readOnly,
+      maxLength: 7,
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      textAlign: TextAlign.center,
+      onChanged: (value) => widget.onChanged(widget.lineKey, value),
+      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+      decoration: const InputDecoration(
+        isDense: true,
+        counterText: '',
+        contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+        border: OutlineInputBorder(),
       ),
     );
   }

@@ -70,7 +70,6 @@ class PresupuestoPdf {
               pw.Expanded(child: _fieldRow('VTO:', customer.cluExpiry)),
             ],
           ),
-          _fieldRow('TC:', customer.tarjetaConsumo),
           pw.Row(
             children: [
               pw.Expanded(child: _fieldRow('TEL:', customer.phone)),

@@ -14,6 +14,7 @@ class PresupuestoPaper extends StatelessWidget {
     required this.budget,
     required this.controllers,
     required this.onSerialChanged,
+    required this.onTcChanged,
     this.readOnly = false,
     this.onChanged,
   });
@@ -21,6 +22,7 @@ class PresupuestoPaper extends StatelessWidget {
   final Budget budget;
   final BudgetCustomerControllers controllers;
   final void Function(String lineKey, String value) onSerialChanged;
+  final void Function(String lineKey, String value) onTcChanged;
   final bool readOnly;
   final VoidCallback? onChanged;
 
@@ -53,6 +55,7 @@ class PresupuestoPaper extends StatelessWidget {
             rows: document.tableRows,
             readOnly: readOnly,
             onSerialChanged: onSerialChanged,
+            onTcChanged: onTcChanged,
           ),
           const SizedBox(height: 8),
           PresupuestoTotalsSection(summary: document.summary),

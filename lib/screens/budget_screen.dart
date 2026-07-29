@@ -46,7 +46,6 @@ class _BudgetScreenState extends State<BudgetScreen> {
         dni: _controllers.dni.text.trim(),
         clu: _controllers.clu.text.trim(),
         cluExpiry: _controllers.cluExpiry.text.trim(),
-        tarjetaConsumo: _controllers.tarjetaConsumo.text.trim(),
         phone: _controllers.phone.text.trim(),
         email: _controllers.email.text.trim(),
         address: _controllers.address.text.trim(),
@@ -382,6 +381,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
                   onChanged: () => setState(() {}),
                   onSerialChanged: (lineKey, value) {
                     context.read<CartService>().updateSerialNumber(lineKey, value);
+                  },
+                  onTcChanged: (lineKey, value) {
+                    context.read<CartService>().updateTarjetaConsumo(lineKey, value);
                   },
                 ),
                 const SizedBox(height: 16),

@@ -53,16 +53,13 @@ class PresupuestoItemRow {
         isArma = false,
         serialNumber = '';
 
-  factory PresupuestoItemRow.fromLine(
-    BudgetLine line, {
-    String tarjetaConsumo = '',
-  }) {
+  factory PresupuestoItemRow.fromLine(BudgetLine line) {
     return PresupuestoItemRow(
       lineKey: line.lineKey,
       code: line.code,
       quantity: line.quantity,
       detail: line.detail,
-      tc: tarjetaConsumo.trim(),
+      tc: line.tarjetaConsumo.trim(),
       unitPrice: line.formattedUnitPlain,
       lineTotal: line.formattedLinePlain,
       isArma: line.isArma,
@@ -114,10 +111,7 @@ class PresupuestoDocument {
 
   factory PresupuestoDocument.fromBudget(Budget budget) {
     final date = budget.date;
-    final tc = budget.customer.tarjetaConsumo;
-    final rows = budget.lines
-        .map((line) => PresupuestoItemRow.fromLine(line, tarjetaConsumo: tc))
-        .toList();
+    final rows = budget.lines.map(PresupuestoItemRow.fromLine).toList();
     while (rows.length < PresupuestoBranding.paperRows) {
       rows.add(const PresupuestoItemRow.empty());
     }

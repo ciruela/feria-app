@@ -132,15 +132,6 @@ class PresupuestoCustomerFields extends StatelessWidget {
             ),
           ],
         ),
-        PresupuestoLabeledField(
-          label: 'TC:',
-          controller: controllers.tarjetaConsumo,
-          readOnly: readOnly,
-          onChanged: onChanged,
-          maxLength: 7,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        ),
         Row(
           children: [
             Expanded(

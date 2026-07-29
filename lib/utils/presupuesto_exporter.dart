@@ -15,7 +15,6 @@ class PresupuestoExporter {
         'CLU: ${_value(budget.customer.clu)}   '
         'VTO: ${_value(budget.customer.cluExpiry)}',
       )
-      ..writeln('TC: ${_value(budget.customer.tarjetaConsumo)}')
       ..writeln(
         'TEL: ${_value(budget.customer.phone)}   '
         'MAIL: ${_value(budget.customer.email)}',
@@ -36,7 +35,7 @@ class PresupuestoExporter {
     for (final line in budget.lines) {
       buffer.writeln(
         '${line.code}\t${line.quantity}\t${line.detail}\t'
-        '${budget.customer.tarjetaConsumo}\t'
+        '${line.tarjetaConsumo}\t'
         '${line.formattedUnit}\t${line.formattedLine}',
       );
     }
