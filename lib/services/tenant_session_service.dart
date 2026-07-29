@@ -394,6 +394,50 @@ class TenantSessionService extends ChangeNotifier {
     }
   }
 
+  /// Crea cuenta personal sin organización (para quienes recibirán una invitación).
+  Future<bool> signUpForTeamAccess({
+    required String email,
+    required String password,
+    required String fullName,
+  }) async {
+    if (!isConfigured) return false;
+    _busy = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final response = await SupabaseService.client.auth.signUp(
+        email: email.trim(),
+        password: password,
+        data: {
+          RegistrationIntent.fullNameKey: fullName.trim(),
+        },
+      );
+
+      if (response.session != null) {
+        await _clearAwaitingOrgFlag();
+        await SupabaseService.client.auth.refreshSession();
+        _view = WorkspaceView.none;
+        _membershipsLoaded = false;
+        _readClaims();
+        await ensureSessionReady();
+      }
+
+      _busy = false;
+      notifyListeners();
+      return true;
+    } on AuthException catch (e) {
+      _error = e.message;
+      _busy = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      _busy = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   void clearPendingRegistration() {
     unawaited(_clearAwaitingOrgFlag());
     notifyListeners();

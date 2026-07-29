@@ -62,6 +62,57 @@ Uint8List _cciReportBytes() {
   return Uint8List.fromList(excel.encode()!);
 }
 
+Uint8List _ppuReportBytes() {
+  // PPU real: encabezado de precio (U$D) en fila 0, fila vacía, identidad en fila 2.
+  final excel = Excel.createExcel();
+  final name = excel.sheets.keys.first;
+  excel.rename(name, 'Hoja');
+  final s = excel['Hoja'];
+  void put(int c, int r, String v) => s
+      .cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r))
+      .value = TextCellValue(v);
+
+  put(0, 0, 'MARCA PPU');
+  put(6, 0, 'CAJA ');
+  put(7, 0, 'CAJAS');
+  put(8, 0, 'U\$D');
+  put(0, 2, 'Código');
+  put(1, 2, 'Descripción');
+  put(4, 2, 'TOTAL');
+  put(6, 2, 'X');
+  put(0, 3, '9684');
+  put(1, 3, 'C.243 WIN 100GR SP RIFLE LINE PPU');
+  put(4, 3, '380');
+  put(6, 3, '20');
+  put(7, 3, 'E4/G4');
+  put(8, 3, '60');
+  return Uint8List.fromList(excel.encode()!);
+}
+
+Uint8List _rdReportBytes() {
+  final excel = Excel.createExcel();
+  final name = excel.sheets.keys.first;
+  excel.rename(name, 'Hoja');
+  final s = excel['Hoja'];
+  void put(int c, int r, String v) => s
+      .cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r))
+      .value = TextCellValue(v);
+
+  put(0, 0, 'MARCA: RD');
+  put(0, 1, 'Código');
+  put(1, 1, 'Descripción');
+  put(2, 1, 'TOTAL ');
+  put(3, 1, 'CAJA X ');
+  put(4, 1, 'CAJAS');
+  put(5, 1, '\$');
+  put(0, 2, '13040');
+  put(1, 2, 'FULMINANTES SMALL PISTOL C.9');
+  put(2, 2, '79000');
+  put(3, 2, '1000');
+  put(5, 2, '65000');
+  return Uint8List.fromList(excel.encode()!);
+}
+
 void main() {
   group('ExcelCatalogService.parseRows (reporte CCI real)', () {
     test('salta preámbulo, une encabezado partido y detecta marca', () {
@@ -223,6 +274,58 @@ void main() {
         ],
       );
       expect(() => service.parseRows(bytes), throwsException);
+    });
+
+    test('detecta encabezado en fila actual aunque la fila de arriba tenga texto', () {
+      final excel = Excel.createExcel();
+      final name = excel.sheets.keys.first;
+      excel.rename(name, 'Hoja');
+      final s = excel['Hoja'];
+      void put(int c, int r, String v) => s
+          .cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r))
+          .value = TextCellValue(v);
+
+      put(0, 0, 'Marca: CCI');
+      put(0, 1, 'Código');
+      put(1, 1, 'Descripción');
+      put(2, 1, 'USD');
+      put(0, 2, '100');
+      put(1, 2, '22LR 40gr');
+      put(2, 2, '8.5');
+
+      final rows = service.parseRows(Uint8List.fromList(excel.encode()!));
+      expect(rows.length, 1);
+      expect(rows.first['codigo'], '100');
+      expect(rows.first['precio_usd'], '8.5');
+    });
+
+    test('acepta IMPORTE y P. UNIT como columna de precio', () {
+      for (final priceHeader in ['IMPORTE', 'P. UNIT']) {
+        final bytes = _sheetBytes(
+          ['CODIGO', 'PRODUCTO', priceHeader],
+          [
+            ['0034', '22LR 40gr', '8.5'],
+          ],
+        );
+        final rows = service.parseRows(bytes);
+        expect(rows.single['precio_usd'], '8.5', reason: priceHeader);
+      }
+    });
+
+    test('planilla PPU: encabezado partido con fila vacía en el medio', () {
+      final rows = service.parseRows(_ppuReportBytes());
+      expect(rows.length, 1);
+      expect(rows.first['codigo'], '9684');
+      expect(rows.first['precio_usd'], '60');
+      expect(rows.first['marca'], 'PPU');
+    });
+
+    test('planilla RD: columna \$ como precio', () {
+      final rows = service.parseRows(_rdReportBytes());
+      expect(rows.length, 1);
+      expect(rows.first['codigo'], '13040');
+      expect(rows.first['precio_usd'], '65000');
+      expect(rows.first['marca'], 'RD');
     });
   });
 

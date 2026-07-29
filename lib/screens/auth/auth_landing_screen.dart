@@ -5,6 +5,7 @@ import '../../widgets/feria_shell.dart';
 import 'auth_common.dart';
 import 'login_screen.dart';
 import 'register_organization_screen.dart';
+import 'register_team_account_screen.dart';
 import 'seller_portal_screen.dart';
 
 /// Pantalla inicial: separa iniciar sesion de registrar una armeria nueva.
@@ -86,6 +87,41 @@ class AuthLandingScreen extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  OutlinedButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const RegisterTeamAccountScreen(),
+                        ),
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      side: const BorderSide(color: AppColors.goldDark),
+                    ),
+                    child: const Column(
+                      children: [
+                        Text(
+                          'CREAR CUENTA',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                            color: AppColors.goldDark,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Me van a invitar a una armería',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],

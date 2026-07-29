@@ -31,19 +31,19 @@ class _CategoryCatalogScreenState extends State<CategoryCatalogScreen> {
   String? _marca;
   String? _calibre;
   String? _marcaLetter;
-  String? _codigoLetter;
+  String _codigoQuery = '';
 
   bool get hasActiveFilters =>
       _marca != null ||
       _calibre != null ||
       _marcaLetter != null ||
-      _codigoLetter != null;
+      _codigoQuery.isNotEmpty;
 
   int get _activeFilterCount => [
         _marca,
         _calibre,
         _marcaLetter,
-        _codigoLetter,
+        if (_codigoQuery.isNotEmpty) _codigoQuery,
       ].where((value) => value != null).length;
 
   void clearFilters() {
@@ -51,32 +51,14 @@ class _CategoryCatalogScreenState extends State<CategoryCatalogScreen> {
       _marca = null;
       _calibre = null;
       _marcaLetter = null;
-      _codigoLetter = null;
+      _codigoQuery = '';
     });
   }
 
-  void _toggleMarca(String marca) {
-    setState(() => _marca = _marca == marca ? null : marca);
-  }
-
-  void _toggleCalibre(String calibre) {
-    setState(() => _calibre = _calibre == calibre ? null : calibre);
-  }
-
-  void _toggleMarcaLetter(String letter) {
-    setState(() => _marcaLetter = _marcaLetter == letter ? null : letter);
-  }
-
-  void _toggleCodigoLetter(String letter) {
-    setState(() => _codigoLetter = _codigoLetter == letter ? null : letter);
-  }
-
   Future<void> _openFilterSheet({
-    required int productCount,
     required List<String> brands,
-    required List<String> calibers,
     required Set<String> marcaLetters,
-    required Set<String> codigoLetters,
+    required Set<String> codigoPrefixes,
   }) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -85,41 +67,67 @@ class _CategoryCatalogScreenState extends State<CategoryCatalogScreen> {
       builder: (sheetContext) {
         return DraggableScrollableSheet(
           expand: false,
-          initialChildSize: 0.72,
+          initialChildSize: 0.78,
           minChildSize: 0.45,
           maxChildSize: 0.92,
           builder: (context, scrollController) {
-            return _FilterSheetContent(
-              scrollController: scrollController,
-              productCount: productCount,
-              showCodigoFilter: widget.type == ProductType.municion,
-              brands: brands,
-              calibers: calibers,
-              marcaLetters: marcaLetters,
-              codigoLetters: codigoLetters,
-              selectedMarca: _marca,
-              selectedCalibre: _calibre,
-              selectedMarcaLetter: _marcaLetter,
-              selectedCodigoLetter: _codigoLetter,
-              onMarcaTap: (marca) {
-                _toggleMarca(marca);
-                Navigator.pop(sheetContext);
-              },
-              onCalibreTap: (calibre) {
-                _toggleCalibre(calibre);
-                Navigator.pop(sheetContext);
-              },
-              onMarcaLetterTap: (letter) {
-                _toggleMarcaLetter(letter);
-                Navigator.pop(sheetContext);
-              },
-              onCodigoLetterTap: (letter) {
-                _toggleCodigoLetter(letter);
-                Navigator.pop(sheetContext);
-              },
-              onClear: () {
-                clearFilters();
-                Navigator.pop(sheetContext);
+            return StatefulBuilder(
+              builder: (context, sheetSetState) {
+                final catalog = context.watch<CatalogService>();
+                final calibers = catalog.calibersFor(widget.type, _marca);
+                final products = catalog.filtered(
+                  type: widget.type,
+                  marca: _marca,
+                  calibre: _calibre,
+                  marcaLetter: _marcaLetter,
+                  codigoQuery:
+                      _codigoQuery.isEmpty ? null : _codigoQuery,
+                );
+
+                void refresh(VoidCallback update) {
+                  setState(update);
+                  sheetSetState(() {});
+                }
+
+                return _FilterSheetContent(
+                  scrollController: scrollController,
+                  productCount: products.length,
+                  brands: brands,
+                  calibers: calibers,
+                  marcaLetters: marcaLetters,
+                  codigoPrefixes: codigoPrefixes,
+                  selectedMarca: _marca,
+                  selectedCalibre: _calibre,
+                  selectedMarcaLetter: _marcaLetter,
+                  codigoQuery: _codigoQuery,
+                  onMarcaTap: (marca) => refresh(
+                    () => _marca = _marca == marca ? null : marca,
+                  ),
+                  onCalibreTap: (calibre) => refresh(
+                    () => _calibre = _calibre == calibre ? null : calibre,
+                  ),
+                  onMarcaLetterTap: (letter) => refresh(
+                    () => _marcaLetter =
+                        _marcaLetter == letter ? null : letter,
+                  ),
+                  onCodigoQueryChanged: (query) => refresh(
+                    () => _codigoQuery = query.trim(),
+                  ),
+                  onCodigoPrefixTap: (prefix) => refresh(() {
+                    if (_codigoQuery == prefix) {
+                      _codigoQuery = '';
+                    } else {
+                      _codigoQuery = prefix;
+                    }
+                  }),
+                  onClear: () => refresh(() {
+                    _marca = null;
+                    _calibre = null;
+                    _marcaLetter = null;
+                    _codigoQuery = '';
+                  }),
+                  onApply: () => Navigator.pop(sheetContext),
+                );
               },
             );
           },
@@ -133,16 +141,15 @@ class _CategoryCatalogScreenState extends State<CategoryCatalogScreen> {
     final catalog = context.watch<CatalogService>();
     final type = widget.type;
     final brands = catalog.brandsFor(type);
-    final calibers = catalog.calibersFor(type);
     final marcaLetters = catalog.usedLettersForMarca(type);
-    final codigoLetters = catalog.usedLettersForCodigo(type);
+    final codigoPrefixes = catalog.usedLettersForCodigo(type);
 
     final products = catalog.filtered(
       type: type,
       marca: _marca,
       calibre: _calibre,
       marcaLetter: _marcaLetter,
-      codigoLetter: _codigoLetter,
+      codigoQuery: _codigoQuery.isEmpty ? null : _codigoQuery,
     );
     final cartCount = context.watch<CartService>().itemCount;
 
@@ -160,19 +167,17 @@ class _CategoryCatalogScreenState extends State<CategoryCatalogScreen> {
             activeMarca: _marca,
             activeCalibre: _calibre,
             activeMarcaLetter: _marcaLetter,
-            activeCodigoLetter: _codigoLetter,
+            activeCodigoQuery: _codigoQuery,
             onOpenFilters: () => _openFilterSheet(
-              productCount: products.length,
               brands: brands,
-              calibers: calibers,
               marcaLetters: marcaLetters,
-              codigoLetters: codigoLetters,
+              codigoPrefixes: codigoPrefixes,
             ),
             onClear: clearFilters,
             onRemoveMarca: () => setState(() => _marca = null),
             onRemoveCalibre: () => setState(() => _calibre = null),
             onRemoveMarcaLetter: () => setState(() => _marcaLetter = null),
-            onRemoveCodigoLetter: () => setState(() => _codigoLetter = null),
+            onRemoveCodigoQuery: () => setState(() => _codigoQuery = ''),
           ),
           Expanded(
             child: products.isEmpty
@@ -239,13 +244,13 @@ class _CompactFilterBar extends StatelessWidget {
     required this.activeMarca,
     required this.activeCalibre,
     required this.activeMarcaLetter,
-    required this.activeCodigoLetter,
+    required this.activeCodigoQuery,
     required this.onOpenFilters,
     required this.onClear,
     required this.onRemoveMarca,
     required this.onRemoveCalibre,
     required this.onRemoveMarcaLetter,
-    required this.onRemoveCodigoLetter,
+    required this.onRemoveCodigoQuery,
   });
 
   final int productCount;
@@ -254,13 +259,13 @@ class _CompactFilterBar extends StatelessWidget {
   final String? activeMarca;
   final String? activeCalibre;
   final String? activeMarcaLetter;
-  final String? activeCodigoLetter;
+  final String activeCodigoQuery;
   final VoidCallback onOpenFilters;
   final VoidCallback onClear;
   final VoidCallback onRemoveMarca;
   final VoidCallback onRemoveCalibre;
   final VoidCallback onRemoveMarcaLetter;
-  final VoidCallback onRemoveCodigoLetter;
+  final VoidCallback onRemoveCodigoQuery;
 
   @override
   Widget build(BuildContext context) {
@@ -346,10 +351,10 @@ class _CompactFilterBar extends StatelessWidget {
                       label: 'Marca ${activeMarcaLetter!}',
                       onRemove: onRemoveMarcaLetter,
                     ),
-                  if (activeCodigoLetter != null)
+                  if (activeCodigoQuery.isNotEmpty)
                     _ActiveFilterChip(
-                      label: 'Cód. ${activeCodigoLetter!}',
-                      onRemove: onRemoveCodigoLetter,
+                      label: 'Cód. $activeCodigoQuery',
+                      onRemove: onRemoveCodigoQuery,
                     ),
                 ],
               ),
@@ -394,99 +399,149 @@ class _FilterSheetContent extends StatelessWidget {
   const _FilterSheetContent({
     required this.scrollController,
     required this.productCount,
-    required this.showCodigoFilter,
     required this.brands,
     required this.calibers,
     required this.marcaLetters,
-    required this.codigoLetters,
+    required this.codigoPrefixes,
     required this.selectedMarca,
     required this.selectedCalibre,
     required this.selectedMarcaLetter,
-    required this.selectedCodigoLetter,
+    required this.codigoQuery,
     required this.onMarcaTap,
     required this.onCalibreTap,
     required this.onMarcaLetterTap,
-    required this.onCodigoLetterTap,
+    required this.onCodigoQueryChanged,
+    required this.onCodigoPrefixTap,
     required this.onClear,
+    required this.onApply,
   });
 
   final ScrollController scrollController;
   final int productCount;
-  final bool showCodigoFilter;
   final List<String> brands;
   final List<String> calibers;
   final Set<String> marcaLetters;
-  final Set<String> codigoLetters;
+  final Set<String> codigoPrefixes;
   final String? selectedMarca;
   final String? selectedCalibre;
   final String? selectedMarcaLetter;
-  final String? selectedCodigoLetter;
+  final String codigoQuery;
   final ValueChanged<String> onMarcaTap;
   final ValueChanged<String> onCalibreTap;
   final ValueChanged<String> onMarcaLetterTap;
-  final ValueChanged<String> onCodigoLetterTap;
+  final ValueChanged<String> onCodigoQueryChanged;
+  final ValueChanged<String> onCodigoPrefixTap;
   final VoidCallback onClear;
+  final VoidCallback onApply;
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      controller: scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+    return Column(
       children: [
-        Row(
-          children: [
-            Text(
-              'Filtrar catálogo',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
+        Expanded(
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            children: [
+              Row(
+                children: [
+                  Text(
+                    'Filtrar catálogo',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
                   ),
-            ),
-            const Spacer(),
-            TextButton(onPressed: onClear, child: const Text('Limpiar')),
-          ],
-        ),
-        Text(
-          '$productCount producto${productCount == 1 ? '' : 's'} con estos filtros',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
+                  const Spacer(),
+                  TextButton(onPressed: onClear, child: const Text('Limpiar')),
+                ],
               ),
-        ),
-        const SizedBox(height: 16),
-        _FilterSection(
-          label: 'Marca',
-          child: _HorizontalChips(
-            items: brands,
-            selected: selectedMarca,
-            onTap: onMarcaTap,
-            labelBuilder: (value) => value.toUpperCase(),
+              Text(
+                'Podés combinar varios filtros antes de ver los resultados.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              _FilterSection(
+                label: 'Marca',
+                child: _HorizontalChips(
+                  items: brands,
+                  selected: selectedMarca,
+                  onTap: onMarcaTap,
+                  labelBuilder: (value) => value.toUpperCase(),
+                ),
+              ),
+              _FilterSection(
+                label: selectedMarca == null
+                    ? 'Calibre'
+                    : 'Calibre · ${selectedMarca!.toUpperCase()}',
+                child: _HorizontalChips(
+                  items: calibers,
+                  selected: selectedCalibre,
+                  onTap: onCalibreTap,
+                  labelBuilder: (value) => value.toUpperCase(),
+                ),
+              ),
+              _FilterSection(
+                label: 'Letra marca',
+                child: _HorizontalLetters(
+                  letters: marcaLetters,
+                  selected: selectedMarcaLetter,
+                  onTap: onMarcaLetterTap,
+                ),
+              ),
+              _FilterSection(
+                label: 'Código',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _CodigoQueryField(
+                      value: codigoQuery,
+                      onChanged: onCodigoQueryChanged,
+                    ),
+                    if (codigoPrefixes.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Atajos por primer carácter',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _CodePrefixChips(
+                        prefixes: codigoPrefixes,
+                        selected: codigoQuery.length == 1 ? codigoQuery : null,
+                        onTap: onCodigoPrefixTap,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        _FilterSection(
-          label: 'Calibre',
-          child: _HorizontalChips(
-            items: calibers,
-            selected: selectedCalibre,
-            onTap: onCalibreTap,
-            labelBuilder: (value) => value.toUpperCase(),
-          ),
-        ),
-        _FilterSection(
-          label: 'Letra marca',
-          child: _HorizontalLetters(
-            letters: marcaLetters,
-            selected: selectedMarcaLetter,
-            onTap: onMarcaLetterTap,
-          ),
-        ),
-        if (showCodigoFilter)
-          _FilterSection(
-            label: 'Letra código',
-            child: _HorizontalLetters(
-              letters: codigoLetters,
-              selected: selectedCodigoLetter,
-              onTap: onCodigoLetterTap,
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: onApply,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: Text(
+                  'VER $productCount PRODUCTO${productCount == 1 ? '' : 'S'}',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
             ),
           ),
+        ),
       ],
     );
   }
@@ -566,6 +621,116 @@ class _HorizontalChips extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+class _CodigoQueryField extends StatefulWidget {
+  const _CodigoQueryField({
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_CodigoQueryField> createState() => _CodigoQueryFieldState();
+}
+
+class _CodigoQueryFieldState extends State<_CodigoQueryField> {
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.value);
+  }
+
+  @override
+  void didUpdateWidget(covariant _CodigoQueryField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.value != _controller.text) {
+      _controller.value = TextEditingValue(
+        text: widget.value,
+        selection: TextSelection.collapsed(offset: widget.value.length),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _controller,
+      textCapitalization: TextCapitalization.characters,
+      autocorrect: false,
+      decoration: InputDecoration(
+        hintText: 'Escribí el código o parte de él',
+        prefixIcon: const Icon(Icons.search_rounded, size: 20),
+        suffixIcon: widget.value.isNotEmpty
+            ? IconButton(
+                tooltip: 'Borrar',
+                onPressed: () => widget.onChanged(''),
+                icon: const Icon(Icons.close_rounded, size: 18),
+              )
+            : null,
+        border: const OutlineInputBorder(),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      ),
+      onChanged: widget.onChanged,
+    );
+  }
+}
+
+class _CodePrefixChips extends StatelessWidget {
+  const _CodePrefixChips({
+    required this.prefixes,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final Set<String> prefixes;
+  final String? selected;
+  final ValueChanged<String> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (prefixes.isEmpty) {
+      return const Text(
+        'Sin códigos en el catálogo',
+        style: TextStyle(color: AppColors.textSecondary),
+      );
+    }
+
+    final items = prefixes.toList()
+      ..sort((a, b) {
+        final aNum = int.tryParse(a);
+        final bNum = int.tryParse(b);
+        if (aNum != null && bNum != null) return aNum.compareTo(bNum);
+        if (aNum != null) return -1;
+        if (bNum != null) return 1;
+        return a.compareTo(b);
+      });
+
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final prefix in items)
+          LetterChip(
+            letter: prefix,
+            enabled: true,
+            selected: selected == prefix,
+            onTap: () => onTap(prefix),
+          ),
+      ],
     );
   }
 }

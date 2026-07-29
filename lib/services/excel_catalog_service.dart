@@ -51,9 +51,22 @@ class ExcelCatalogService {
         .replaceAll('ú', 'u');
 
     if (h.isEmpty) return null;
-    // Precio: cualquier encabezado que arranque con "precio" (precio, precio
-    // usd, precio u$d., etc.).
+    // Precio: flexible (planillas CCI, export propio, armerías).
     if (h.startsWith('precio')) return 'precio_usd';
+    if (h == 'usd' ||
+        h == 'u\$d' ||
+        h == 'u\$s' ||
+        h == '\$' ||
+        h.startsWith('u\$d') ||
+        h.startsWith('u\$s') ||
+        h == 'importe' ||
+        h == 'valor' ||
+        h.contains('p. unit') ||
+        h.contains('p unit') ||
+        h == 'punit' ||
+        h == 'punitario') {
+      return 'precio_usd';
+    }
 
     switch (h) {
       case 'tipo':
@@ -72,6 +85,10 @@ class ExcelCatalogService {
       case 'descripcion':
       case 'detalle':
       case 'descripcion interna':
+      case 'producto':
+      case 'articulo':
+      case 'item':
+      case 'nombre':
         return 'descripcion';
       case 'balas_por_caja':
       case 'balas por caja':
@@ -104,6 +121,17 @@ class ExcelCatalogService {
     }
   }
 
+  static void _registerHeader(
+    String raw,
+    Map<String, int> cols,
+    int columnIndex,
+  ) {
+    final canonical = _canonicalHeader(raw);
+    if (canonical != null && !cols.containsKey(canonical)) {
+      cols[canonical] = columnIndex;
+    }
+  }
+
   /// Ubica la fila de encabezados (tolerando filas de título arriba y
   /// encabezados partidos en dos filas, como CAJA + X / PRECIO + U$D.) y
   /// detecta la marca si aparece como "Marca: XXX" en el preámbulo.
@@ -113,16 +141,22 @@ class ExcelCatalogService {
 
     for (var h = 0; h < maxScan; h++) {
       final cols = <String, int>{};
-      final above = h > 0 ? rows[h - 1] : const <Data?>[];
-      final cur = rows[h];
-      final width = cur.length > above.length ? cur.length : above.length;
+      // Acumula encabezados de todas las filas de preámbulo hasta [h]
+      // (PPU y similares: U$D en fila 0, Código/Descripción en fila 2).
+      for (var r = 0; r <= h; r++) {
+        final above = r > 0 ? rows[r - 1] : const <Data?>[];
+        final cur = rows[r];
+        final width = cur.length > above.length ? cur.length : above.length;
 
-      for (var i = 0; i < width; i++) {
-        final topText = i < above.length ? _cellText(above[i]) : '';
-        final curText = i < cur.length ? _cellText(cur[i]) : '';
-        final canonical = _canonicalHeader('$topText $curText');
-        if (canonical != null && !cols.containsKey(canonical)) {
-          cols[canonical] = i;
+        for (var i = 0; i < width; i++) {
+          final topText = i < above.length ? _cellText(above[i]) : '';
+          final curText = i < cur.length ? _cellText(cur[i]) : '';
+          _registerHeader(curText, cols, i);
+          _registerHeader(topText, cols, i);
+          _registerHeader('$topText $curText', cols, i);
+          if (topText.isNotEmpty && curText.isNotEmpty) {
+            _registerHeader('$topText$curText', cols, i);
+          }
         }
       }
 
@@ -139,8 +173,9 @@ class ExcelCatalogService {
 
     if (best == null) {
       throw Exception(
-        'No encontré los encabezados en el Excel. Necesito una columna de '
-        'código/descripción/modelo y una de precio.',
+        'No encontré los encabezados en el Excel. Necesito al menos una columna '
+        'de código, descripción o modelo, y otra de precio (precio, USD, '
+        'importe o p. unit). Si es .xls o CSV, guardalo como .xlsx e intentá de nuevo.',
       );
     }
     return best;
@@ -183,11 +218,13 @@ class ExcelCatalogService {
   }
 
   static String? _detectBrand(List<List<Data?>> rows, int upTo) {
-    final re = RegExp(r'marca\s*:\s*(.+)', caseSensitive: false);
+    final withColon = RegExp(r'marca\s*:\s*(.+)', caseSensitive: false);
+    final withoutColon = RegExp(r'^marca\s+(.+)$', caseSensitive: false);
     for (var r = 0; r < upTo && r < rows.length; r++) {
       for (final cell in rows[r]) {
         final text = _cellText(cell).replaceAll('\u00a0', ' ').trim();
-        final match = re.firstMatch(text);
+        final match = withColon.firstMatch(text) ??
+            withoutColon.firstMatch(text);
         if (match != null) {
           final brand = match.group(1)?.trim() ?? '';
           if (brand.isNotEmpty) return brand;

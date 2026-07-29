@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/app_config.dart';
 import '../../models/team_member.dart';
@@ -88,9 +89,19 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
       if (!mounted) return;
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$error')),
+        SnackBar(content: Text(_formatInviteError(error))),
       );
     }
+  }
+
+  String _formatInviteError(Object error) {
+    if (error is PostgrestException) {
+      return error.message;
+    }
+    if (error is StateError) {
+      return error.message;
+    }
+    return error.toString();
   }
 
   Future<void> _deactivate(TeamMember member) async {
@@ -183,9 +194,10 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
                     ),
                     child: Text(
                       _canManage
-                          ? 'Invitá por email a quienes administran la armería '
-                              '(login con cuenta). Los vendedores del mostrador '
-                              'entran con “Entrar como vendedor” en el inicio.'
+                          ? 'Invitá por email a quienes administran la armería. '
+                              'La persona debe crear una cuenta antes (Inicio → '
+                              '“Crear cuenta”). Los vendedores del mostrador '
+                              'entran con “Entrar como vendedor”.'
                           : 'Solo el dueño puede invitar administradores. '
                               'Los vendedores usan dominio + clave desde el inicio.',
                       style: const TextStyle(
@@ -436,6 +448,8 @@ class _InviteDialogState extends State<_InviteDialog> {
               decoration: const InputDecoration(
                 labelText: 'Email',
                 hintText: 'persona@mail.com',
+                helperText:
+                    'Debe ser el mismo email con el que se registró en la app',
                 border: OutlineInputBorder(),
               ),
               validator: (value) {

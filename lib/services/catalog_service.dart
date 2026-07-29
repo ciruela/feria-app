@@ -797,10 +797,9 @@ class CatalogService extends ChangeNotifier {
     String? marca,
     String? calibre,
     String? marcaLetter,
-    String? codigoLetter,
+    String? codigoQuery,
   }) {
-    final isMunicion = type == ProductType.municion;
-
+    final query = codigoQuery?.trim() ?? '';
     final results = byType(type).where((product) {
       final marcaOk = marca == null ||
           product.marca.toLowerCase() == marca.toLowerCase();
@@ -808,10 +807,10 @@ class CatalogService extends ChangeNotifier {
           product.calibre.toLowerCase() == calibre.toLowerCase();
       final marcaLetterOk = marcaLetter == null ||
           product.marca.toUpperCase().startsWith(marcaLetter.toUpperCase());
-      final codigoLetterOk = !isMunicion ||
-          codigoLetter == null ||
-          product.codigo.toUpperCase().startsWith(codigoLetter.toUpperCase());
-      return marcaOk && calibreOk && marcaLetterOk && codigoLetterOk;
+      final codigoOk = query.isEmpty ||
+          (product.codigo.isNotEmpty &&
+              product.codigo.toUpperCase().contains(query.toUpperCase()));
+      return marcaOk && calibreOk && marcaLetterOk && codigoOk;
     }).toList();
 
     results.sort((a, b) {

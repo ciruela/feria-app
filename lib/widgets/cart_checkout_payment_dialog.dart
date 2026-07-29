@@ -89,12 +89,14 @@ class _CartCheckoutPaymentDialog extends StatelessWidget {
                     label: 'PAGAR EN DOS FORMAS',
                     selected: current?.isDual ?? false,
                     onTap: () async {
-                      final dual = await _pickDualPayment(
-                        context,
-                        cart: cart,
-                        exchangeRate: exchangeRate,
-                        pricingSettings: pricingSettings,
-                        totalsService: totalsService,
+                      final dual = await showDialog<CartCheckoutPayment>(
+                        context: context,
+                        builder: (context) => _CartDualPaymentWizardDialog(
+                          cart: cart,
+                          exchangeRate: exchangeRate,
+                          pricingSettings: pricingSettings,
+                          totalsService: totalsService,
+                        ),
                       );
                       if (dual != null && context.mounted) {
                         Navigator.of(context).pop(dual);
@@ -154,88 +156,132 @@ class _CartCheckoutPaymentDialog extends StatelessWidget {
       ),
     );
   }
-
-  Future<CartCheckoutPayment?> _pickDualPayment(
-    BuildContext context, {
-    required CartService cart,
-    required ExchangeRateService exchangeRate,
-    required PricingSettingsService pricingSettings,
-    required CartTotalsService totalsService,
-  }) async {
-    final first = await showDialog<PaymentMethod>(
-      context: context,
-      builder: (context) => _CartDualStepDialog(
-        stepTitle: 'Primera forma de pago',
-        exclude: const {},
-        cart: cart,
-        exchangeRate: exchangeRate,
-        pricingSettings: pricingSettings,
-        totalsService: totalsService,
-      ),
-    );
-    if (first == null || !context.mounted) return null;
-
-    final second = await showDialog<PaymentMethod>(
-      context: context,
-      builder: (context) => _CartDualStepDialog(
-        stepTitle: 'Segunda forma de pago',
-        exclude: {first},
-        cart: cart,
-        exchangeRate: exchangeRate,
-        pricingSettings: pricingSettings,
-        totalsService: totalsService,
-      ),
-    );
-    if (second == null || !context.mounted) return null;
-
-    final total = totalsService.cartTotalAtMethod(
-      cart: cart,
-      method: first,
-      exchangeRate: exchangeRate,
-      pricingSettings: pricingSettings,
-    );
-
-    final share = await showDialog<double>(
-      context: context,
-      builder: (context) => _CartDualShareDialog(
-        first: first,
-        second: second,
-        totalUsd: total.usd,
-        totalArs: total.ars,
-      ),
-    );
-    if (share == null) return null;
-
-    return CartCheckoutPayment.dual(
-      pricingMethod: first,
-      secondMethod: second,
-      primaryShare: share,
-    );
-  }
 }
 
-class _CartDualStepDialog extends StatelessWidget {
-  const _CartDualStepDialog({
-    required this.stepTitle,
-    required this.exclude,
+enum _DualPaymentStep { first, second, split }
+
+class _CartDualPaymentWizardDialog extends StatefulWidget {
+  const _CartDualPaymentWizardDialog({
     required this.cart,
     required this.exchangeRate,
     required this.pricingSettings,
     required this.totalsService,
   });
 
-  final String stepTitle;
-  final Set<PaymentMethod> exclude;
   final CartService cart;
   final ExchangeRateService exchangeRate;
   final PricingSettingsService pricingSettings;
   final CartTotalsService totalsService;
 
   @override
-  Widget build(BuildContext context) {
-    final methods =
-        selectablePaymentMethods.where((method) => !exclude.contains(method)).toList();
+  State<_CartDualPaymentWizardDialog> createState() =>
+      _CartDualPaymentWizardDialogState();
+}
 
+class _CartDualPaymentWizardDialogState
+    extends State<_CartDualPaymentWizardDialog> {
+  _DualPaymentStep _step = _DualPaymentStep.first;
+  PaymentMethod? _first;
+  PaymentMethod? _second;
+  double _share = 0.5;
+  final _amountController = TextEditingController();
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  double get _total {
+    if (_first == null) return 0;
+    final total = widget.totalsService.cartTotalAtMethod(
+      cart: widget.cart,
+      method: _first!,
+      exchangeRate: widget.exchangeRate,
+      pricingSettings: widget.pricingSettings,
+    );
+    return _first!.isUsdPayment ? total.usd : total.ars;
+  }
+
+  double _amountFor(double share) => _total * share;
+
+  String _formatAmount(double amount) {
+    if (_first == null) return '';
+    return _first!.isUsdPayment ? formatUsd(amount) : formatArs(amount);
+  }
+
+  void _syncShareFromAmount(String raw) {
+    final normalized = raw.replaceAll('.', '').replaceAll(',', '.');
+    final amount = double.tryParse(normalized);
+    if (amount == null || amount <= 0 || _total <= 0) return;
+
+    setState(() {
+      _share = (amount / _total).clamp(dualPaymentMinShare, dualPaymentMaxShare);
+    });
+  }
+
+  bool get _canProceed {
+    return switch (_step) {
+      _DualPaymentStep.first => _first != null,
+      _DualPaymentStep.second => _second != null,
+      _DualPaymentStep.split => true,
+    };
+  }
+
+  String get _stepTitle {
+    return switch (_step) {
+      _DualPaymentStep.first => 'Primera forma de pago',
+      _DualPaymentStep.second => 'Segunda forma de pago',
+      _DualPaymentStep.split => 'Dividir el pago',
+    };
+  }
+
+  String? get _stepSubtitle {
+    return switch (_step) {
+      _DualPaymentStep.first =>
+        'Elegí la primera forma. Define el precio de referencia del carrito.',
+      _DualPaymentStep.second =>
+        'Elegí la segunda forma. Tiene que ser distinta a la primera.',
+      _DualPaymentStep.split =>
+        'Indicá cuánto paga con ${_first?.shortLabel ?? 'la primera'} '
+        'y el resto queda en ${_second?.shortLabel ?? 'la segunda'}.',
+    };
+  }
+
+  void _goBack() {
+    setState(() {
+      _step = switch (_step) {
+        _DualPaymentStep.second => _DualPaymentStep.first,
+        _DualPaymentStep.split => _DualPaymentStep.second,
+        _DualPaymentStep.first => _DualPaymentStep.first,
+      };
+    });
+  }
+
+  void _goNext() {
+    if (!_canProceed) return;
+
+    if (_step == _DualPaymentStep.split) {
+      if (_first == null || _second == null) return;
+      Navigator.of(context).pop(
+        CartCheckoutPayment.dual(
+          pricingMethod: _first!,
+          secondMethod: _second!,
+          primaryShare: _share,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _step = _step == _DualPaymentStep.first
+          ? _DualPaymentStep.second
+          : _DualPaymentStep.split;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -249,45 +295,91 @@ class _CartDualStepDialog extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-              child: Text(
-                stepTitle,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleLarge,
+              child: Column(
+                children: [
+                  Text(
+                    _stepTitle,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  if (_stepSubtitle != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      _stepSubtitle!,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ],
               ),
             ),
             const SizedBox(height: 12),
             Flexible(
-              child: ListView.separated(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                shrinkWrap: true,
-                itemCount: methods.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final method = methods[index];
-                  final total = totalsService.cartTotalAtMethod(
-                    cart: cart,
-                    method: method,
-                    exchangeRate: exchangeRate,
-                    pricingSettings: pricingSettings,
-                  );
-                  final amount = method.isUsdPayment
-                      ? formatUsd(total.usd)
-                      : formatArs(total.ars);
-
-                  return FilterChipButton(
-                    label: '${method.shortLabel.toUpperCase()} · $amount',
-                    selected: false,
-                    compact: true,
-                    onTap: () => Navigator.of(context).pop(method),
-                  );
+                child: switch (_step) {
+                  _DualPaymentStep.first || _DualPaymentStep.second =>
+                    _MethodPicker(
+                      exclude: _step == _DualPaymentStep.second && _first != null
+                          ? {_first!}
+                          : const {},
+                      selected: _step == _DualPaymentStep.first ? _first : _second,
+                      cart: widget.cart,
+                      exchangeRate: widget.exchangeRate,
+                      pricingSettings: widget.pricingSettings,
+                      totalsService: widget.totalsService,
+                      onSelected: (method) {
+                        setState(() {
+                          if (_step == _DualPaymentStep.first) {
+                            _first = method;
+                          } else {
+                            _second = method;
+                          }
+                        });
+                      },
+                    ),
+                  _DualPaymentStep.split => _SplitStep(
+                      first: _first!,
+                      second: _second!,
+                      share: _share,
+                      total: _total,
+                      amountController: _amountController,
+                      formatAmount: _formatAmount,
+                      amountFor: _amountFor,
+                      onShareChanged: (value) {
+                        setState(() {
+                          _share = value;
+                          _amountController.text = _formatAmount(_amountFor(value))
+                              .replaceAll(RegExp(r'[^0-9.,]'), '');
+                        });
+                      },
+                      onAmountChanged: _syncShareFromAmount,
+                    ),
                 },
               ),
             ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('CANCELAR'),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              child: Row(
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('CANCELAR'),
+                  ),
+                  if (_step != _DualPaymentStep.first) ...[
+                    TextButton(
+                      onPressed: _goBack,
+                      child: const Text('VOLVER'),
+                    ),
+                  ],
+                  const Spacer(),
+                  FilledButton(
+                    onPressed: _canProceed ? _goNext : null,
+                    child: Text(
+                      _step == _DualPaymentStep.split ? 'CONFIRMAR' : 'SIGUIENTE',
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -297,156 +389,142 @@ class _CartDualStepDialog extends StatelessWidget {
   }
 }
 
-class _CartDualShareDialog extends StatefulWidget {
-  const _CartDualShareDialog({
+class _MethodPicker extends StatelessWidget {
+  const _MethodPicker({
+    required this.exclude,
+    required this.selected,
+    required this.cart,
+    required this.exchangeRate,
+    required this.pricingSettings,
+    required this.totalsService,
+    required this.onSelected,
+  });
+
+  final Set<PaymentMethod> exclude;
+  final PaymentMethod? selected;
+  final CartService cart;
+  final ExchangeRateService exchangeRate;
+  final PricingSettingsService pricingSettings;
+  final CartTotalsService totalsService;
+  final ValueChanged<PaymentMethod> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final methods = selectablePaymentMethods
+        .where((method) => !exclude.contains(method))
+        .toList();
+
+    return Column(
+      children: [
+        for (final method in methods) ...[
+          FilterChipButton(
+            label: _methodLabel(method),
+            selected: selected == method,
+            compact: true,
+            onTap: () => onSelected(method),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ],
+    );
+  }
+
+  String _methodLabel(PaymentMethod method) {
+    final total = totalsService.cartTotalAtMethod(
+      cart: cart,
+      method: method,
+      exchangeRate: exchangeRate,
+      pricingSettings: pricingSettings,
+    );
+    final amount =
+        method.isUsdPayment ? formatUsd(total.usd) : formatArs(total.ars);
+    return '${method.shortLabel.toUpperCase()} · $amount';
+  }
+}
+
+class _SplitStep extends StatelessWidget {
+  const _SplitStep({
     required this.first,
     required this.second,
-    required this.totalUsd,
-    required this.totalArs,
+    required this.share,
+    required this.total,
+    required this.amountController,
+    required this.formatAmount,
+    required this.amountFor,
+    required this.onShareChanged,
+    required this.onAmountChanged,
   });
 
   final PaymentMethod first;
   final PaymentMethod second;
-  final double totalUsd;
-  final double totalArs;
-
-  @override
-  State<_CartDualShareDialog> createState() => _CartDualShareDialogState();
-}
-
-class _CartDualShareDialogState extends State<_CartDualShareDialog> {
-  final _amountController = TextEditingController();
-  double _share = 0.5;
-
-  @override
-  void dispose() {
-    _amountController.dispose();
-    super.dispose();
-  }
-
-  double get _total =>
-      widget.first.isUsdPayment ? widget.totalUsd : widget.totalArs;
-
-  double _amountFor(double share) => _total * share;
-
-  String _formatAmount(double amount) {
-    return widget.first.isUsdPayment ? formatUsd(amount) : formatArs(amount);
-  }
-
-  void _syncShareFromAmount(String raw) {
-    final normalized = raw.replaceAll('.', '').replaceAll(',', '.');
-    final amount = double.tryParse(normalized);
-    if (amount == null || amount <= 0 || _total <= 0) return;
-
-    setState(() {
-      _share = (amount / _total).clamp(dualPaymentMinShare, dualPaymentMaxShare);
-    });
-  }
+  final double share;
+  final double total;
+  final TextEditingController amountController;
+  final String Function(double amount) formatAmount;
+  final double Function(double share) amountFor;
+  final ValueChanged<double> onShareChanged;
+  final ValueChanged<String> onAmountChanged;
 
   @override
   Widget build(BuildContext context) {
-    final firstAmount = _amountFor(_share);
-    final secondAmount = _amountFor(1 - _share);
-    final amountLabel = widget.first.isUsdPayment
-        ? 'Monto en USD (${widget.first.shortLabel})'
-        : 'Monto en pesos (${widget.first.shortLabel})';
+    final firstAmount = amountFor(share);
+    final secondAmount = amountFor(1 - share);
+    final amountLabel = first.isUsdPayment
+        ? 'Monto en USD (${first.shortLabel})'
+        : 'Monto en pesos (${first.shortLabel})';
 
-    return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Dividir el pago',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Indicá cuánto paga con ${widget.first.shortLabel} '
-                'y el resto queda en ${widget.second.shortLabel}.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                amountLabel,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 6),
-              TextField(
-                controller: _amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                ],
-                decoration: InputDecoration(
-                  hintText: widget.first.isUsdPayment ? 'Ej: 500' : 'Ej: 500000',
-                  suffixText: widget.first.isUsdPayment ? 'USD' : 'ARS',
-                ),
-                onChanged: _syncShareFromAmount,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '${(100 * _share).round()}% · ${widget.first.shortLabel}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              Slider(
-                value: _share,
-                min: dualPaymentMinShare,
-                max: dualPaymentMaxShare,
-                divisions: 18,
-                label: '${(100 * _share).round()}%',
-                onChanged: (value) {
-                  setState(() {
-                    _share = value;
-                    _amountController.text = _formatAmount(_amountFor(value))
-                        .replaceAll(RegExp(r'[^0-9.,]'), '');
-                  });
-                },
-              ),
-              _SharePreviewRow(
-                label: '1. ${widget.first.shortLabel}',
-                value: _formatAmount(firstAmount),
-                total: _formatAmount(_total),
-              ),
-              const SizedBox(height: 8),
-              _SharePreviewRow(
-                label: '2. ${widget.second.shortLabel}',
-                value: _formatAmount(secondAmount),
-                total: _formatAmount(_total),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('CANCELAR'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(_share),
-                    child: const Text('CONFIRMAR'),
-                  ),
-                ],
-              ),
-            ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          amountLabel,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
           ),
         ),
-      ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: amountController,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+          ],
+          decoration: InputDecoration(
+            hintText: first.isUsdPayment ? 'Ej: 500' : 'Ej: 500000',
+            suffixText: first.isUsdPayment ? 'USD' : 'ARS',
+          ),
+          onChanged: onAmountChanged,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          '${(100 * share).round()}% · ${first.shortLabel}',
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        Slider(
+          value: share,
+          min: dualPaymentMinShare,
+          max: dualPaymentMaxShare,
+          divisions: 18,
+          label: '${(100 * share).round()}%',
+          onChanged: onShareChanged,
+        ),
+        _SharePreviewRow(
+          label: '1. ${first.shortLabel}',
+          value: formatAmount(firstAmount),
+          total: formatAmount(total),
+        ),
+        const SizedBox(height: 8),
+        _SharePreviewRow(
+          label: '2. ${second.shortLabel}',
+          value: formatAmount(secondAmount),
+          total: formatAmount(total),
+        ),
+      ],
     );
   }
 }
