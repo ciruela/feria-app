@@ -11,6 +11,7 @@ import '../widgets/big_action_button.dart';
 import '../widgets/feria_shell.dart';
 import '../widgets/section_header.dart';
 import '../widgets/supabase_config_banner.dart';
+import '../widgets/tenant_app_title.dart';
 
 typedef AdminEntryCallback = void Function(AdminUser admin);
 
@@ -31,7 +32,7 @@ class RoleGateScreen extends StatelessWidget {
 
     return FeriaScaffold(
       appBar: FeriaAppBar(
-        title: const Text('Catálogo Feria'),
+        title: const TenantAppTitle(),
         showBackButton: false,
         leading: session.isSignedIn && session.destinationCount > 1
             ? IconButton(
@@ -107,6 +108,11 @@ const _masterId = 'master';
 class _HeroHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final tenantName = context
+        .watch<TenantSessionService>()
+        .activeTenantDisplayName
+        .toUpperCase();
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -135,7 +141,9 @@ class _HeroHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'FERIA ARMAS',
+                  tenantName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: Colors.white,
                         letterSpacing: 1.4,

@@ -43,3 +43,16 @@ String slugifyTenantName(String name) {
   if (reserved.contains(s)) return '$s-shop';
   return s;
 }
+
+/// Presentación legible de un slug (world-guns → World Guns).
+String humanizeTenantSlug(String slug) {
+  return slug
+      .trim()
+      .split(RegExp(r'[-_\s]+'))
+      .where((part) => part.isNotEmpty)
+      .map(
+        (part) =>
+            '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
+      )
+      .join(' ');
+}

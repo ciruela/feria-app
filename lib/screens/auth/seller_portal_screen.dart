@@ -79,6 +79,7 @@ class _SellerPortalScreenState extends State<SellerPortalScreen> {
         codigo: _codeController.text.trim(),
         seller: seller,
         tenantId: validation.tenantId,
+        tenantNombre: validation.tenantNombre,
       );
 
       if (!mounted) return;

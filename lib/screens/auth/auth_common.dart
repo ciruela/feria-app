@@ -30,7 +30,14 @@ class AuthHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final session = context.watch<TenantSessionService>();
     final slug = detectTenantSlug();
+    final title = session.isSignedIn && session.effectiveTenantId != null
+        ? session.activeTenantDisplayName
+        : slug != null && slug.isNotEmpty
+            ? humanizeTenantSlug(slug)
+            : 'Feria Armerías';
+
     return Column(
       children: [
         const Icon(
@@ -40,7 +47,7 @@ class AuthHeader extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Text(
-          slug == null ? 'Feria Armerías' : 'Armería: $slug',
+          title,
           textAlign: TextAlign.center,
           style: const TextStyle(
             fontSize: 24,

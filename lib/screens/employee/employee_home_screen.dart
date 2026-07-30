@@ -15,6 +15,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/big_action_button.dart';
 import '../../widgets/feria_shell.dart';
+import '../../widgets/tenant_app_title.dart';
 import '../../widgets/quick_nav_bar.dart';
 import '../../widgets/section_header.dart';
 import '../auth/tenant_app_shell.dart';
@@ -35,7 +36,7 @@ class EmployeeHomeScreen extends StatelessWidget {
 
     return FeriaScaffold(
       appBar: FeriaAppBar(
-        title: const FeriaAppBarTitle('Catálogo Feria'),
+        title: const TenantAppTitle(),
         actions: [
           if (AppConfig.usesRemoteCatalog)
             IconButton(

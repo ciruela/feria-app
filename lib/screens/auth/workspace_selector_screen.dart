@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../services/in_tenant_flow_service.dart';
 import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/feria_shell.dart';
@@ -40,6 +41,7 @@ class _WorkspaceSelectorScreenState extends State<WorkspaceSelectorScreen> {
         );
         return;
       }
+      context.read<InTenantFlowService>().reset();
       setState(() => _enteringTenantId = null);
     } catch (e) {
       if (!mounted) return;

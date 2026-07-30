@@ -15,6 +15,7 @@ import '../../widgets/big_action_button.dart';
 import '../../widgets/feria_shell.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/supabase_config_banner.dart';
+import '../../widgets/tenant_app_title.dart';
 import '../employee/employee_home_screen.dart';
 import '../exchange_rate_screen.dart';
 import '../auth/tenant_app_shell.dart';
@@ -43,7 +44,7 @@ class AdminHomeScreen extends StatelessWidget {
 
     return FeriaScaffold(
       appBar: FeriaAppBar(
-        title: const FeriaAppBarTitle('Administración'),
+        title: const TenantAppTitle(),
         actions: [
           IconButton(
             tooltip: 'Salir',

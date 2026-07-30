@@ -10,6 +10,7 @@ import '../config/app_config.dart';
 import '../models/seller.dart';
 import '../utils/app_logger.dart';
 import '../utils/jwt.dart';
+import '../utils/tenant_slug.dart';
 import 'seller_portal_service.dart';
 import 'supabase_service.dart';
 
@@ -55,6 +56,8 @@ class TenantSessionService extends ChangeNotifier {
   bool _preferWorkspaceSelector = false;
   String? _sellerId;
   String _sellerNombre = '';
+  String _activeTenantNombre = '';
+  String _activeTenantSlug = '';
 
   bool get isConfigured => AppConfig.useSupabase;
 
@@ -118,6 +121,54 @@ class TenantSessionService extends ChangeNotifier {
 
   int get destinationCount => _memberships.length + (_isPlatformAdmin ? 1 : 0);
 
+  /// Membresía de la armería activa (JWT / selector).
+  TenantOption? get activeMembership {
+    final tenantId = effectiveTenantId;
+    if (tenantId == null) return null;
+    for (final membership in _memberships) {
+      if (membership.id == tenantId) return membership;
+    }
+    return null;
+  }
+
+  /// Nombre visible de la armería activa (p. ej. World Guns).
+  String get activeTenantDisplayName {
+    final membership = activeMembership;
+    if (membership != null && membership.nombre.trim().isNotEmpty) {
+      return membership.nombre.trim();
+    }
+
+    if (_activeTenantNombre.trim().isNotEmpty) {
+      return _activeTenantNombre.trim();
+    }
+
+    final slug = activeTenantSlug;
+    if (slug != null && slug.isNotEmpty) {
+      return humanizeTenantSlug(slug);
+    }
+
+    return 'Feria Armerías';
+  }
+
+  String? get activeTenantSlug {
+    final membership = activeMembership;
+    if (membership != null && membership.slug.trim().isNotEmpty) {
+      return membership.slug.trim();
+    }
+
+    if (_activeTenantSlug.trim().isNotEmpty) {
+      return _activeTenantSlug.trim();
+    }
+
+    if (isSignedIn) {
+      final meta = SupabaseService.client.auth.currentUser?.appMetadata;
+      final sellerSlug = meta?['seller_slug']?.toString().trim();
+      if (sellerSlug != null && sellerSlug.isNotEmpty) return sellerSlug;
+    }
+
+    return detectTenantSlug();
+  }
+
   bool get needsWorkspaceChoice =>
       _view == WorkspaceView.none && destinationCount > 1;
 
@@ -152,6 +203,28 @@ class TenantSessionService extends ChangeNotifier {
     _selectedTenantId = null;
     _sessionReady = false;
     _preferWorkspaceSelector = false;
+    _activeTenantNombre = '';
+    _activeTenantSlug = '';
+  }
+
+  void _syncActiveTenantBranding(String tenantId) {
+    for (final membership in _memberships) {
+      if (membership.id == tenantId) {
+        _activeTenantNombre = membership.nombre;
+        _activeTenantSlug = membership.slug;
+        return;
+      }
+    }
+    _activeTenantNombre = '';
+    _activeTenantSlug = '';
+  }
+
+  void _setActiveTenantBranding({
+    required String nombre,
+    String slug = '',
+  }) {
+    _activeTenantNombre = nombre.trim();
+    _activeTenantSlug = slug.trim();
   }
 
   bool get needsSessionBootstrap =>
@@ -577,6 +650,10 @@ class TenantSessionService extends ChangeNotifier {
       _membershipsLoaded = true;
 
       await _applyWorkspaceResolution();
+      final activeId = effectiveTenantId;
+      if (activeId != null) {
+        _syncActiveTenantBranding(activeId);
+      }
       notifyListeners();
     } catch (e) {
       _error = e.toString();
@@ -609,6 +686,8 @@ class TenantSessionService extends ChangeNotifier {
     _view = WorkspaceView.none;
     _preferWorkspaceSelector = true;
     _sessionReady = true;
+    _activeTenantNombre = '';
+    _activeTenantSlug = '';
     notifyListeners();
   }
 
@@ -625,6 +704,7 @@ class TenantSessionService extends ChangeNotifier {
       await SupabaseService.client.auth.refreshSession();
       _readClaims();
       _selectedTenantId = tenantId;
+      _syncActiveTenantBranding(tenantId);
       _view = WorkspaceView.tenant;
       _preferWorkspaceSelector = false;
       _busy = false;
@@ -644,6 +724,7 @@ class TenantSessionService extends ChangeNotifier {
     required String codigo,
     required Seller seller,
     required String tenantId,
+    required String tenantNombre,
   }) async {
     if (!isConfigured) {
       throw StateError('Supabase no configurado');
@@ -658,7 +739,7 @@ class TenantSessionService extends ChangeNotifier {
 
       await SupabaseService.client.auth.signInAnonymously();
 
-      await SellerPortalService().completeLogin(
+      final login = await SellerPortalService().completeLogin(
         slug: slug,
         codigo: codigo,
         sellerId: seller.id,
@@ -667,6 +748,12 @@ class TenantSessionService extends ChangeNotifier {
       await SupabaseService.client.auth.refreshSession();
       _readClaims();
       _selectedTenantId = tenantId;
+      _setActiveTenantBranding(
+        nombre: tenantNombre.trim().isNotEmpty
+            ? tenantNombre
+            : login.tenantNombre,
+        slug: slug.trim(),
+      );
       _view = WorkspaceView.tenant;
       _membershipsLoaded = true;
       _memberships = const [];
