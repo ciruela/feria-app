@@ -69,7 +69,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Catálogo Feria'), findsOneWidget);
+    expect(find.text('¿Cómo entrás?'), findsOneWidget);
     expect(find.text('Empleado'), findsOneWidget);
   });
 }

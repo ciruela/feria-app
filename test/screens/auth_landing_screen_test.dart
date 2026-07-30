@@ -1,12 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'package:app_feria/screens/auth/auth_landing_screen.dart';
+import 'package:app_feria/services/tenant_session_service.dart';
 
 void main() {
   testWidgets('Auth landing muestra opciones separadas', (tester) async {
     await tester.pumpWidget(
-      const MaterialApp(home: AuthLandingScreen()),
+      ChangeNotifierProvider<TenantSessionService>(
+        create: (_) => TenantSessionService(),
+        child: const MaterialApp(home: AuthLandingScreen()),
+      ),
     );
 
     expect(find.text('INICIAR SESIÓN'), findsOneWidget);
