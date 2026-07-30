@@ -283,6 +283,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
       if (AppConfig.useSupabase) {
         await context.read<TenantSessionService>().ensureSupabaseWriteContext();
         if (!mounted) return;
+        await catalog.syncFromCloud(silent: true);
+        if (!mounted) return;
         await SupabaseSalesRepository(catalog: catalog).insert(
           snapshot,
           sellerId: sellerId,

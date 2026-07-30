@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/cart_checkout_payment.dart';
+import '../config/app_config.dart';
 import '../models/product.dart';
 
 class CartItem {
@@ -65,6 +66,7 @@ class CartService extends ChangeNotifier {
   }
 
   bool canAddMore(Product product) {
+    if (AppConfig.useSupabase && product.stock == null) return false;
     if (!product.inStock) return false;
 
     final remaining = remainingStock(product);
@@ -83,7 +85,11 @@ class CartService extends ChangeNotifier {
       addProductQuantity(product, 1);
 
   CartAddResult addProductQuantity(Product product, int quantity) {
-    if (quantity <= 0 || !product.inStock) {
+    if (quantity <= 0) return CartAddResult.stockLimitReached;
+    if (AppConfig.useSupabase && product.stock == null) {
+      return CartAddResult.stockLimitReached;
+    }
+    if (!product.inStock) {
       return CartAddResult.stockLimitReached;
     }
 

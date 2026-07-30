@@ -29,7 +29,7 @@ void main() {
     expect(catalog.products.single.stock, 3);
   });
 
-  test('applySaleStockDecrement clamps at zero', () async {
+  test('applySaleStockDecrement rechaza stock insuficiente', () async {
     final catalog = CatalogService();
     await catalog.addProduct(
       type: ProductType.municion,
@@ -42,8 +42,11 @@ void main() {
     );
 
     final productId = catalog.products.single.id;
-    await catalog.applySaleStockDecrement({productId: 3});
 
-    expect(catalog.products.single.stock, 0);
+    expect(
+      () => catalog.applySaleStockDecrement({productId: 3}),
+      throwsA(isA<StateError>()),
+    );
+    expect(catalog.products.single.stock, 1);
   });
 }

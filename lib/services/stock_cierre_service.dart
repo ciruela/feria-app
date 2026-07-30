@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:excel/excel.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/product.dart';
 import '../models/sale_record.dart';
@@ -105,39 +106,21 @@ class StockCierreService {
 
     for (final product in products) {
       final movs = byProduct[product.id] ?? const <StockMovimiento>[];
-
-      var ventaDelta = 0;
-      var cargaDelta = 0;
-      var ajusteDelta = 0;
-      for (final mov in movs) {
-        switch (mov.motivo) {
-          case StockMotivo.venta:
-          case StockMotivo.anulacion:
-            ventaDelta += mov.delta;
-          case StockMotivo.carga:
-            cargaDelta += mov.delta;
-          case StockMotivo.ajuste:
-            ajusteDelta += mov.delta;
-        }
-      }
-
-      final netDelta = ventaDelta + cargaDelta + ajusteDelta;
-      final cierre = product.stock ?? 0;
-      final apertura = cierre - netDelta;
-
-      // Solo productos con movimientos en el día (evita listar todo el catálogo).
       if (movs.isEmpty) continue;
 
-      lines.add(
-        CierreLine(
-          product: product,
-          aperturaCajas: apertura,
-          vendidoCajas: -ventaDelta,
-          cargaCajas: cargaDelta,
-          ajusteCajas: ajusteDelta,
-          cierreCajas: cierre,
-        ),
+      final line = _lineFromMovimientos(product: product, movs: movs);
+      if (line != null) lines.add(line);
+    }
+
+    // Movimientos de productos ya eliminados del catálogo (huérfanos).
+    final knownIds = products.map((p) => p.id).toSet();
+    for (final entry in byProduct.entries) {
+      if (knownIds.contains(entry.key)) continue;
+      final line = _lineFromMovimientos(
+        product: _orphanProduct(entry.key),
+        movs: entry.value,
       );
+      if (line != null) lines.add(line);
     }
 
     lines.sort((a, b) {
@@ -154,6 +137,62 @@ class StockCierreService {
 
     return CierreResumen(day: day, lines: lines);
   }
+
+  /// Expuesto para tests unitarios de reconciliación.
+  @visibleForTesting
+  CierreLine? reconcileLine({
+    required Product product,
+    required List<StockMovimiento> movs,
+  }) =>
+      _lineFromMovimientos(product: product, movs: movs);
+
+  /// Reconcilia apertura/cierre desde movimientos auditados (`stock_antes` /
+  /// `stock_despues`), no desde el stock actual del catálogo en caché.
+  CierreLine? _lineFromMovimientos({
+    required Product product,
+    required List<StockMovimiento> movs,
+  }) {
+    if (movs.isEmpty) return null;
+
+    var ventaDelta = 0;
+    var cargaDelta = 0;
+    var ajusteDelta = 0;
+    for (final mov in movs) {
+      switch (mov.motivo) {
+        case StockMotivo.venta:
+        case StockMotivo.anulacion:
+          ventaDelta += mov.delta;
+        case StockMotivo.carga:
+          cargaDelta += mov.delta;
+        case StockMotivo.ajuste:
+          ajusteDelta += mov.delta;
+      }
+    }
+
+    final sorted = [...movs]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    final netDelta = ventaDelta + cargaDelta + ajusteDelta;
+
+    final cierre = sorted.last.stockDespues ?? product.stock ?? 0;
+    final apertura = sorted.first.stockAntes ?? (cierre - netDelta);
+
+    return CierreLine(
+      product: product,
+      aperturaCajas: apertura,
+      vendidoCajas: -ventaDelta,
+      cargaCajas: cargaDelta,
+      ajusteCajas: ajusteDelta,
+      cierreCajas: cierre,
+    );
+  }
+
+  Product _orphanProduct(String id) => Product(
+        id: id,
+        type: ProductType.municion,
+        marca: '(eliminado)',
+        calibre: '',
+        codigo: id,
+        precioUsd: 0,
+      );
 
   StockAlCierre stockAlCierre(List<Product> products) {
     var cajasMunicion = 0;

@@ -52,6 +52,8 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
       _error = null;
     });
     try {
+      await context.read<CatalogService>().syncFromCloud(silent: true);
+      if (!mounted) return;
       final products = context.read<CatalogService>().products;
       final salesService = _salesService;
       if (salesService == null) {
@@ -209,7 +211,8 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
                         const SizedBox(height: 24),
                         const SectionHeader(
                           title: 'Stock al cierre',
-                          subtitle: 'Totales actuales del inventario',
+                          subtitle:
+                              'Inventario actual en catálogo (no histórico del día)',
                         ),
                         const SizedBox(height: 12),
                         _StockAlCierreCard(stock: _stockAlCierre!),

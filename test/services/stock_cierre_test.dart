@@ -1,4 +1,5 @@
 import 'package:app_feria/models/product.dart';
+import 'package:app_feria/models/stock_movimiento.dart';
 import 'package:app_feria/services/stock_cierre_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -41,6 +42,55 @@ CierreLine _line({
     );
 
 void main() {
+  group('reconcileLine', () {
+    final service = StockCierreService();
+    final day = DateTime(2026, 7, 30, 10);
+
+    test('usa stock_antes/despues del movimiento, no el catálogo actual', () {
+      final product = _municion('m1', rpb: 50, stock: 99);
+      final line = service.reconcileLine(
+        product: product,
+        movs: [
+          StockMovimiento(
+            id: '1',
+            productoId: 'm1',
+            delta: -2,
+            motivo: StockMotivo.venta,
+            createdAt: day,
+            stockAntes: 10,
+            stockDespues: 8,
+          ),
+        ],
+      );
+
+      expect(line, isNotNull);
+      expect(line!.aperturaCajas, 10);
+      expect(line.cierreCajas, 8);
+      expect(line.vendidoCajas, 2);
+    });
+
+    test('cierre histórico no mezcla stock de días posteriores', () {
+      final product = _municion('m1', rpb: 50, stock: 3);
+      final line = service.reconcileLine(
+        product: product,
+        movs: [
+          StockMovimiento(
+            id: '1',
+            productoId: 'm1',
+            delta: -2,
+            motivo: StockMotivo.venta,
+            createdAt: day,
+            stockAntes: 10,
+            stockDespues: 8,
+          ),
+        ],
+      );
+
+      expect(line!.cierreCajas, 8);
+      expect(line.aperturaCajas, 10);
+    });
+  });
+
   group('CierreLine', () {
     test('balas derivadas para munición', () {
       final line = _line(

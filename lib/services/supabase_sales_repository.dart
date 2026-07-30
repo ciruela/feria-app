@@ -42,6 +42,12 @@ class SupabaseSalesRepository {
     String? sellerId,
     double? exchangeRate,
   }) async {
+    final quantities = _quantitiesFromBudgetLines(budget.lines);
+    if (_catalog != null) {
+      final error = _catalog.validateSaleQuantities(quantities);
+      if (error != null) throw StateError(error);
+    }
+
     final paymentMethods =
         budget.paymentMethods.map((method) => method.key).join(', ');
 
@@ -66,17 +72,28 @@ class SupabaseSalesRepository {
     final saleId = row['id'] as String;
     final tenantId = _currentTenantId();
 
-    await _uploadPdfWithRetry(
-      saleId: saleId,
-      budget: budget,
-      tenantId: tenantId,
-    );
+    try {
+      await _applyStockDecrement(
+        budget,
+        saleId: saleId,
+        sellerId: sellerId,
+      );
 
-    await _applyStockDecrement(
-      budget,
-      saleId: saleId,
-      sellerId: sellerId,
-    );
+      await _uploadPdfWithRetry(
+        saleId: saleId,
+        budget: budget,
+        tenantId: tenantId,
+      );
+    } catch (error, stackTrace) {
+      await _rollbackSale(
+        saleId: saleId,
+        budget: budget,
+        sellerId: sellerId,
+        error: error,
+        stackTrace: stackTrace,
+      );
+      rethrow;
+    }
 
     final itemsCount = budget.lines.fold<int>(0, (sum, l) => sum + l.quantity);
     AuditService.instance.log(
@@ -88,6 +105,44 @@ class SupabaseSalesRepository {
       actorId: sellerId,
       actorNombre: budget.sellerName ?? 'Vendedor',
     );
+  }
+
+  Future<void> _rollbackSale({
+    required String saleId,
+    required Budget budget,
+    String? sellerId,
+    required Object error,
+    StackTrace? stackTrace,
+  }) async {
+    AppLogger.warn(
+      'Revirtiendo venta $saleId tras error en stock/PDF',
+      error: error,
+      stackTrace: stackTrace,
+    );
+
+    try {
+      await _applyStockRestore(
+        budget,
+        saleId: saleId,
+        sellerId: sellerId,
+      );
+    } catch (restoreError, restoreStack) {
+      AppLogger.error(
+        'No se pudo restituir stock al revertir venta $saleId',
+        error: restoreError,
+        stackTrace: restoreStack,
+      );
+    }
+
+    try {
+      await SupabaseService.client.from(_table).delete().eq('id', saleId);
+    } catch (deleteError, deleteStack) {
+      AppLogger.error(
+        'No se pudo borrar venta $saleId tras fallo',
+        error: deleteError,
+        stackTrace: deleteStack,
+      );
+    }
   }
 
   Future<bool> voidSale(
@@ -240,16 +295,6 @@ class SupabaseSalesRepository {
       }
     }
 
-    try {
-      await SupabaseService.client.from(_table).delete().eq('id', saleId);
-    } catch (deleteError, deleteStack) {
-      AppLogger.error(
-        'No se pudo revertir venta $saleId tras fallo de PDF',
-        error: deleteError,
-        stackTrace: deleteStack,
-      );
-    }
-
     AppLogger.error(
       'PDF no guardado para venta $saleId',
       error: lastError,
@@ -328,6 +373,33 @@ class SupabaseSalesRepository {
 
     for (final entry in quantities.entries) {
       await _catalogRepo.decrementStock(
+        entry.key,
+        entry.value,
+        ventaId: saleId,
+        vendedorId: sellerId,
+      );
+    }
+  }
+
+  Future<void> _applyStockRestore(
+    Budget budget, {
+    String? saleId,
+    String? sellerId,
+  }) async {
+    final quantities = _quantitiesFromBudgetLines(budget.lines);
+    if (quantities.isEmpty) return;
+
+    if (_catalog != null) {
+      await _catalog.applySaleStockRestore(
+        quantities,
+        saleId: saleId,
+        sellerId: sellerId,
+      );
+      return;
+    }
+
+    for (final entry in quantities.entries) {
+      await _catalogRepo.restoreStock(
         entry.key,
         entry.value,
         ventaId: saleId,

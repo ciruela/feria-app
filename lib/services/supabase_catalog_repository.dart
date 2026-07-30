@@ -1,13 +1,17 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../models/product.dart';
 import '../models/stock_movimiento.dart';
 import '../utils/app_logger.dart';
 import '../utils/jwt.dart';
 import 'product_photo_service.dart';
+import 'stock_errors.dart';
 import 'supabase_service.dart';
 import 'supabase_stock_movimientos_repository.dart';
 
 class SupabaseCatalogRepository {
   static const _table = 'productos';
+  static const _rpcApplyDelta = 'apply_product_stock_delta';
 
   final SupabaseStockMovimientosRepository _movimientos =
       SupabaseStockMovimientosRepository();
@@ -42,91 +46,245 @@ class SupabaseCatalogRepository {
 
   Product productFromRow(Map<String, dynamic> row) => _fromRow(row);
 
-  Future<void> decrementStock(
+  /// Descuenta stock en Supabase. Retorna el saldo nuevo o lanza si no alcanza.
+  Future<int> decrementStock(
     String productId,
     int quantity, {
     String? ventaId,
     String? vendedorId,
+    String label = '',
   }) async {
-    if (quantity <= 0) return;
-
-    final row = await SupabaseService.client
-        .from(_table)
-        .select('stock')
-        .eq('id', productId)
-        .maybeSingle();
-
-    if (row == null) return;
-
-    final current = row['stock'] as int?;
-    if (current == null) return;
-
-    final next = (current - quantity).clamp(0, current);
-
-    await SupabaseService.client.from(_table).update({
-      'stock': next,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', productId);
-
-    try {
-      await _movimientos.insert(
-        productoId: productId,
-        delta: next - current,
-        motivo: StockMotivo.venta,
-        stockAntes: current,
-        stockDespues: next,
-        ventaId: ventaId,
-        vendedorId: vendedorId,
-      );
-    } catch (e, s) {
-      // El movimiento es auditoría: no bloquea la venta si falla.
-      AppLogger.warn('No se registró el movimiento de stock (venta)',
-          error: e, stackTrace: s);
+    if (quantity <= 0) {
+      return _readStockOrThrow(productId, label: label);
     }
+
+    return _applyDelta(
+      productId: productId,
+      delta: -quantity,
+      motivo: StockMotivo.venta,
+      ventaId: ventaId,
+      vendedorId: vendedorId,
+      label: label,
+    );
   }
 
-  /// Restituye stock al anular una venta. Vuelve a sumar las unidades y deja
-  /// un movimiento de auditoría con motivo "anulacion".
-  Future<void> restoreStock(
+  /// Restituye stock al anular una venta.
+  Future<int> restoreStock(
     String productId,
     int quantity, {
     String? ventaId,
     String? vendedorId,
+    String label = '',
   }) async {
-    if (quantity <= 0) return;
+    if (quantity <= 0) {
+      return _readStockOrThrow(productId, label: label);
+    }
 
-    final row = await SupabaseService.client
-        .from(_table)
-        .select('stock')
-        .eq('id', productId)
-        .maybeSingle();
+    return _applyDelta(
+      productId: productId,
+      delta: quantity,
+      motivo: StockMotivo.anulacion,
+      ventaId: ventaId,
+      vendedorId: vendedorId,
+      label: label,
+    );
+  }
 
-    if (row == null) return;
-
-    final current = row['stock'] as int?;
-    if (current == null) return;
-
-    final next = current + quantity;
-
-    await SupabaseService.client.from(_table).update({
-      'stock': next,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', productId);
-
+  Future<int> _applyDelta({
+    required String productId,
+    required int delta,
+    required StockMotivo motivo,
+    String? ventaId,
+    String? vendedorId,
+    String label = '',
+  }) async {
     try {
-      await _movimientos.insert(
+      final result = await SupabaseService.client.rpc<int>(
+        _rpcApplyDelta,
+        params: {
+          'p_product_id': productId,
+          'p_delta': delta,
+          'p_motivo': motivo.key,
+          'p_venta_id': ventaId,
+          'p_vendedor_id': vendedorId,
+        },
+      );
+      return result;
+    } on PostgrestException catch (error) {
+      if (!_isRpcMissing(error)) {
+        _throwStockError(error, productId: productId, label: label, delta: delta);
+      }
+    } catch (error) {
+      if (error is InsufficientStockException ||
+          error is StockNotTrackedException ||
+          error is StockConflictException) {
+        rethrow;
+      }
+      AppLogger.warn(
+        'RPC apply_product_stock_delta no disponible, usando fallback',
+        error: error,
+      );
+    }
+
+    return _applyDeltaFallback(
+      productId: productId,
+      delta: delta,
+      motivo: motivo,
+      ventaId: ventaId,
+      vendedorId: vendedorId,
+      label: label,
+    );
+  }
+
+  bool _isRpcMissing(PostgrestException error) {
+    final msg = error.message.toLowerCase();
+    return msg.contains('apply_product_stock_delta') &&
+        (msg.contains('does not exist') || msg.contains('could not find'));
+  }
+
+  void _throwStockError(
+    PostgrestException error, {
+    required String productId,
+    required String label,
+    required int delta,
+  }) {
+    final msg = error.message.toLowerCase();
+    if (msg.contains('insufficient_stock')) {
+      throw InsufficientStockException(
+        productId: productId,
+        requested: delta.abs(),
+        available: 0,
+        label: label,
+      );
+    }
+    if (msg.contains('stock_not_tracked')) {
+      throw StockNotTrackedException(productId: productId, label: label);
+    }
+    if (msg.contains('product_not_found')) {
+      throw StateError('Producto no encontrado: ${label.isNotEmpty ? label : productId}');
+    }
+    throw StateError('No se pudo actualizar stock: ${error.message}');
+  }
+
+  Future<int> _applyDeltaFallback({
+    required String productId,
+    required int delta,
+    required StockMotivo motivo,
+    String? ventaId,
+    String? vendedorId,
+    String label = '',
+  }) async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final row = await SupabaseService.client
+          .from(_table)
+          .select('stock')
+          .eq('id', productId)
+          .maybeSingle();
+
+      if (row == null) {
+        throw StateError('Producto no encontrado: ${label.isNotEmpty ? label : productId}');
+      }
+
+      final current = row['stock'] as int?;
+      if (current == null) {
+        throw StockNotTrackedException(productId: productId, label: label);
+      }
+
+      final next = current + delta;
+      if (next < 0) {
+        throw InsufficientStockException(
+          productId: productId,
+          requested: delta.abs(),
+          available: current,
+          label: label,
+        );
+      }
+
+      final updated = await SupabaseService.client
+          .from(_table)
+          .update({
+            'stock': next,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', productId)
+          .eq('stock', current)
+          .select('stock')
+          .maybeSingle();
+
+      if (updated == null) {
+        if (attempt == 1) {
+          throw StockConflictException(productId: productId, label: label);
+        }
+        continue;
+      }
+
+      await _insertMovementWithRetry(
         productoId: productId,
-        delta: next - current,
-        motivo: StockMotivo.anulacion,
+        delta: delta,
+        motivo: motivo,
         stockAntes: current,
         stockDespues: next,
         ventaId: ventaId,
         vendedorId: vendedorId,
       );
-    } catch (e, s) {
-      AppLogger.warn('No se registró el movimiento de stock (anulación)',
-          error: e, stackTrace: s);
+
+      return next;
     }
+
+    throw StockConflictException(productId: productId, label: label);
+  }
+
+  Future<int> _readStockOrThrow(String productId, {String label = ''}) async {
+    final row = await SupabaseService.client
+        .from(_table)
+        .select('stock')
+        .eq('id', productId)
+        .maybeSingle();
+    if (row == null) {
+      throw StateError('Producto no encontrado: ${label.isNotEmpty ? label : productId}');
+    }
+    final current = row['stock'] as int?;
+    if (current == null) {
+      throw StockNotTrackedException(productId: productId, label: label);
+    }
+    return current;
+  }
+
+  Future<void> _insertMovementWithRetry({
+    required String productoId,
+    required int delta,
+    required StockMotivo motivo,
+    int? stockAntes,
+    int? stockDespues,
+    String? ventaId,
+    String? vendedorId,
+    String nota = '',
+  }) async {
+    Object? lastError;
+    StackTrace? lastStack;
+    for (var attempt = 1; attempt <= 2; attempt++) {
+      try {
+        await _movimientos.insert(
+          productoId: productoId,
+          delta: delta,
+          motivo: motivo,
+          stockAntes: stockAntes,
+          stockDespues: stockDespues,
+          ventaId: ventaId,
+          vendedorId: vendedorId,
+          nota: nota,
+        );
+        return;
+      } catch (error, stackTrace) {
+        lastError = error;
+        lastStack = stackTrace;
+      }
+    }
+    AppLogger.error(
+      'Stock actualizado pero falló el movimiento de auditoría',
+      error: lastError,
+      stackTrace: lastStack,
+    );
   }
 
   /// Registra carga/ajuste manual de stock (auditoría). No modifica el stock:
@@ -140,19 +298,14 @@ class SupabaseCatalogRepository {
     String nota = '',
   }) async {
     if (delta == 0) return;
-    try {
-      await _movimientos.insert(
-        productoId: productId,
-        delta: delta,
-        motivo: motivo,
-        stockAntes: stockAntes,
-        stockDespues: stockDespues,
-        nota: nota,
-      );
-    } catch (e, s) {
-      AppLogger.warn('No se registró el ajuste manual de stock',
-          error: e, stackTrace: s);
-    }
+    await _insertMovementWithRetry(
+      productoId: productId,
+      delta: delta,
+      motivo: motivo,
+      stockAntes: stockAntes,
+      stockDespues: stockDespues,
+      nota: nota,
+    );
   }
 
   Product _fromRow(Map<String, dynamic> row) {

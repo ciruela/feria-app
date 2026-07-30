@@ -18,6 +18,7 @@ import 'audit_service.dart';
 import 'excel_catalog_service.dart';
 import 'supabase_catalog_repository.dart';
 import 'product_photo_service.dart';
+import 'stock_errors.dart';
 import 'supabase_service.dart';
 
 class CatalogService extends ChangeNotifier {
@@ -475,6 +476,50 @@ class CatalogService extends ChangeNotifier {
     return null;
   }
 
+  String _productStockLabel(Product product) {
+    if (product.isArma) {
+      return '${product.marca} ${product.modeloDisplay}'.trim();
+    }
+    if (product.codigo.isNotEmpty) {
+      return '${product.marca} ${product.codigo}';
+    }
+    return product.marca;
+  }
+
+  /// Valida cantidades contra el catálogo actual (llamar tras [syncFromCloud]).
+  String? validateSaleQuantities(Map<String, int> quantities) {
+    for (final entry in quantities.entries) {
+      if (entry.value <= 0) continue;
+
+      final product = productById(entry.key);
+      if (product == null) {
+        return 'Producto ${entry.key} no está en el catálogo.';
+      }
+
+      final stock = product.stock;
+      final label = _productStockLabel(product);
+      if (stock == null) {
+        return StockNotTrackedException(productId: product.id, label: label)
+            .toString();
+      }
+      if (stock < entry.value) {
+        return InsufficientStockException(
+          productId: product.id,
+          requested: entry.value,
+          available: stock,
+          label: label,
+        ).toString();
+      }
+    }
+    return null;
+  }
+
+  void _setLocalStock(String productId, int stock) {
+    final index = _products.indexWhere((product) => product.id == productId);
+    if (index == -1) return;
+    _products[index] = _products[index].copyWith(stock: stock);
+  }
+
   String exportJson({bool pretty = true}) {
     final data = {
       'products': _products.map((product) => product.toJson()).toList(),
@@ -496,6 +541,7 @@ class CatalogService extends ChangeNotifier {
     var added = 0;
     var skipped = 0;
     final changedProducts = <Product>[];
+    final stockBeforeImport = <String, int?>{};
 
     for (var i = 0; i < rows.length; i++) {
       try {
@@ -504,6 +550,7 @@ class CatalogService extends ChangeNotifier {
 
         if (existing != null) {
           final index = _products.indexWhere((product) => product.id == existing.id);
+          stockBeforeImport.putIfAbsent(existing.id, () => existing.stock);
           final newStock = row.stock ?? existing.stock;
           final product = existing.copyWith(
             precioUsd: row.precioUsd > 0 ? row.precioUsd : existing.precioUsd,
@@ -523,6 +570,7 @@ class CatalogService extends ChangeNotifier {
           updated++;
         } else if (_canCreateFromRow(row)) {
           final product = _productFromExcelRow(row);
+          stockBeforeImport[product.id] = 0;
           _products.add(product);
           changedProducts.add(product);
           added++;
@@ -540,6 +588,24 @@ class CatalogService extends ChangeNotifier {
     if (SupabaseService.isConfigured && changedProducts.isNotEmpty) {
       await _ensureSupabaseWriteContext();
       await _supabaseCatalog.upsertAll(changedProducts);
+
+      for (final product in changedProducts) {
+        final newStock = product.stock;
+        if (newStock == null) continue;
+
+        final before = stockBeforeImport[product.id];
+        if (before == null) continue;
+        if (before == newStock) continue;
+
+        await _supabaseCatalog.logStockChange(
+          productId: product.id,
+          delta: newStock - before,
+          motivo: before == 0 ? StockMotivo.carga : StockMotivo.ajuste,
+          stockAntes: before,
+          stockDespues: newStock,
+          nota: 'Importación Excel',
+        );
+      }
     }
 
     AuditService.instance.log(
@@ -660,7 +726,7 @@ class CatalogService extends ChangeNotifier {
     }
   }
 
-  /// Descuenta stock tras una venta confirmada (local + Supabase).
+  /// Descuenta stock tras una venta confirmada (Supabase primero, luego cache local).
   Future<void> applySaleStockDecrement(
     Map<String, int> quantities, {
     String? saleId,
@@ -668,40 +734,34 @@ class CatalogService extends ChangeNotifier {
   }) async {
     if (quantities.isEmpty) return;
 
+    final validationError = validateSaleQuantities(quantities);
+    if (validationError != null) {
+      throw StateError(validationError);
+    }
+
     var changed = false;
     for (final entry in quantities.entries) {
       if (entry.value <= 0) continue;
 
-      final index = _products.indexWhere((product) => product.id == entry.key);
-      if (index == -1) {
-        AppLogger.warn(
-          'Venta: producto ${entry.key} no está en el catálogo local',
-        );
-        continue;
-      }
+      final product = productById(entry.key);
+      if (product == null) continue;
 
-      final product = _products[index];
-      final current = product.stock;
-      if (current == null) {
-        AppLogger.warn(
-          'Venta: ${product.id} no tiene stock cargado — no se descontó',
-        );
-        continue;
-      }
-
-      final next = (current - entry.value).clamp(0, current);
-      if (next == current) continue;
-
-      _products[index] = product.copyWith(stock: next);
-      changed = true;
+      final label = _productStockLabel(product);
 
       if (SupabaseService.isConfigured) {
-        await _supabaseCatalog.decrementStock(
+        final next = await _supabaseCatalog.decrementStock(
           entry.key,
           entry.value,
           ventaId: saleId,
           vendedorId: sellerId,
+          label: label,
         );
+        _setLocalStock(entry.key, next);
+        changed = true;
+      } else {
+        final current = product.stock!;
+        _setLocalStock(entry.key, current - entry.value);
+        changed = true;
       }
     }
 
@@ -711,7 +771,7 @@ class CatalogService extends ChangeNotifier {
     }
   }
 
-  /// Restituye stock al anular una venta (local + Supabase).
+  /// Restituye stock al anular una venta (Supabase primero, luego cache local).
   Future<void> applySaleStockRestore(
     Map<String, int> quantities, {
     String? saleId,
@@ -723,23 +783,23 @@ class CatalogService extends ChangeNotifier {
     for (final entry in quantities.entries) {
       if (entry.value <= 0) continue;
 
-      final index = _products.indexWhere((product) => product.id == entry.key);
-      if (index == -1) continue;
-
-      final product = _products[index];
-      final current = product.stock;
-      if (current == null) continue;
-
-      _products[index] = product.copyWith(stock: current + entry.value);
-      changed = true;
+      final product = productById(entry.key);
+      final label =
+          product != null ? _productStockLabel(product) : entry.key;
 
       if (SupabaseService.isConfigured) {
-        await _supabaseCatalog.restoreStock(
+        final next = await _supabaseCatalog.restoreStock(
           entry.key,
           entry.value,
           ventaId: saleId,
           vendedorId: sellerId,
+          label: label,
         );
+        _setLocalStock(entry.key, next);
+        changed = true;
+      } else if (product != null && product.stock != null) {
+        _setLocalStock(entry.key, product.stock! + entry.value);
+        changed = true;
       }
     }
 
