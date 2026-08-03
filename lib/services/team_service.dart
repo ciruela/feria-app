@@ -13,6 +13,18 @@ class TeamFetchResult {
   final bool migrationPending;
 }
 
+class TeamInviteResult {
+  const TeamInviteResult({
+    required this.email,
+    required this.emailSent,
+    required this.invitedNewUser,
+  });
+
+  final String email;
+  final bool emailSent;
+  final bool invitedNewUser;
+}
+
 class TeamService {
   Future<TeamFetchResult> fetchMembers() async {
     try {
@@ -58,29 +70,49 @@ class TeamService {
     }).toList();
   }
 
-  Future<void> invite({
+  /// Invita por email. Si la persona no tiene cuenta, Auth le manda el mail
+  /// de invitación; si ya tiene, solo se agrega a la armería.
+  Future<TeamInviteResult> invite({
     required String email,
     String nombre = '',
     String rol = 'admin',
   }) async {
     try {
-      await SupabaseService.client.rpc(
-        'invite_user_to_tenant',
-        params: {
-          'p_email': email.trim(),
-          'p_nombre': nombre.trim(),
-          'p_rol': rol,
+      final response = await SupabaseService.client.functions.invoke(
+        'invite-team-member',
+        body: {
+          'email': email.trim(),
+          'nombre': nombre.trim(),
+          'rol': rol,
         },
       );
-    } on PostgrestException catch (error) {
-      if (error.code == 'PGRST202') {
-        throw StateError(
-          'Falta aplicar la migración de equipo en Supabase. '
-          'Ejecutá supabase/migrations/011_team_members.sql en el SQL Editor.',
-        );
+
+      final map = _asStringKeyedMap(response.data);
+      if (response.status >= 400) {
+        throw StateError(_errorMessage(map, response.status));
       }
-      rethrow;
+
+      final status = map['status'] as String? ?? 'added';
+      return TeamInviteResult(
+        email: map['email'] as String? ?? email.trim(),
+        emailSent: map['email_sent'] == true || status == 'invited',
+        invitedNewUser: status == 'invited',
+      );
+    } on FunctionException catch (error) {
+      final map = _asStringKeyedMap(error.details);
+      throw StateError(_errorMessage(map, error.status));
     }
+  }
+
+  static Map<String, dynamic> _asStringKeyedMap(Object? data) {
+    if (data is Map) return Map<String, dynamic>.from(data);
+    return const {};
+  }
+
+  static String _errorMessage(Map<String, dynamic> map, int status) {
+    final message = (map['error'] as String?)?.trim();
+    if (message != null && message.isNotEmpty) return message;
+    return 'No se pudo invitar ($status)';
   }
 
   Future<void> deactivate(String userId) async {

@@ -117,7 +117,7 @@ class AuthLandingScreen extends StatelessWidget {
                         ),
                         SizedBox(height: 4),
                         Text(
-                          'Me van a invitar a una armería',
+                          'Opcional: también te pueden invitar por mail',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,

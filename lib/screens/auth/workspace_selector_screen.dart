@@ -141,7 +141,7 @@ class _WorkspaceSelectorScreenState extends State<WorkspaceSelectorScreen> {
                             padding: EdgeInsets.all(16),
                             child: Text(
                               'No tenés acceso a ninguna armería todavía. '
-                              'Pedile a un administrador que te invite.',
+                              'Pedile al dueño que te invite por email.',
                               textAlign: TextAlign.center,
                               style: TextStyle(color: AppColors.textSecondary),
                             ),

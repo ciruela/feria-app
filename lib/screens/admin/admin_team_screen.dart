@@ -75,14 +75,18 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
 
     setState(() => _loading = true);
     try {
-      await _service.invite(
+      final invited = await _service.invite(
         email: result.email,
         nombre: result.nombre,
         rol: result.rol,
       );
       if (!mounted) return;
+      final message = invited.emailSent
+          ? 'Invitación enviada a ${invited.email}. '
+              'Va a recibir un mail para crear su contraseña y entrar.'
+          : '${invited.email} ya tenía cuenta: quedó agregada al equipo.';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${result.email} agregado al equipo')),
+        SnackBar(content: Text(message)),
       );
       await _load();
     } catch (error) {
@@ -195,8 +199,8 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
                     child: Text(
                       _canManage
                           ? 'Invitá por email a quienes administran la armería. '
-                              'La persona debe crear una cuenta antes (Inicio → '
-                              '“Crear cuenta”). Los vendedores del mostrador '
+                              'Si todavía no tienen cuenta, les llega un mail '
+                              'para crearla. Los vendedores del mostrador '
                               'entran con “Entrar como vendedor”.'
                           : 'Solo el dueño puede invitar administradores. '
                               'Los vendedores usan dominio + clave desde el inicio.',

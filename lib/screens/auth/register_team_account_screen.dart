@@ -69,7 +69,8 @@ class _RegisterTeamAccountScreenState extends State<RegisterTeamAccountScreen> {
         children: [
           const AuthHeader(
             subtitle:
-                'Creá tu cuenta para que te inviten a una armería existente',
+                'Si te invitaron por mail, usá el link del correo. '
+                'Si no, creá la cuenta con el mismo email de la invitación.',
           ),
           const SizedBox(height: 28),
           TextFormField(
@@ -100,8 +101,9 @@ class _RegisterTeamAccountScreenState extends State<RegisterTeamAccountScreen> {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Después de confirmar el email, pedile al dueño de la armería '
-            'que te invite con el mismo correo.',
+            'Lo más simple: pedile al dueño que te invite desde Equipo; '
+            'te llega un mail para crear la contraseña. Esta pantalla es '
+            'por si preferís registrarte vos primero.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
