@@ -15,6 +15,16 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Límites defensivos del pedido web público.
+const MAX_ITEMS = 100;
+const MAX_QTY_PER_ITEM = 9999;
+const MAX_FIELD_LEN = 200;
+
+// Recorta un campo de texto libre del cliente a un largo seguro.
+function cleanField(value: unknown): string {
+  return String(value ?? "").trim().slice(0, MAX_FIELD_LEN);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
@@ -25,10 +35,32 @@ Deno.serve(async (req) => {
 
     const slug = (body.slug ?? "").trim();
     const cliente = body.cliente ?? {};
-    const items: Array<{ productId: string; quantity: number }> =
+    const rawItems: Array<{ productId: string; quantity: number }> =
       Array.isArray(body.items) ? body.items : [];
 
-    if (!slug || items.length === 0) {
+    if (!slug || rawItems.length === 0) {
+      return json({ error: "Pedido invalido" }, 400);
+    }
+
+    // Límite defensivo de líneas por pedido (evita payloads abusivos).
+    if (rawItems.length > MAX_ITEMS) {
+      return json({ error: "Demasiados items en el pedido" }, 400);
+    }
+
+    // Agrega cantidades por producto: si el mismo id viene repetido, se suma
+    // (así el chequeo de stock es contra el total real, no por línea suelta).
+    const wanted = new Map<string, number>();
+    for (const item of rawItems) {
+      const id = String(item?.productId ?? "").trim();
+      if (!id) return json({ error: "Item invalido" }, 400);
+      const qty = Math.floor(Number(item?.quantity) || 0);
+      if (qty <= 0) continue;
+      if (qty > MAX_QTY_PER_ITEM) {
+        return json({ error: "Cantidad invalida" }, 400);
+      }
+      wanted.set(id, (wanted.get(id) ?? 0) + qty);
+    }
+    if (wanted.size === 0) {
       return json({ error: "Pedido invalido" }, 400);
     }
 
@@ -46,7 +78,7 @@ Deno.serve(async (req) => {
     }
 
     // Traer los productos reales del tenant para recalcular precios.
-    const ids = items.map((i) => i.productId);
+    const ids = [...wanted.keys()];
     const { data: productos } = await admin
       .from("productos")
       .select("id,precio_usd,stock,marca,modelo,codigo")
@@ -57,10 +89,9 @@ Deno.serve(async (req) => {
 
     let totalUsd = 0;
     const lines: any[] = [];
-    for (const item of items) {
-      const p = byId.get(item.productId);
-      const qty = Math.max(1, Math.floor(Number(item.quantity) || 0));
-      if (!p) return json({ error: `Producto inexistente: ${item.productId}` }, 400);
+    for (const [productId, qty] of wanted) {
+      const p = byId.get(productId);
+      if (!p) return json({ error: `Producto inexistente: ${productId}` }, 400);
       if (p.stock !== null && Number(p.stock) < qty) {
         return json({ error: `Sin stock: ${p.marca} ${p.modelo}` }, 409);
       }
@@ -80,10 +111,10 @@ Deno.serve(async (req) => {
       .from("pedidos")
       .insert({
         tenant_id: tenant.id,
-        cliente_nombre: (cliente.nombre ?? "").toString(),
-        cliente_email: (cliente.email ?? "").toString(),
-        cliente_telefono: (cliente.telefono ?? "").toString(),
-        cliente_dni: (cliente.dni ?? "").toString(),
+        cliente_nombre: cleanField(cliente.nombre),
+        cliente_email: cleanField(cliente.email),
+        cliente_telefono: cleanField(cliente.telefono),
+        cliente_dni: cleanField(cliente.dni),
         items: { lines },
         total_usd: totalUsd,
         estado: "pendiente",
