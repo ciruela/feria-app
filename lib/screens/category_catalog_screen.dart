@@ -143,6 +143,7 @@ class _CategoryCatalogScreenState extends State<CategoryCatalogScreen> {
     final brands = catalog.brandsFor(type);
     final marcaLetters = catalog.usedLettersForMarca(type);
     final codigoPrefixes = catalog.usedLettersForCodigo(type);
+    final calibers = catalog.calibersFor(type, _marca);
 
     final products = catalog.filtered(
       type: type,
@@ -157,72 +158,104 @@ class _CategoryCatalogScreenState extends State<CategoryCatalogScreen> {
       appBar: FeriaAppBar(
         title: Text(widget.type.label),
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _CompactFilterBar(
-            productCount: products.length,
-            activeFilterCount: _activeFilterCount,
-            hasActiveFilters: hasActiveFilters,
-            activeMarca: _marca,
-            activeCalibre: _calibre,
-            activeMarcaLetter: _marcaLetter,
-            activeCodigoQuery: _codigoQuery,
-            onOpenFilters: () => _openFilterSheet(
-              brands: brands,
-              marcaLetters: marcaLetters,
-              codigoPrefixes: codigoPrefixes,
-            ),
-            onClear: clearFilters,
-            onRemoveMarca: () => setState(() => _marca = null),
-            onRemoveCalibre: () => setState(() => _calibre = null),
-            onRemoveMarcaLetter: () => setState(() => _marcaLetter = null),
-            onRemoveCodigoQuery: () => setState(() => _codigoQuery = ''),
-          ),
-          Expanded(
-            child: products.isEmpty
-                ? const EmptyState(
-                    icon: Icons.search_off_rounded,
-                    title: 'Ningún producto con esos filtros',
-                    subtitle: 'Tocá Filtros para ajustar o limpiar la búsqueda',
-                  )
-                : LayoutBuilder(
-                    builder: (context, constraints) {
-                      final useList = constraints.maxWidth < 720;
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          // En pantallas anchas (desktop / web) mostramos un panel de filtros
+          // fijo al costado; en angostas (mobile) usamos el bottom sheet.
+          final isWide = constraints.maxWidth >= 900;
+          final results = _ProductResults(products: products);
 
-                      if (useList) {
-                        return ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                          itemCount: products.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (context, index) {
-                            return ProductCard(
-                              product: products[index],
-                              layout: ProductCardLayout.list,
-                            );
-                          },
-                        );
-                      }
-
-                      return GridView.builder(
-                        padding: const EdgeInsets.all(16),
-                        gridDelegate:
-                            const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 480,
-                          crossAxisSpacing: 14,
-                          mainAxisSpacing: 14,
-                          mainAxisExtent: 760,
-                        ),
-                        itemCount: products.length,
-                        itemBuilder: (context, index) {
-                          return ProductCard(product: products[index]);
-                        },
-                      );
-                    },
+          if (!isWide) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _CompactFilterBar(
+                  productCount: products.length,
+                  activeFilterCount: _activeFilterCount,
+                  hasActiveFilters: hasActiveFilters,
+                  activeMarca: _marca,
+                  activeCalibre: _calibre,
+                  activeMarcaLetter: _marcaLetter,
+                  activeCodigoQuery: _codigoQuery,
+                  onOpenFilters: () => _openFilterSheet(
+                    brands: brands,
+                    marcaLetters: marcaLetters,
+                    codigoPrefixes: codigoPrefixes,
                   ),
-          ),
-        ],
+                  onClear: clearFilters,
+                  onRemoveMarca: () => setState(() => _marca = null),
+                  onRemoveCalibre: () => setState(() => _calibre = null),
+                  onRemoveMarcaLetter: () =>
+                      setState(() => _marcaLetter = null),
+                  onRemoveCodigoQuery: () => setState(() => _codigoQuery = ''),
+                ),
+                Expanded(child: results),
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: 320,
+                child: _FilterSidebar(
+                  hasActiveFilters: hasActiveFilters,
+                  brands: brands,
+                  calibers: calibers,
+                  marcaLetters: marcaLetters,
+                  codigoPrefixes: codigoPrefixes,
+                  selectedMarca: _marca,
+                  selectedCalibre: _calibre,
+                  selectedMarcaLetter: _marcaLetter,
+                  codigoQuery: _codigoQuery,
+                  onMarcaTap: (marca) => setState(
+                    () => _marca = _marca == marca ? null : marca,
+                  ),
+                  onCalibreTap: (calibre) => setState(
+                    () => _calibre = _calibre == calibre ? null : calibre,
+                  ),
+                  onMarcaLetterTap: (letter) => setState(
+                    () => _marcaLetter = _marcaLetter == letter ? null : letter,
+                  ),
+                  onCodigoQueryChanged: (query) => setState(
+                    () => _codigoQuery = query.trim(),
+                  ),
+                  onCodigoPrefixTap: (prefix) => setState(() {
+                    _codigoQuery = _codigoQuery == prefix ? '' : prefix;
+                  }),
+                  onClear: clearFilters,
+                ),
+              ),
+              const VerticalDivider(width: 1),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _CompactFilterBar(
+                      productCount: products.length,
+                      activeFilterCount: _activeFilterCount,
+                      hasActiveFilters: hasActiveFilters,
+                      activeMarca: _marca,
+                      activeCalibre: _calibre,
+                      activeMarcaLetter: _marcaLetter,
+                      activeCodigoQuery: _codigoQuery,
+                      onOpenFilters: null,
+                      onClear: clearFilters,
+                      onRemoveMarca: () => setState(() => _marca = null),
+                      onRemoveCalibre: () => setState(() => _calibre = null),
+                      onRemoveMarcaLetter: () =>
+                          setState(() => _marcaLetter = null),
+                      onRemoveCodigoQuery: () =>
+                          setState(() => _codigoQuery = ''),
+                    ),
+                    Expanded(child: results),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
       bottomNavigationBar: QuickNavBar(
         cartCount: cartCount,
@@ -260,7 +293,10 @@ class _CompactFilterBar extends StatelessWidget {
   final String? activeCalibre;
   final String? activeMarcaLetter;
   final String activeCodigoQuery;
-  final VoidCallback onOpenFilters;
+
+  /// Si es `null`, no se muestra el botón "Filtros" (caso desktop, donde el
+  /// panel de filtros ya está visible al costado).
+  final VoidCallback? onOpenFilters;
   final VoidCallback onClear;
   final VoidCallback onRemoveMarca;
   final VoidCallback onRemoveCalibre;
@@ -279,28 +315,30 @@ class _CompactFilterBar extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
             child: Row(
               children: [
-                OutlinedButton.icon(
-                  onPressed: onOpenFilters,
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
+                if (onOpenFilters != null) ...[
+                  OutlinedButton.icon(
+                    onPressed: onOpenFilters,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      side: BorderSide(
+                        color: hasActiveFilters
+                            ? AppColors.primary
+                            : AppColors.border,
+                      ),
                     ),
-                    side: BorderSide(
-                      color: hasActiveFilters
-                          ? AppColors.primary
-                          : AppColors.border,
+                    icon: const Icon(Icons.tune_rounded, size: 18),
+                    label: Text(
+                      activeFilterCount > 0
+                          ? 'Filtros ($activeFilterCount)'
+                          : 'Filtros',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ),
-                  icon: const Icon(Icons.tune_rounded, size: 18),
-                  label: Text(
-                    activeFilterCount > 0
-                        ? 'Filtros ($activeFilterCount)'
-                        : 'Filtros',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                ),
-                const SizedBox(width: 10),
+                  const SizedBox(width: 10),
+                ],
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -462,62 +500,20 @@ class _FilterSheetContent extends StatelessWidget {
                     ),
               ),
               const SizedBox(height: 16),
-              _FilterSection(
-                label: 'Marca',
-                child: _HorizontalChips(
-                  items: brands,
-                  selected: selectedMarca,
-                  onTap: onMarcaTap,
-                  labelBuilder: (value) => value.toUpperCase(),
-                ),
-              ),
-              _FilterSection(
-                label: selectedMarca == null
-                    ? 'Calibre'
-                    : 'Calibre · ${selectedMarca!.toUpperCase()}',
-                child: _HorizontalChips(
-                  items: calibers,
-                  selected: selectedCalibre,
-                  onTap: onCalibreTap,
-                  labelBuilder: (value) => value.toUpperCase(),
-                ),
-              ),
-              _FilterSection(
-                label: 'Letra marca',
-                child: _HorizontalLetters(
-                  letters: marcaLetters,
-                  selected: selectedMarcaLetter,
-                  onTap: onMarcaLetterTap,
-                ),
-              ),
-              _FilterSection(
-                label: 'Código',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _CodigoQueryField(
-                      value: codigoQuery,
-                      onChanged: onCodigoQueryChanged,
-                    ),
-                    if (codigoPrefixes.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      const Text(
-                        'Atajos por primer carácter',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      _CodePrefixChips(
-                        prefixes: codigoPrefixes,
-                        selected: codigoQuery.length == 1 ? codigoQuery : null,
-                        onTap: onCodigoPrefixTap,
-                      ),
-                    ],
-                  ],
-                ),
+              _FilterControls(
+                brands: brands,
+                calibers: calibers,
+                marcaLetters: marcaLetters,
+                codigoPrefixes: codigoPrefixes,
+                selectedMarca: selectedMarca,
+                selectedCalibre: selectedCalibre,
+                selectedMarcaLetter: selectedMarcaLetter,
+                codigoQuery: codigoQuery,
+                onMarcaTap: onMarcaTap,
+                onCalibreTap: onCalibreTap,
+                onMarcaLetterTap: onMarcaLetterTap,
+                onCodigoQueryChanged: onCodigoQueryChanged,
+                onCodigoPrefixTap: onCodigoPrefixTap,
               ),
             ],
           ),
@@ -540,6 +536,260 @@ class _FilterSheetContent extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Grilla / lista de productos, reutilizada en mobile y desktop.
+class _ProductResults extends StatelessWidget {
+  const _ProductResults({required this.products});
+
+  final List<Product> products;
+
+  @override
+  Widget build(BuildContext context) {
+    if (products.isEmpty) {
+      return const EmptyState(
+        icon: Icons.search_off_rounded,
+        title: 'Ningún producto con esos filtros',
+        subtitle: 'Ajustá o limpiá la búsqueda para ver más resultados',
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useList = constraints.maxWidth < 720;
+
+        if (useList) {
+          return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+            itemCount: products.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (context, index) {
+              return ProductCard(
+                product: products[index],
+                layout: ProductCardLayout.list,
+              );
+            },
+          );
+        }
+
+        return GridView.builder(
+          padding: const EdgeInsets.all(16),
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 480,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
+            mainAxisExtent: 760,
+          ),
+          itemCount: products.length,
+          itemBuilder: (context, index) {
+            return ProductCard(product: products[index]);
+          },
+        );
+      },
+    );
+  }
+}
+
+/// Panel de filtros fijo para pantallas anchas (desktop / web). Los filtros se
+/// aplican en vivo, sin necesidad de abrir un bottom sheet.
+class _FilterSidebar extends StatelessWidget {
+  const _FilterSidebar({
+    required this.hasActiveFilters,
+    required this.brands,
+    required this.calibers,
+    required this.marcaLetters,
+    required this.codigoPrefixes,
+    required this.selectedMarca,
+    required this.selectedCalibre,
+    required this.selectedMarcaLetter,
+    required this.codigoQuery,
+    required this.onMarcaTap,
+    required this.onCalibreTap,
+    required this.onMarcaLetterTap,
+    required this.onCodigoQueryChanged,
+    required this.onCodigoPrefixTap,
+    required this.onClear,
+  });
+
+  final bool hasActiveFilters;
+  final List<String> brands;
+  final List<String> calibers;
+  final Set<String> marcaLetters;
+  final Set<String> codigoPrefixes;
+  final String? selectedMarca;
+  final String? selectedCalibre;
+  final String? selectedMarcaLetter;
+  final String codigoQuery;
+  final ValueChanged<String> onMarcaTap;
+  final ValueChanged<String> onCalibreTap;
+  final ValueChanged<String> onMarcaLetterTap;
+  final ValueChanged<String> onCodigoQueryChanged;
+  final ValueChanged<String> onCodigoPrefixTap;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+            child: Row(
+              children: [
+                Text(
+                  'Filtros',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const Spacer(),
+                if (hasActiveFilters)
+                  TextButton(
+                    onPressed: onClear,
+                    child: const Text(
+                      'LIMPIAR',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              children: [
+                _FilterControls(
+                  wrap: true,
+                  brands: brands,
+                  calibers: calibers,
+                  marcaLetters: marcaLetters,
+                  codigoPrefixes: codigoPrefixes,
+                  selectedMarca: selectedMarca,
+                  selectedCalibre: selectedCalibre,
+                  selectedMarcaLetter: selectedMarcaLetter,
+                  codigoQuery: codigoQuery,
+                  onMarcaTap: onMarcaTap,
+                  onCalibreTap: onCalibreTap,
+                  onMarcaLetterTap: onMarcaLetterTap,
+                  onCodigoQueryChanged: onCodigoQueryChanged,
+                  onCodigoPrefixTap: onCodigoPrefixTap,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Secciones de filtro (marca, calibre, letra, código) compartidas entre el
+/// bottom sheet (mobile) y el panel lateral (desktop).
+class _FilterControls extends StatelessWidget {
+  const _FilterControls({
+    required this.brands,
+    required this.calibers,
+    required this.marcaLetters,
+    required this.codigoPrefixes,
+    required this.selectedMarca,
+    required this.selectedCalibre,
+    required this.selectedMarcaLetter,
+    required this.codigoQuery,
+    required this.onMarcaTap,
+    required this.onCalibreTap,
+    required this.onMarcaLetterTap,
+    required this.onCodigoQueryChanged,
+    required this.onCodigoPrefixTap,
+    this.wrap = false,
+  });
+
+  final List<String> brands;
+  final List<String> calibers;
+  final Set<String> marcaLetters;
+  final Set<String> codigoPrefixes;
+  final String? selectedMarca;
+  final String? selectedCalibre;
+  final String? selectedMarcaLetter;
+  final String codigoQuery;
+  final ValueChanged<String> onMarcaTap;
+  final ValueChanged<String> onCalibreTap;
+  final ValueChanged<String> onMarcaLetterTap;
+  final ValueChanged<String> onCodigoQueryChanged;
+  final ValueChanged<String> onCodigoPrefixTap;
+  final bool wrap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _FilterSection(
+          label: 'Marca',
+          child: _HorizontalChips(
+            items: brands,
+            selected: selectedMarca,
+            onTap: onMarcaTap,
+            labelBuilder: (value) => value.toUpperCase(),
+            wrap: wrap,
+          ),
+        ),
+        _FilterSection(
+          label: selectedMarca == null
+              ? 'Calibre'
+              : 'Calibre · ${selectedMarca!.toUpperCase()}',
+          child: _HorizontalChips(
+            items: calibers,
+            selected: selectedCalibre,
+            onTap: onCalibreTap,
+            labelBuilder: (value) => value.toUpperCase(),
+            wrap: wrap,
+          ),
+        ),
+        _FilterSection(
+          label: 'Letra marca',
+          child: _HorizontalLetters(
+            letters: marcaLetters,
+            selected: selectedMarcaLetter,
+            onTap: onMarcaLetterTap,
+            wrap: wrap,
+          ),
+        ),
+        _FilterSection(
+          label: 'Código',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _CodigoQueryField(
+                value: codigoQuery,
+                onChanged: onCodigoQueryChanged,
+              ),
+              if (codigoPrefixes.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                const Text(
+                  'Atajos por primer carácter',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _CodePrefixChips(
+                  prefixes: codigoPrefixes,
+                  selected: codigoQuery.length == 1 ? codigoQuery : null,
+                  onTap: onCodigoPrefixTap,
+                ),
+              ],
+            ],
           ),
         ),
       ],
@@ -586,6 +836,7 @@ class _HorizontalChips extends StatelessWidget {
     required this.selected,
     required this.onTap,
     required this.labelBuilder,
+    this.wrap = false,
   });
 
   final List<String> items;
@@ -593,12 +844,35 @@ class _HorizontalChips extends StatelessWidget {
   final ValueChanged<String> onTap;
   final String Function(String) labelBuilder;
 
+  /// En `true` los chips se acomodan en varias líneas (ideal para el panel
+  /// lateral de desktop); en `false` scrollean horizontalmente (mobile).
+  final bool wrap;
+
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) {
       return const Text(
         'Sin opciones',
         style: TextStyle(color: AppColors.textSecondary),
+      );
+    }
+
+    bool isSelectedItem(String item) =>
+        selected != null && selected!.toLowerCase() == item.toLowerCase();
+
+    if (wrap) {
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final item in items)
+            FilterChipButton(
+              compact: true,
+              label: labelBuilder(item),
+              selected: isSelectedItem(item),
+              onTap: () => onTap(item),
+            ),
+        ],
       );
     }
 
@@ -610,13 +884,11 @@ class _HorizontalChips extends StatelessWidget {
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final item = items[index];
-          final isSelected =
-              selected != null && selected!.toLowerCase() == item.toLowerCase();
 
           return FilterChipButton(
             compact: true,
             label: labelBuilder(item),
-            selected: isSelected,
+            selected: isSelectedItem(item),
             onTap: () => onTap(item),
           );
         },
@@ -740,15 +1012,33 @@ class _HorizontalLetters extends StatelessWidget {
     required this.letters,
     required this.selected,
     required this.onTap,
+    this.wrap = false,
   });
 
   final Set<String> letters;
   final String? selected;
   final ValueChanged<String> onTap;
+  final bool wrap;
 
   @override
   Widget build(BuildContext context) {
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+    if (wrap) {
+      return Wrap(
+        spacing: 5,
+        runSpacing: 5,
+        children: [
+          for (final letter in alphabet.split(''))
+            LetterChip(
+              letter: letter,
+              enabled: letters.contains(letter),
+              selected: selected == letter,
+              onTap: () => onTap(letter),
+            ),
+        ],
+      );
+    }
 
     return SizedBox(
       height: 38,
