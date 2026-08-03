@@ -69,11 +69,11 @@ class ComprobantePdfService {
       return Uint8List.fromList(data);
     } catch (error, stackTrace) {
       AppLogger.warn(
-        'Download autenticado falló para $pdfPath, probando URL pública',
+        'Download autenticado falló para $pdfPath, probando URL firmada',
         error: error,
         stackTrace: stackTrace,
       );
-      return _fetchPdfBytesPublic(pdfPath);
+      return _fetchPdfBytesSigned(pdfPath);
     }
   }
 
@@ -147,8 +147,8 @@ class ComprobantePdfService {
     );
   }
 
-  static Future<Uint8List> _fetchPdfBytesPublic(String pdfPath) async {
-    final url = SupabaseService.publicComprobanteUrl(pdfPath);
+  static Future<Uint8List> _fetchPdfBytesSigned(String pdfPath) async {
+    final url = await SupabaseService.signedComprobanteUrl(pdfPath);
     if (url == null) {
       throw StateError('No se pudo resolver la URL del comprobante');
     }
