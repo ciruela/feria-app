@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
+import '../../utils/tenant_slug.dart';
 import '../../widgets/feria_shell.dart';
 import 'auth_common.dart';
 import 'login_screen.dart';
@@ -14,6 +15,8 @@ class AuthLandingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tenantPortalOnly = isTenantSubdomainEntry();
+
     return FeriaScaffold(
       body: SafeArea(
         child: Center(
@@ -92,76 +95,78 @@ class AuthLandingScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  OutlinedButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const RegisterTeamAccountScreen(),
-                        ),
-                      );
-                    },
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: const BorderSide(color: AppColors.goldDark),
-                    ),
-                    child: const Column(
-                      children: [
-                        Text(
-                          'CREAR CUENTA',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5,
-                            color: AppColors.goldDark,
+                  if (!tenantPortalOnly) ...[
+                    const SizedBox(height: 14),
+                    OutlinedButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const RegisterTeamAccountScreen(),
                           ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Opcional: también te pueden invitar por mail',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textSecondary,
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: const BorderSide(color: AppColors.goldDark),
+                      ),
+                      child: const Column(
+                        children: [
+                          Text(
+                            'CREAR CUENTA',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                              color: AppColors.goldDark,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  OutlinedButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const RegisterOrganizationScreen(),
-                        ),
-                      );
-                    },
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: const BorderSide(color: AppColors.accent),
-                    ),
-                    child: const Column(
-                      children: [
-                        Text(
-                          'REGISTRAR MI ARMERÍA',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5,
-                            color: AppColors.accent,
+                          SizedBox(height: 4),
+                          Text(
+                            'Opcional: también te pueden invitar por mail',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Quiero crear una organización nueva',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 14),
+                    OutlinedButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const RegisterOrganizationScreen(),
+                          ),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: const BorderSide(color: AppColors.accent),
+                      ),
+                      child: const Column(
+                        children: [
+                          Text(
+                            'REGISTRAR MI ARMERÍA',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                              color: AppColors.accent,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Quiero crear una organización nueva',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

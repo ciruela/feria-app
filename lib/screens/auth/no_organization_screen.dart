@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/tenant_slug.dart';
 import '../../widgets/feria_shell.dart';
 import 'register_organization_screen.dart';
 
@@ -13,6 +14,7 @@ class NoOrganizationScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final session = context.watch<TenantSessionService>();
+    final tenantPortalOnly = isTenantSubdomainEntry();
 
     return FeriaScaffold(
       appBar: FeriaAppBar(
@@ -67,30 +69,44 @@ class NoOrganizationScreen extends StatelessWidget {
                       height: 1.45,
                     ),
                   ),
+                  if (tenantPortalOnly) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Si entraste por el subdominio de tu armería, pedile al '
+                      'administrador que te invite con tu email.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 28),
                   OutlinedButton(
                     onPressed: () =>
                         context.read<TenantSessionService>().signOut(),
                     child: const Text('CERRAR SESIÓN'),
                   ),
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const RegisterOrganizationScreen(),
+                  if (!tenantPortalOnly) ...[
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const RegisterOrganizationScreen(),
+                          ),
+                        );
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 14,
                         ),
-                      );
-                    },
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 14,
                       ),
+                      child: const Text('REGISTRAR UNA ARMERÍA'),
                     ),
-                    child: const Text('REGISTRAR UNA ARMERÍA'),
-                  ),
+                  ],
                 ],
               ),
             ),

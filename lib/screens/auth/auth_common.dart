@@ -23,10 +23,18 @@ Future<void> reloadTenantData(BuildContext context) async {
   ]);
 }
 
-class AuthHeader extends StatelessWidget {
-  const AuthHeader({super.key, this.subtitle = 'Panel de administración y ventas'});
+/// Subtítulo del header según el tipo de entrada (plataforma vs tenant).
+String authLandingSubtitle() {
+  if (isTenantSubdomainEntry()) {
+    return 'Acceso para el equipo de esta armería';
+  }
+  return 'Panel de administración y ventas';
+}
 
-  final String subtitle;
+class AuthHeader extends StatelessWidget {
+  const AuthHeader({super.key, this.subtitle});
+
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +64,7 @@ class AuthHeader extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          subtitle,
+          subtitle ?? authLandingSubtitle(),
           textAlign: TextAlign.center,
           style: const TextStyle(color: AppColors.textSecondary),
         ),

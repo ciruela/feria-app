@@ -1,12 +1,14 @@
-/// Detecta el slug del tenant desde la URL (solo relevante en web).
-///
-/// Soporta:
-///   - subdominio:  worldguns.armenext.com  -> "worldguns"
-///   - query param: armenext.com/?tenant=world-guns -> "world-guns"
-///   - primer path: armenext.com/worldguns -> "worldguns"
-///
-/// El slug de la URL puede omitir guiones (`urbantactical` = `urban-tactical` en DB).
-/// El aislamiento real de datos lo da Supabase Auth + RLS, no la URL.
+// Detecta el slug del tenant desde la URL (solo relevante en web).
+//
+// Soporta:
+//   - subdominio:  worldguns.armenext.com  -> "worldguns"
+//   - query param: armenext.com/?tenant=world-guns -> "world-guns"
+//   - primer path: armenext.com/worldguns -> "worldguns"
+//
+// El slug de la URL puede omitir guiones (`urbantactical` = `urban-tactical` en DB).
+// El aislamiento real de datos lo da Supabase Auth + RLS, no la URL.
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 /// Dominio base de la app web en producción.
 const tenantAppDomain = 'armenext.com';
@@ -43,6 +45,24 @@ String? detectTenantSlug() {
   }
 
   return null;
+}
+
+/// Subdominio tenant (ej. urbantactical.armenext.com), no app/www/apex.
+bool isTenantSubdomainHost(String host) {
+  final normalized = host.trim().toLowerCase();
+  if (normalized.isEmpty ||
+      normalized == tenantAppDomain ||
+      normalized == 'www.$tenantAppDomain') {
+    return false;
+  }
+  final parts = normalized.split('.');
+  return parts.length >= 3 && !_reservedHostLabels.contains(parts.first);
+}
+
+/// Entrada interna de una armería: solo login + portal vendedor en web.
+bool isTenantSubdomainEntry() {
+  if (!kIsWeb) return false;
+  return isTenantSubdomainHost(Uri.base.host);
 }
 
 /// Clave normalizada para comparar slugs con o sin guiones.

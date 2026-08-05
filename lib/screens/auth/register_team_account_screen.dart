@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/tenant_slug.dart';
 import '../../widgets/feria_shell.dart';
 import 'auth_common.dart';
 import 'register_credentials_fields.dart';
+import 'tenant_registration_blocked_screen.dart';
 
 /// Registro de cuenta personal para unirse a una armería existente vía invitación.
 class RegisterTeamAccountScreen extends StatefulWidget {
@@ -60,6 +62,10 @@ class _RegisterTeamAccountScreenState extends State<RegisterTeamAccountScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (isTenantSubdomainEntry()) {
+      return const TenantRegistrationBlockedScreen();
+    }
+
     final session = context.watch<TenantSessionService>();
 
     return FeriaScaffold(

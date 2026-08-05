@@ -7,6 +7,7 @@ import '../../utils/tenant_slug.dart';
 import '../../widgets/feria_shell.dart';
 import 'auth_common.dart';
 import 'register_credentials_fields.dart';
+import 'tenant_registration_blocked_screen.dart';
 
 class RegisterOrganizationScreen extends StatefulWidget {
   const RegisterOrganizationScreen({super.key});
@@ -71,6 +72,10 @@ class _RegisterOrganizationScreenState
 
   @override
   Widget build(BuildContext context) {
+    if (isTenantSubdomainEntry()) {
+      return const TenantRegistrationBlockedScreen();
+    }
+
     final session = context.watch<TenantSessionService>();
     final slugPreview = slugifyTenantName(_companyController.text);
     final signedIn = session.isSignedIn;

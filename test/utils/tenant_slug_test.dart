@@ -47,9 +47,16 @@ void main() {
     });
   });
 
-  group('tenantSlugToSubdomain', () {
-    test('quita guiones del slug', () {
-      expect(tenantSlugToSubdomain('mi-armeria'), 'miarmeria');
+  group('isTenantSubdomainHost', () {
+    test('detecta subdominios tenant', () {
+      expect(isTenantSubdomainHost('urbantactical.armenext.com'), isTrue);
+      expect(isTenantSubdomainHost('worldguns.armenext.com'), isTrue);
+    });
+
+    test('excluye app, www y apex', () {
+      expect(isTenantSubdomainHost('app.armenext.com'), isFalse);
+      expect(isTenantSubdomainHost('www.armenext.com'), isFalse);
+      expect(isTenantSubdomainHost('armenext.com'), isFalse);
     });
   });
 }
