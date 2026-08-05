@@ -6,6 +6,8 @@ import '../services/auth_service.dart';
 import '../services/in_tenant_flow_service.dart';
 import '../services/seller_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/formatters.dart';
+import '../utils/layout_breakpoints.dart';
 import '../widgets/armenext_brand.dart';
 import '../widgets/feria_shell.dart';
 import '../widgets/section_header.dart';
@@ -43,12 +45,16 @@ class _SellerSelectScreenState extends State<SellerSelectScreen> {
     final sellerService = context.watch<SellerService>();
     final sellers = sellerService.sellers;
     final width = MediaQuery.sizeOf(context).width;
-    final columns = width >= 720 ? 4 : 2;
+    final columns = width >= LayoutBreakpoints.desktop
+        ? 5
+        : width >= LayoutBreakpoints.mobile
+            ? 4
+            : 3;
 
     return FeriaScaffold(
       constrainBody: false,
       appBar: FeriaAppBar(
-        title: const Text('¿Quién atiende?'),
+        title: const Text('Empleado'),
         showBackButton: false,
         leading: IconButton(
           tooltip: 'Volver',
@@ -159,7 +165,7 @@ class _SellerSelectScreenState extends State<SellerSelectScreen> {
                             crossAxisCount: columns,
                             crossAxisSpacing: 10,
                             mainAxisSpacing: 10,
-                            childAspectRatio: 1.35,
+                            childAspectRatio: width >= LayoutBreakpoints.desktop ? 1.05 : 0.92,
                           ),
                           delegate: SliverChildBuilderDelegate(
                             (context, index) {
@@ -212,68 +218,65 @@ class _SellerTile extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  String get _initials {
-    final parts = seller.nombre.trim().split(RegExp(r'\s+'));
-    if (parts.length >= 2) {
-      return '${parts.first[0]}${parts[1][0]}'.toUpperCase();
-    }
-    return seller.nombre.substring(0, 1).toUpperCase();
-  }
-
   @override
   Widget build(BuildContext context) {
+    final initial = seller.nombre.trim().isNotEmpty
+        ? seller.nombre.trim()[0].toUpperCase()
+        : '?';
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 120),
-      transform: Matrix4.translationValues(0, selected ? -2 : 0, 0),
       decoration: BoxDecoration(
-        color: selected ? AppColors.textPrimary : AppColors.surfaceRaised,
+        color: selected ? AppColors.accent : AppColors.surfaceRaised,
         borderRadius: BorderRadius.circular(AppDecorations.radius),
         border: Border.all(
-          color: AppColors.border,
+          color: selected ? AppColors.accent : AppColors.border,
           width: AppDecorations.hairline,
         ),
-        boxShadow: selected ? AppDecorations.tileLifted : null,
+        boxShadow: selected ? AppDecorations.avatarGlow : null,
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(AppDecorations.radius),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: selected ? AppColors.accent : AppColors.surfaceTouch,
-                  borderRadius: BorderRadius.circular(AppDecorations.radius),
-                  boxShadow: selected ? AppDecorations.avatarGlow : null,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  _initials,
-                  style: AppText.number.copyWith(
-                    color: selected ? AppColors.onAccent : AppColors.textPrimary,
-                    fontWeight: FontWeight.w500,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? AppColors.onAccent.withValues(alpha: 0.2)
+                        : AppColors.surfaceTouch,
+                    borderRadius: BorderRadius.circular(AppDecorations.radius),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    initial,
+                    style: AppText.number.copyWith(
+                      color: selected ? AppColors.onAccent : AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 20,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  seller.nombre,
+                const SizedBox(height: 10),
+                Text(
+                  formatSellerFirstName(seller.nombre),
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: AppText.bodySmall.copyWith(
-                    color: selected ? AppColors.surface : AppColors.textPrimary,
-                    fontWeight: FontWeight.w500,
+                    color: selected ? AppColors.onAccent : AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -294,7 +297,7 @@ class _ContinueBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final ready = selected != null;
     final message = ready
-        ? 'Vas a entrar como ${selected!.nombre}'
+        ? 'Vas a entrar como ${formatSellerFirstName(selected!.nombre)}'
         : 'Tocá tu nombre para continuar';
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 

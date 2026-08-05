@@ -102,10 +102,23 @@ class _SellerPortalScreenState extends State<SellerPortalScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = _formatPortalError(error);
         _loading = false;
       });
     }
+  }
+
+  String _formatPortalError(Object error) {
+    final message = error.toString().replaceFirst('Exception: ', '');
+    if (message.contains('Dominio o clave incorrectos')) {
+      return '$message\n\nSi la clave era corta o vieja, pedile al admin que '
+          'genere una nueva en Administración → Vendedores (mín. 10 caracteres).';
+    }
+    if (message.contains('No hay vendedores activos')) {
+      return '$message\n\nEl admin debe cargar vendedores en '
+          'Administración → Vendedores antes de usar el portal.';
+    }
+    return message;
   }
 
   void _backToCredentials() {

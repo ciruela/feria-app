@@ -11,7 +11,7 @@ import '../../services/in_tenant_flow_service.dart';
 import '../../services/seller_service.dart';
 import '../../services/tenant_session_service.dart';
 import '../admin/admin_home_screen.dart';
-import '../employee/employee_home_screen.dart';
+import '../employee/employee_catalog_screen.dart';
 import '../role_gate_screen.dart';
 import '../seller_select_screen.dart';
 
@@ -37,7 +37,7 @@ class TenantAppShell extends StatelessWidget {
           onSellerSelected: (_) => flow.openEmployeeHome(),
         );
       case TenantAppPhase.employeeHome:
-        home = const EmployeeHomeScreen();
+        home = const EmployeeCatalogScreen();
       case TenantAppPhase.adminHome:
         home = const AdminHomeScreen();
     }

@@ -93,13 +93,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     return FeriaScaffold(
       appBar: FeriaAppBar(
-        title: Text(product.isArma ? product.modeloDisplay : product.codigo),
+        title: const Text('Catálogo'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(AppDecorations.radius),
+              ),
+              child: Text(
+                product.type.label.toUpperCase(),
+                style: AppText.label.copyWith(fontSize: 10),
+              ),
+            ),
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
-          _DetailHeader(product: product, accent: _accent),
-          const SizedBox(height: 16),
           _PhotoGallery(
             foto: product.foto,
             displayUrls: displayUrls,
@@ -131,7 +145,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
             ),
           ],
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+          Text(
+            product.isArma ? product.modeloDisplay : product.codigo,
+            style: AppText.heading.copyWith(fontSize: 24),
+          ),
+          if (product.codigo.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(product.codigo, style: AppText.bodySmall),
+          ],
+          const SizedBox(height: 16),
           _InfoBlock(product: product),
           const SizedBox(height: 16),
           ProductPricesPanel(
@@ -163,70 +186,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   shadowColor: Colors.transparent,
                   minimumSize: const Size.fromHeight(56),
                 ),
-                icon: const Icon(Icons.add_shopping_cart_rounded),
+                icon: const Icon(Icons.shopping_bag_outlined),
                 label: Text(
                   !product.inStock
-                      ? 'SIN STOCK'
+                      ? 'Sin stock'
                       : canAdd
-                          ? 'AGREGAR AL CARRITO'
-                          : 'STOCK MÁXIMO EN CARRITO',
+                          ? 'Agregar al carrito'
+                          : 'Stock máximo en carrito',
                 ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DetailHeader extends StatelessWidget {
-  const _DetailHeader({
-    required this.product,
-    required this.accent,
-  });
-
-  final Product product;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [accent, accent.withValues(alpha: 0.78)],
-        ),
-        borderRadius: AppDecorations.radiusMd,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              product.marcaUpper,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.1,
-              ),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(99),
-            ),
-            child: Text(
-              product.type.label.toUpperCase(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.8,
               ),
             ),
           ),

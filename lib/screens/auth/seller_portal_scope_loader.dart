@@ -58,9 +58,17 @@ class _SellerPortalScopeLoaderState extends State<SellerPortalScopeLoader> {
     try {
       await Future.wait([
         context.read<CatalogService>().load(),
-        context.read<SellerService>().load(),
         context.read<ExchangeRateService>().load(),
       ]);
+
+      try {
+        await context.read<SellerService>().load();
+      } catch (sellerError) {
+        // Si el listado remoto falla, igual podemos usar el vendedor del JWT.
+        if (session.sellerId == null || session.sellerId!.isEmpty) {
+          rethrow;
+        }
+      }
 
       final sellerId = session.sellerId;
       if (!mounted) return;

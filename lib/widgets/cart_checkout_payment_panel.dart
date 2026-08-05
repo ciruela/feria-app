@@ -24,7 +24,7 @@ class CartCheckoutPaymentPanel extends StatelessWidget {
     final checkout = cart.checkoutPayment;
 
     return Material(
-      color: AppColors.surfaceRaised,
+      color: AppColors.surfaceTouch,
       borderRadius: BorderRadius.circular(AppDecorations.radius),
       child: InkWell(
         onTap: () async {
@@ -37,13 +37,10 @@ class CartCheckoutPaymentPanel extends StatelessWidget {
         },
         borderRadius: BorderRadius.circular(AppDecorations.radius),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppDecorations.radius),
-            border: Border.all(
-              color: AppColors.border,
-              width: AppDecorations.hairline,
-            ),
+            border: Border.all(color: AppColors.border),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -56,11 +53,7 @@ class CartCheckoutPaymentPanel extends StatelessWidget {
                       style: AppText.label,
                     ),
                   ),
-                  Icon(
-                    Icons.edit_outlined,
-                    size: 16,
-                    color: AppColors.textMuted,
-                  ),
+                  Icon(Icons.edit_outlined, size: 16, color: AppColors.textMuted),
                 ],
               ),
               const SizedBox(height: 8),
@@ -113,35 +106,46 @@ class _CheckoutSummary extends StatelessWidget {
       total: total,
     );
 
+    if (allocations.length == 1) {
+      final allocation = allocations.first;
+      final amount = allocation.paysInUsd
+          ? formatUsd(allocation.amountUsd)
+          : formatArs(allocation.amountArs);
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            allocation.method.shortLabel,
+            style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 2),
+          Text(amount, style: AppText.number.copyWith(fontSize: 20)),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Referencia: ${checkout.pricingMethod.label}',
-          style: AppText.bodySmall,
-        ),
-        const SizedBox(height: 8),
-        ...allocations.map((allocation) {
-          final amount = allocation.paysInUsd
-              ? formatUsd(allocation.amountUsd)
-              : formatArs(allocation.amountArs);
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    allocation.method.label,
-                    style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w500),
-                  ),
+      children: allocations.map((allocation) {
+        final amount = allocation.paysInUsd
+            ? formatUsd(allocation.amountUsd)
+            : formatArs(allocation.amountArs);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  allocation.method.shortLabel,
+                  style: AppText.bodySmall,
                 ),
-                Text(amount, style: AppText.number),
-              ],
-            ),
-          );
-        }),
-      ],
+              ),
+              Text(amount, style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w600)),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 }

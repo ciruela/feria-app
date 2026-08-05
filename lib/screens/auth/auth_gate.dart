@@ -5,7 +5,7 @@ import '../../auth/workspace_resolution.dart';
 import '../../services/in_tenant_flow_service.dart';
 import '../../theme/app_theme.dart';
 import '../../services/tenant_session_service.dart';
-import '../employee/employee_home_screen.dart';
+import '../employee/employee_catalog_screen.dart';
 import '../super_admin/super_admin_home_screen.dart';
 import 'auth_landing_screen.dart';
 import 'email_confirmation_screen.dart';
@@ -74,7 +74,7 @@ class _AuthGateState extends State<AuthGate> {
       AuthShellRoute.platformAdmin => const SuperAdminHomeScreen(),
       AuthShellRoute.sellerPortal => SellerPortalScopeLoader(
           key: ValueKey(session.effectiveTenantId ?? 'seller'),
-          child: const EmployeeHomeScreen(),
+          child: const EmployeeCatalogScreen(),
         ),
       AuthShellRoute.tenantApp => TenantScopeLoader(
           key: ValueKey(session.effectiveTenantId ?? 'tenant'),

@@ -32,6 +32,7 @@ class EmployeeHomeScreen extends StatelessWidget {
     final catalog = context.watch<CatalogService>();
     final sellerService = context.watch<SellerService>();
     final seller = sellerService.selected;
+    final session = context.watch<TenantSessionService>();
     final cartCount = context.watch<CartService>().itemCount;
 
     return FeriaScaffold(
@@ -60,9 +61,12 @@ class EmployeeHomeScreen extends StatelessWidget {
             onSelected: (value) {
               switch (value) {
                 case 'seller':
-                  context.read<InTenantFlowService>().openSellerSelect();
+                  if (session.isSellerPortalSession) {
+                    session.signOut();
+                  } else {
+                    context.read<InTenantFlowService>().openSellerSelect();
+                  }
                 case 'logout':
-                  final session = context.read<TenantSessionService>();
                   if (session.isSellerPortalSession) {
                     context.read<AuthService>().logout();
                     session.signOut();

@@ -17,7 +17,7 @@ Future<CartCheckoutPayment?> showCartCheckoutPaymentDialog(
   BuildContext context, {
   CartCheckoutPayment? current,
 }) {
-  final useSheet = MediaQuery.sizeOf(context).width < 720;
+  final useSheet = MediaQuery.sizeOf(context).width < 960;
 
   if (useSheet) {
     return showModalBottomSheet<CartCheckoutPayment>(
@@ -106,7 +106,7 @@ class _CartCheckoutPaymentDialog extends StatelessWidget {
   ) {
     return ConstrainedBox(
       constraints: BoxConstraints(
-        maxWidth: 420,
+        maxWidth: asSheet ? double.infinity : 480,
         maxHeight: asSheet
             ? double.infinity
             : MediaQuery.sizeOf(context).height * 0.82,
@@ -137,8 +137,9 @@ class _CartCheckoutPaymentDialog extends StatelessWidget {
                 ),
                 SizedBox(height: 6),
                 Text(
-                  'Elegí el precio de referencia para todo el carrito '
-                  'y, si hace falta, dividí el cobro en dos formas.',
+                  'Define el precio de referencia del comprobante. '
+                  'Si hace falta, dividí el cobro en dos formas y repartí '
+                  'el monto de lista entre ambas.',
                   textAlign: TextAlign.center,
                   style: AppText.bodySmall,
                 ),
@@ -152,78 +153,160 @@ class _CartCheckoutPaymentDialog extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               shrinkWrap: true,
               children: [
-                  FilterChipButton(
-                    label: 'PAGAR EN DOS FORMAS',
-                    selected: current?.isDual ?? false,
-                    onTap: () async {
-                      final dual = await showDialog<CartCheckoutPayment>(
-                        context: context,
-                        builder: (context) => _CartDualPaymentWizardDialog(
-                          cart: cart,
-                          exchangeRate: exchangeRate,
-                          pricingSettings: pricingSettings,
-                          totalsService: totalsService,
-                        ),
-                      );
-                      if (dual != null && context.mounted) {
-                        Navigator.of(context).pop(dual);
-                      }
-                    },
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final dual = await showDialog<CartCheckoutPayment>(
+                      context: context,
+                      builder: (context) => _CartDualPaymentWizardDialog(
+                        cart: cart,
+                        exchangeRate: exchangeRate,
+                        pricingSettings: pricingSettings,
+                        totalsService: totalsService,
+                      ),
+                    );
+                    if (dual != null && context.mounted) {
+                      Navigator.of(context).pop(dual);
+                    }
+                  },
+                  icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                  label: const Text('Pagar en dos formas'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(44),
+                    side: const BorderSide(color: AppColors.border),
                   ),
-                  const SizedBox(height: 12),
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Una sola forma de pago',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textSecondary,
+                ),
+                const SizedBox(height: 12),
+                ...selectablePaymentMethods.map((method) {
+                  final total = totalsService.cartTotalAtMethod(
+                    cart: cart,
+                    method: method,
+                    exchangeRate: exchangeRate,
+                    pricingSettings: pricingSettings,
+                  );
+                  final selected = current != null &&
+                      !current!.isDual &&
+                      current!.pricingMethod == method;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _PaymentMethodRow(
+                      method: method,
+                      total: total,
+                      selected: selected,
+                      onTap: () => Navigator.of(context).pop(
+                        CartCheckoutPayment.single(method),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  ...selectablePaymentMethods.map((method) {
-                    final total = totalsService.cartTotalAtMethod(
-                      cart: cart,
-                      method: method,
-                      exchangeRate: exchangeRate,
-                      pricingSettings: pricingSettings,
-                    );
-                    final amount = method.isUsdPayment
-                        ? formatUsd(total.usd)
-                        : formatArs(total.ars);
-                    final selected =
-                        current != null && !current!.isDual && current!.pricingMethod == method;
-
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: FilterChipButton(
-                        label: '${method.shortLabel.toUpperCase()} · $amount',
-                        selected: selected,
-                        compact: true,
-                        onTap: () => Navigator.of(context).pop(
-                          CartCheckoutPayment.single(method),
-                        ),
-                      ),
-                    );
-                  }),
-                ],
+                  );
+                }),
+              ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text(asSheet ? 'Listo' : 'Cancelar'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.surfaceTouch,
+                    foregroundColor: AppColors.textPrimary,
+                    minimumSize: const Size.fromHeight(AppDecorations.buttonPrimary),
+                  ),
+                  child: const Text('Listo'),
                 ),
               ),
             ),
           ],
         ),
       );
+  }
+}
+
+int? _installmentCount(PaymentMethod method) {
+  return switch (method) {
+    PaymentMethod.tarjeta3 => 3,
+    PaymentMethod.tarjeta6 => 6,
+    PaymentMethod.tarjeta9 => 9,
+    PaymentMethod.tarjeta12 => 12,
+    PaymentMethod.tarjeta18 => 18,
+    _ => null,
+  };
+}
+
+class _PaymentMethodRow extends StatelessWidget {
+  const _PaymentMethodRow({
+    required this.method,
+    required this.total,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final PaymentMethod method;
+  final CartLineTotal total;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final amount =
+        method.isUsdPayment ? formatUsd(total.usd) : formatArs(total.ars);
+    final installments = _installmentCount(method);
+    String? installmentDetail;
+    if (installments != null && installments > 1 && !method.isUsdPayment) {
+      final cuota = total.ars / installments;
+      installmentDetail = '$installments x ${formatArs(cuota)}';
+    }
+
+    return Material(
+      color: selected ? AppColors.textPrimary : AppColors.surfaceTouch,
+      borderRadius: BorderRadius.circular(AppDecorations.radius),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppDecorations.radius),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppDecorations.radius),
+            border: Border.all(
+              color: selected ? AppColors.textPrimary : AppColors.border,
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      method.shortLabel,
+                      style: AppText.bodyLarge.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: selected ? AppColors.surface : AppColors.textPrimary,
+                      ),
+                    ),
+                    if (installmentDetail != null)
+                      Text(
+                        installmentDetail,
+                        style: AppText.bodySmall.copyWith(
+                          color: selected ? AppColors.surface : AppColors.textMuted,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Text(
+                amount,
+                style: AppText.bodyLarge.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: selected ? AppColors.surface : AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

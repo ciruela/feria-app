@@ -164,9 +164,17 @@ class SellerService extends ChangeNotifier {
       activo: true,
     );
 
+    if (SupabaseService.isConfigured) {
+      try {
+        await _supabaseSellers.upsert(seller);
+      } catch (error) {
+        _lastError = error.toString();
+        rethrow;
+      }
+    }
+
     _sellers.add(seller);
     await _persistCache();
-    await _pushToSupabase(seller);
     AuditService.instance.log(
       accion: 'Agregó vendedor',
       entidad: AuditEntidad.vendedor,
@@ -242,7 +250,12 @@ class SellerService extends ChangeNotifier {
 
     await _persistCache();
     if (SupabaseService.isConfigured) {
-      await _supabaseSellers.updateName(id, trimmed);
+      try {
+        await _supabaseSellers.updateName(id, trimmed);
+      } catch (error) {
+        _lastError = error.toString();
+        rethrow;
+      }
     }
     AuditService.instance.log(
       accion: 'Renombró vendedor',
@@ -265,7 +278,12 @@ class SellerService extends ChangeNotifier {
 
     await _persistCache();
     if (SupabaseService.isConfigured) {
-      await _supabaseSellers.setActive(id, activo: active);
+      try {
+        await _supabaseSellers.setActive(id, activo: active);
+      } catch (error) {
+        _lastError = error.toString();
+        rethrow;
+      }
     }
     AuditService.instance.log(
       accion: active ? 'Reactivó vendedor' : 'Desactivó vendedor',
@@ -382,16 +400,6 @@ class SellerService extends ChangeNotifier {
         'sellers': _sellers.map((seller) => seller.toJson()).toList(),
       }),
     );
-  }
-
-  Future<void> _pushToSupabase(Seller seller) async {
-    if (!SupabaseService.isConfigured) return;
-
-    try {
-      await _supabaseSellers.upsert(seller);
-    } catch (error) {
-      _lastError = error.toString();
-    }
   }
 
   void _parseSellers(String raw) {

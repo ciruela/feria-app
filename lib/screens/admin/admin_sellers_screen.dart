@@ -5,6 +5,7 @@ import '../../config/app_config.dart';
 import '../../models/seller.dart';
 import '../../services/seller_portal_service.dart';
 import '../../services/seller_service.dart';
+import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/tenant_slug.dart';
 import '../../utils/uppercase_input.dart';
@@ -70,6 +71,9 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
     if (name == null || name.trim().isEmpty || !mounted) return;
 
     try {
+      if (AppConfig.useSupabase) {
+        await context.read<TenantSessionService>().ensureSupabaseWriteContext();
+      }
       await context.read<SellerService>().addSeller(name);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -94,6 +98,9 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
     if (name.trim().toLowerCase() == seller.nombre.toLowerCase()) return;
 
     try {
+      if (AppConfig.useSupabase) {
+        await context.read<TenantSessionService>().ensureSupabaseWriteContext();
+      }
       await context.read<SellerService>().updateSellerName(seller.id, name);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -136,6 +143,9 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
     if (ok != true || !mounted) return;
 
     try {
+      if (AppConfig.useSupabase) {
+        await context.read<TenantSessionService>().ensureSupabaseWriteContext();
+      }
       await context.read<SellerService>().deleteSeller(seller.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -177,19 +187,39 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
 
     if (ok != true || !mounted) return;
 
-    await context.read<SellerService>().deactivateSeller(seller.id);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${seller.nombre} desactivado')),
-    );
+    try {
+      if (AppConfig.useSupabase) {
+        await context.read<TenantSessionService>().ensureSupabaseWriteContext();
+      }
+      await context.read<SellerService>().deactivateSeller(seller.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${seller.nombre} desactivado')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$error')),
+      );
+    }
   }
 
   Future<void> _reactivate(Seller seller) async {
-    await context.read<SellerService>().reactivateSeller(seller.id);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${seller.nombre} reactivado')),
-    );
+    try {
+      if (AppConfig.useSupabase) {
+        await context.read<TenantSessionService>().ensureSupabaseWriteContext();
+      }
+      await context.read<SellerService>().reactivateSeller(seller.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${seller.nombre} reactivado')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$error')),
+      );
+    }
   }
 
   @override
@@ -555,6 +585,13 @@ class _SellerPortalAccessCardState extends State<_SellerPortalAccessCard> {
                 style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Después de la actualización de seguridad hay que definir un código '
+            'nuevo (mínimo 10 letras/números). Los códigos cortos anteriores '
+            'dejaron de funcionar.',
+            style: TextStyle(color: AppColors.textSecondary, height: 1.35),
           ),
           const SizedBox(height: 8),
           Text(
