@@ -27,7 +27,7 @@ class PresupuestoPdf {
     doc.addPage(
       pw.Page(
         pageFormat: PresupuestoPageFormat.pdf,
-        margin: pw.EdgeInsets.symmetric(
+        margin: const pw.EdgeInsets.symmetric(
           horizontal: PresupuestoPageFormat.marginHorizontal,
           vertical: PresupuestoPageFormat.marginVertical,
         ),
@@ -37,7 +37,7 @@ class PresupuestoPdf {
             decoration: pw.BoxDecoration(
               border: pw.Border.all(color: PdfColors.black, width: 1.8),
             ),
-            padding: pw.EdgeInsets.all(PresupuestoPageFormat.borderPadding),
+            padding: const pw.EdgeInsets.all(PresupuestoPageFormat.borderPadding),
             child: document.branding.isUrban
                 ? _buildUrbanPage(document, watermark: urbanWatermark)
                 : _buildStandardPage(document),

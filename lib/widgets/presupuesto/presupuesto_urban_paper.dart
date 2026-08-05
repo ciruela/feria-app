@@ -457,7 +457,7 @@ class _UrbanFiscalConditionField extends StatelessWidget {
           const SizedBox(width: 4),
           Expanded(
             child: DropdownButtonFormField<String>(
-              value: UrbanReceiptOptions.fiscalConditions.contains(value)
+              initialValue: UrbanReceiptOptions.fiscalConditions.contains(value)
                   ? value
                   : UrbanReceiptOptions.defaultFiscalCondition,
               isExpanded: true,
