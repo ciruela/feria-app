@@ -1,7 +1,6 @@
 import '../models/budget.dart';
 import '../models/presupuesto_branding.dart';
 import '../models/presupuesto_summary.dart';
-import '../models/product_prices.dart';
 import 'formatters.dart';
 
 class PresupuestoExporter {
@@ -70,7 +69,7 @@ class PresupuestoExporter {
     buffer
       ..writeln('OBS: ${_value(budget.customer.notes)}')
       ..writeln('')
-      ..writeln(_paymentLine(budget.paymentMethods));
+      ..writeln(_paymentLine(budget));
 
     return buffer.toString();
   }
@@ -120,32 +119,14 @@ class PresupuestoExporter {
 
   static String _value(String value) => value.isEmpty ? '—' : value;
 
-  static String _paymentLine(Set<PaymentMethod> methods) {
-    final parts = <String>[];
-    void add(String label, bool checked) {
-      parts.add('${checked ? '[X]' : '[ ]'} $label');
-    }
-
-    add('EFVO.', methods.contains(PaymentMethod.efectivo));
-    add('DEBITO', methods.contains(PaymentMethod.debito));
-    add('TRANSFERENCIA', methods.contains(PaymentMethod.transferencia));
-    add('PESOS', _usesPesos(methods));
-    add('U\$s', methods.contains(PaymentMethod.dolarBillete));
-    add('1 CTA', methods.contains(PaymentMethod.tarjeta1));
-    add('3 CTAS', methods.contains(PaymentMethod.tarjeta3));
-    add('6 CTAS', methods.contains(PaymentMethod.tarjeta6));
-    add('9 CTAS', methods.contains(PaymentMethod.tarjeta9));
-    add('12 CTAS', methods.contains(PaymentMethod.tarjeta12));
-    add('18 CTAS', methods.contains(PaymentMethod.tarjeta18));
-
-    return parts.join('  ');
-  }
-
-  static bool _usesPesos(Set<PaymentMethod> methods) {
-    return methods.contains(PaymentMethod.lista) ||
-        methods.contains(PaymentMethod.transferencia) ||
-        methods.contains(PaymentMethod.efectivo) ||
-        methods.contains(PaymentMethod.debito) ||
-        methods.any((method) => method.name.startsWith('tarjeta'));
+  static String _paymentLine(Budget budget) {
+    final summary = PresupuestoSummary(budget);
+    final checks = [
+      ...summary.primaryPaymentChecks,
+      ...summary.creditCardChecks,
+    ];
+    return checks
+        .map((check) => '${check.checked ? '[X]' : '[ ]'} ${check.label}')
+        .join('  ');
   }
 }
