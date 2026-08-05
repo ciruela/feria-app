@@ -154,6 +154,21 @@ void main() {
       );
       expect(vacio.isEmpty, isTrue);
     });
+
+    test('isSingleDay distingue un día vs rango', () {
+      final single = CierreResumen(
+        startDate: DateTime(2026, 8, 4),
+        endDate: DateTime(2026, 8, 4),
+        lines: const [],
+      );
+      final range = CierreResumen(
+        startDate: DateTime(2026, 8, 2),
+        endDate: DateTime(2026, 8, 4),
+        lines: const [],
+      );
+      expect(single.isSingleDay, isTrue);
+      expect(range.isSingleDay, isFalse);
+    });
   });
 
   group('StockAlCierre', () {
@@ -213,6 +228,32 @@ void main() {
         resumen: resumen,
         ventas: const [],
         stockAlCierre: stock,
+      );
+      expect(bytes.length, greaterThan(0));
+    });
+
+    test('exportCierreCompleto con rango de fechas genera bytes', () {
+      final resumen = CierreResumen(
+        startDate: DateTime(2026, 8, 2),
+        endDate: DateTime(2026, 8, 4),
+        lines: [
+          _line(
+            product: _municion('m1', rpb: 50),
+            apertura: 5,
+            vendido: 2,
+            cierre: 3,
+          ),
+        ],
+      );
+      final bytes = StockCierreService().exportCierreCompleto(
+        resumen: resumen,
+        ventas: const [],
+        stockAlCierre: const StockAlCierre(
+          cajasMunicion: 0,
+          balasMunicion: 0,
+          unidadesArmas: 0,
+          productosConStock: 0,
+        ),
       );
       expect(bytes.length, greaterThan(0));
     });

@@ -126,4 +126,122 @@ void main() {
     expect(UrbanReceiptOptions.paymentMethods, contains('EF/TR'));
     expect(UrbanReceiptOptions.fiscalConditions, contains('Resp. Inscrip'));
   });
+
+  test('standard payment abbrev and combined total', () {
+    final budget = Budget(
+      date: DateTime(2026, 7, 22),
+      customer: const BudgetCustomer(),
+      lines: const [
+        BudgetLine(
+          lineKey: 'l1',
+          productId: 'p1',
+          code: 'M1',
+          quantity: 1,
+          detail: 'Item',
+          unitArs: 1000,
+          lineArs: 1000,
+          unitUsd: 10,
+          lineUsd: 10,
+          paymentMethod: PaymentMethod.efectivo,
+          isArma: false,
+        ),
+      ],
+      totalArs: 1000,
+      totalUsd: 10,
+      paymentAllocations: const [
+        PaymentAllocation(
+          method: PaymentMethod.efectivo,
+          amountUsd: 0,
+          amountArs: 1000,
+        ),
+        PaymentAllocation(
+          method: PaymentMethod.dolarBillete,
+          amountUsd: 10,
+          amountArs: 0,
+        ),
+      ],
+    );
+    final summary = PresupuestoSummary(budget);
+
+    expect(
+      summary.paymentAbbrevFor(PresupuestoBranding.worldGuns),
+      contains('EF'),
+    );
+    expect(summary.formattedCombinedTotal, contains('1.000'));
+    expect(summary.formattedCombinedTotal, contains('10.00'));
+    expect(summary.primaryPaymentChecks.first.checked, isTrue);
+    expect(summary.paymentAllocationLines, isNotEmpty);
+  });
+
+  test('urban fiscal condition reads legacy email field', () {
+    const branding = PresupuestoBranding.urbanTactical;
+    final budget = Budget(
+      date: DateTime(2026, 7, 22),
+      customer: const BudgetCustomer(email: 'Resp. Inscrip'),
+      lines: const [],
+      totalArs: 0,
+      totalUsd: 0,
+    );
+
+    expect(
+      PresupuestoSummary(budget).fiscalConditionFor(branding),
+      'Resp. Inscrip',
+    );
+  });
+
+  test('urban multi-method abbrev joins unique codes', () {
+    final budget = Budget(
+      date: DateTime(2026, 7, 22),
+      customer: const BudgetCustomer(),
+      lines: const [],
+      totalArs: 100,
+      totalUsd: 0,
+      paymentAllocations: const [
+        PaymentAllocation(
+          method: PaymentMethod.efectivo,
+          amountUsd: 0,
+          amountArs: 50,
+        ),
+        PaymentAllocation(
+          method: PaymentMethod.tarjeta3,
+          amountUsd: 0,
+          amountArs: 50,
+        ),
+      ],
+    );
+
+    expect(
+      PresupuestoSummary(budget)
+          .paymentAbbrevFor(PresupuestoBranding.urbanTactical),
+      'EF/TC',
+    );
+  });
+
+  test('credit card checks reflect selected methods', () {
+    final budget = Budget(
+      date: DateTime(2026, 7, 22),
+      customer: const BudgetCustomer(),
+      lines: const [],
+      totalArs: 100,
+      totalUsd: 0,
+      paymentAllocations: const [
+        PaymentAllocation(
+          method: PaymentMethod.tarjeta6,
+          amountUsd: 0,
+          amountArs: 50,
+        ),
+        PaymentAllocation(
+          method: PaymentMethod.tarjeta12,
+          amountUsd: 0,
+          amountArs: 50,
+        ),
+      ],
+    );
+    final summary = PresupuestoSummary(budget);
+
+    final checks = summary.creditCardChecks;
+    expect(checks.firstWhere((c) => c.label == '6 CTAS').checked, isTrue);
+    expect(checks.firstWhere((c) => c.label == '12 CTAS').checked, isTrue);
+    expect(checks.firstWhere((c) => c.label == '1 CTA').checked, isFalse);
+  });
 }

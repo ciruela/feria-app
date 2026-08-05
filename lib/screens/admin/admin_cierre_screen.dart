@@ -10,11 +10,10 @@ import '../../services/sales_metrics_service.dart';
 import '../../services/stock_cierre_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
+import '../../widgets/admin_date_filter.dart';
 import '../../widgets/feria_shell.dart';
 import '../../widgets/section_header.dart';
 import 'admin_comprobantes_screen.dart';
-
-enum _DateMode { dia, rango }
 
 enum _CierreSection { resumen, ventas, stock, movimientos }
 
@@ -32,7 +31,7 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
   DateTime _selectedDay = DateTime.now();
   DateTime? _rangeFrom;
   DateTime? _rangeTo;
-  _DateMode _dateMode = _DateMode.dia;
+  AdminDateMode _dateMode = AdminDateMode.dia;
   _CierreSection _section = _CierreSection.resumen;
 
   CierreResumen? _resumen;
@@ -63,7 +62,7 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
   }
 
   DateTime get _queryStart {
-    if (_dateMode == _DateMode.dia) {
+    if (_dateMode == AdminDateMode.dia) {
       return DateTime(_selectedDay.year, _selectedDay.month, _selectedDay.day);
     }
     final from = _rangeFrom ?? _selectedDay;
@@ -71,7 +70,7 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
   }
 
   DateTime get _queryEnd {
-    if (_dateMode == _DateMode.dia) {
+    if (_dateMode == AdminDateMode.dia) {
       return _queryStart.add(const Duration(days: 1));
     }
     final to = _rangeTo ?? _rangeFrom ?? _selectedDay;
@@ -79,11 +78,11 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
   }
 
   DateTime get _queryEndInclusive {
-    if (_dateMode == _DateMode.dia) return _selectedDay;
+    if (_dateMode == AdminDateMode.dia) return _selectedDay;
     return _rangeTo ?? _rangeFrom ?? _selectedDay;
   }
 
-  bool get _isRange => _dateMode == _DateMode.rango;
+  bool get _isRange => _dateMode == AdminDateMode.rango;
 
   Future<void> _load() async {
     setState(() {
@@ -265,7 +264,7 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
                     children: [
-                      _DateModeSelector(
+                      AdminDateModeSelector(
                         mode: _dateMode,
                         onChanged: (mode) {
                           setState(() => _dateMode = mode);
@@ -273,10 +272,10 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
                         },
                       ),
                       const SizedBox(height: 10),
-                      if (_dateMode == _DateMode.dia)
-                        _DateChip(date: _selectedDay, onTap: _pickDay)
+                      if (_dateMode == AdminDateMode.dia)
+                        AdminDateChip(date: _selectedDay, onTap: _pickDay)
                       else
-                        _RangeChips(
+                        AdminRangeChips(
                           from: _rangeFrom ?? _selectedDay,
                           to: _rangeTo ?? _rangeFrom ?? _selectedDay,
                           onPickFrom: () => _pickRange(isFrom: true),
@@ -407,25 +406,6 @@ class DateFormatCompat {
   static String _two(int n) => n.toString().padLeft(2, '0');
 }
 
-class _DateModeSelector extends StatelessWidget {
-  const _DateModeSelector({required this.mode, required this.onChanged});
-
-  final _DateMode mode;
-  final ValueChanged<_DateMode> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return SegmentedButton<_DateMode>(
-      segments: const [
-        ButtonSegment(value: _DateMode.dia, label: Text('Un día')),
-        ButtonSegment(value: _DateMode.rango, label: Text('Rango')),
-      ],
-      selected: {mode},
-      onSelectionChanged: (values) => onChanged(values.first),
-    );
-  }
-}
-
 class _SectionSelector extends StatelessWidget {
   const _SectionSelector({required this.section, required this.onChanged});
 
@@ -461,86 +441,6 @@ class _SectionSelector extends StatelessWidget {
         ],
         selected: {section},
         onSelectionChanged: (values) => onChanged(values.first),
-      ),
-    );
-  }
-}
-
-class _RangeChips extends StatelessWidget {
-  const _RangeChips({
-    required this.from,
-    required this.to,
-    required this.onPickFrom,
-    required this.onPickTo,
-  });
-
-  final DateTime from;
-  final DateTime to;
-  final VoidCallback onPickFrom;
-  final VoidCallback onPickTo;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _DateChip(label: 'Desde', date: from, onTap: onPickFrom),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _DateChip(label: 'Hasta', date: to, onTap: onPickTo),
-        ),
-      ],
-    );
-  }
-}
-
-class _DateChip extends StatelessWidget {
-  const _DateChip({
-    required this.date,
-    required this.onTap,
-    this.label,
-  });
-
-  final DateTime date;
-  final VoidCallback onTap;
-  final String? label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.calendar_today_rounded,
-                  color: AppColors.primary),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  label != null
-                      ? '$label · ${formatDate(date)}'
-                      : formatDate(date),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              const Icon(Icons.edit_calendar_outlined,
-                  color: AppColors.textSecondary),
-            ],
-          ),
-        ),
       ),
     );
   }
