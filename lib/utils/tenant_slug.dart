@@ -8,8 +8,6 @@
 // El slug de la URL puede omitir guiones (`urbantactical` = `urban-tactical` en DB).
 // El aislamiento real de datos lo da Supabase Auth + RLS, no la URL.
 
-import 'package:flutter/foundation.dart' show kIsWeb;
-
 /// Dominio base de la app web en producción.
 const tenantAppDomain = 'armenext.com';
 
@@ -60,9 +58,12 @@ bool isTenantSubdomainHost(String host) {
 }
 
 /// Entrada interna de una armería: solo login + portal vendedor en web.
+/// Requiere subdominio real (urbantactical.armenext.com), no ?tenant= en app.
 bool isTenantSubdomainEntry() {
-  if (!kIsWeb) return false;
-  return isTenantSubdomainHost(Uri.base.host);
+  final host = Uri.base.host.toLowerCase();
+  if (!isTenantSubdomainHost(host)) return false;
+  final slug = detectTenantSlug();
+  return slug != null && slug.isNotEmpty;
 }
 
 /// Clave normalizada para comparar slugs con o sin guiones.

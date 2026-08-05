@@ -1,0 +1,15 @@
+# Evita que el navegador sirva JS viejo tras un deploy (Flutter web + service worker).
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/main.dart.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/flutter_bootstrap.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/flutter_service_worker.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/version.json
+  Cache-Control: public, max-age=0, must-revalidate
