@@ -13,6 +13,7 @@ import '../utils/jwt.dart';
 import '../utils/tenant_slug.dart';
 import 'seller_portal_service.dart';
 import 'supabase_service.dart';
+import 'tenant_subdomain_service.dart';
 
 /// Una armeria a la que el usuario tiene acceso (una de sus membresias).
 class TenantOption {
@@ -579,6 +580,8 @@ class TenantSessionService extends ChangeNotifier {
       await SupabaseService.client.auth.refreshSession();
       await _clearAwaitingOrgFlag();
       _readClaims();
+      // Best-effort: subdominio tenant.armenext.com en Cloudflare Pages.
+      unawaited(TenantSubdomainService().registerForCurrentTenant());
       _provisioning = false;
       notifyListeners();
       return true;

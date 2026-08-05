@@ -1,0 +1,46 @@
+name: Register Tenant Domains (Cloudflare Pages)
+
+# Registra subdominios tenant en Pages (urbantactical.armenext.com, etc.).
+# Complementa el DNS wildcard CNAME * → feria-app.pages.dev.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloudflare/tenant-domains.json'
+      - 'scripts/cloudflare_register_tenant_domains.sh'
+      - '.github/workflows/cloudflare-tenant-domains.yml'
+  workflow_dispatch:
+    inputs:
+      subdomains:
+        description: 'Subdominios extra (espacio): ej. urbantactical worldguns'
+        required: false
+        type: string
+
+concurrency:
+  group: cloudflare-tenant-domains-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Register domains from config
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          chmod +x ./scripts/cloudflare_register_tenant_domains.sh
+          if [[ -n "${{ inputs.subdomains }}" ]]; then
+            ./scripts/cloudflare_register_tenant_domains.sh ${{ inputs.subdomains }}
+          else
+            ./scripts/cloudflare_register_tenant_domains.sh
+          fi
