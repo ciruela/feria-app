@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../auth/registration_intent.dart';
+import '../auth/tenant_url_binding.dart';
 import '../auth/workspace_resolution.dart';
 import '../config/app_config.dart';
 import '../models/seller.dart';
@@ -116,11 +117,18 @@ class TenantSessionService extends ChangeNotifier {
   bool get hasNoOrganizationAccess => computeHasNoOrganizationAccess(
         membershipsLoaded: _membershipsLoaded,
         membershipCount: _memberships.length,
-        isPlatformAdmin: _isPlatformAdmin,
+        isPlatformAdmin: canAccessPlatformAdmin,
         isTenantViewNone: _view == WorkspaceView.none,
       );
 
-  int get destinationCount => _memberships.length + (_isPlatformAdmin ? 1 : 0);
+  /// Panel de plataforma solo en app.armenext.com, no en subdominios tenant.
+  bool get canAccessPlatformAdmin =>
+      platformAdminVisibleOnEntry(isPlatformAdmin: _isPlatformAdmin);
+
+  int get destinationCount => computeDestinationCount(
+        membershipCount: _memberships.length,
+        isPlatformAdmin: canAccessPlatformAdmin,
+      );
 
   /// Membresía de la armería activa (JWT / selector).
   TenantOption? get activeMembership {
@@ -255,7 +263,7 @@ class TenantSessionService extends ChangeNotifier {
       currentView: _view,
       jwtTenantId: _tenantId,
       membershipIds: _memberships.map((m) => m.id).toList(),
-      isPlatformAdmin: _isPlatformAdmin,
+      isPlatformAdmin: canAccessPlatformAdmin,
       allowJwtAutoSelect: !_preferWorkspaceSelector,
     );
 
@@ -392,7 +400,7 @@ class TenantSessionService extends ChangeNotifier {
       _selectedTenantId = null;
       _membershipsLoaded = false;
       _sessionReady = false;
-      _preferWorkspaceSelector = true;
+      _preferWorkspaceSelector = !isTenantSubdomainEntry();
       _readClaims();
       await ensureSessionReady();
       _busy = false;
@@ -646,7 +654,7 @@ class TenantSessionService extends ChangeNotifier {
           ),
         );
       }
-      _memberships = list;
+      _memberships = _applyUrlTenantBinding(list);
 
       await _syncPlatformAdminFromServer();
 
@@ -679,9 +687,20 @@ class TenantSessionService extends ChangeNotifier {
   }
 
   void enterPlatform() {
+    if (!canAccessPlatformAdmin) return;
     _view = WorkspaceView.platform;
     _preferWorkspaceSelector = false;
     notifyListeners();
+  }
+
+  List<TenantOption> _applyUrlTenantBinding(List<TenantOption> loaded) {
+    final boundSlug = boundTenantSlugFromEntry();
+    if (boundSlug == null) return loaded;
+    return filterByBoundTenantSlug(
+      items: loaded,
+      boundSlug: boundSlug,
+      slugOf: (membership) => membership.slug,
+    );
   }
 
   void backToSelector() {
@@ -696,6 +715,13 @@ class TenantSessionService extends ChangeNotifier {
 
   Future<bool> enterTenant(String tenantId) async {
     if (!isConfigured || !isSignedIn) return false;
+    if (!_memberships.any((membership) => membership.id == tenantId)) {
+      _error = isTenantSubdomainEntry()
+          ? 'Tu cuenta no tiene acceso a esta armería.'
+          : 'No tenés acceso a esa armería.';
+      notifyListeners();
+      return false;
+    }
     _busy = true;
     _error = null;
     notifyListeners();

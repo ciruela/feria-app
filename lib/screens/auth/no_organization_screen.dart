@@ -15,6 +15,10 @@ class NoOrganizationScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final session = context.watch<TenantSessionService>();
     final tenantPortalOnly = isTenantSubdomainEntry();
+    final boundSlug = detectTenantSlug();
+    final tenantLabel = boundSlug != null && boundSlug.isNotEmpty
+        ? humanizeTenantSlug(boundSlug)
+        : 'esta armería';
 
     return FeriaScaffold(
       appBar: FeriaAppBar(
@@ -51,20 +55,26 @@ class NoOrganizationScreen extends StatelessWidget {
                     color: AppColors.textSecondary,
                   ),
                   const SizedBox(height: 20),
-                  const Text(
-                    'Tu cuenta todavía no tiene acceso a una armería.',
+                  Text(
+                    tenantPortalOnly
+                        ? 'Tu cuenta no tiene acceso a $tenantLabel.'
+                        : 'Tu cuenta todavía no tiene acceso a una armería.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Para entrar a una organización existente, necesitás recibir '
-                    'una invitación de su administrador.',
+                  Text(
+                    tenantPortalOnly
+                        ? 'Iniciá sesión con un email invitado por el '
+                            'administrador de $tenantLabel, o usá '
+                            'app.armenext.com si sos super admin.'
+                        : 'Para entrar a una organización existente, necesitás recibir '
+                            'una invitación de su administrador.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: AppColors.textSecondary,
                       height: 1.45,
                     ),
@@ -72,8 +82,7 @@ class NoOrganizationScreen extends StatelessWidget {
                   if (tenantPortalOnly) ...[
                     const SizedBox(height: 12),
                     const Text(
-                      'Si entraste por el subdominio de tu armería, pedile al '
-                      'administrador que te invite con tu email.',
+                      'No podés usar credenciales de otra armería en este subdominio.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: AppColors.textSecondary,

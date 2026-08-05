@@ -61,7 +61,7 @@ class _WorkspaceSelectorScreenState extends State<WorkspaceSelectorScreen> {
     final loadError = session.membershipsLoaded &&
         session.error != null &&
         session.memberships.isEmpty &&
-        !session.isPlatformAdmin;
+        !session.canAccessPlatformAdmin;
 
     return FeriaScaffold(
       appBar: FeriaAppBar(
@@ -109,7 +109,7 @@ class _WorkspaceSelectorScreenState extends State<WorkspaceSelectorScreen> {
                           ),
                           const SizedBox(height: 20),
                         ],
-                        if (session.isPlatformAdmin) ...[
+                        if (session.canAccessPlatformAdmin) ...[
                           _WorkspaceCard(
                             icon: Icons.admin_panel_settings_rounded,
                             title: 'Panel de plataforma',
@@ -136,7 +136,7 @@ class _WorkspaceSelectorScreenState extends State<WorkspaceSelectorScreen> {
                           const SizedBox(height: 12),
                         ],
                         if (session.memberships.isEmpty &&
-                            !session.isPlatformAdmin)
+                            !session.canAccessPlatformAdmin)
                           const Padding(
                             padding: EdgeInsets.all(16),
                             child: Text(
