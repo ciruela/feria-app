@@ -1,12 +1,27 @@
 import '../models/budget.dart';
+import '../models/presupuesto_branding.dart';
+import '../models/presupuesto_summary.dart';
 import '../models/product_prices.dart';
 import 'formatters.dart';
 
 class PresupuestoExporter {
-  static String toPlainText(Budget budget) {
+  static String toPlainText(
+    Budget budget, {
+    required PresupuestoBranding branding,
+  }) {
+    if (branding.isUrban) {
+      return _urbanPlainText(budget, branding);
+    }
+    return _standardPlainText(budget, branding);
+  }
+
+  static String _standardPlainText(
+    Budget budget,
+    PresupuestoBranding branding,
+  ) {
     final buffer = StringBuffer()
-      ..writeln('WORLD GUNS S.R.L.')
-      ..writeln('PRESUPUESTO (DOC. NO VÁLIDO COMO FACTURA)')
+      ..writeln(branding.companyName)
+      ..writeln('${branding.documentTitle} ${branding.documentSubtitle}')
       ..writeln('Fecha: ${formatDate(budget.date)}')
       ..writeln('')
       ..writeln('SEÑOR/A: ${_value(budget.customer.fullName)}')
@@ -30,7 +45,7 @@ class PresupuestoExporter {
 
     buffer
       ..writeln('')
-      ..writeln('COD\tCANT\tDETALLE\tTC\tP. UNIT\tIMPORTE');
+      ..writeln(branding.tableHeaders.join('\t'));
 
     for (final line in budget.lines) {
       buffer.writeln(
@@ -40,7 +55,7 @@ class PresupuestoExporter {
       );
     }
 
-    final emptyRows = 14 - budget.lines.length;
+    final emptyRows = branding.paperRows - budget.lines.length;
     for (var i = 0; i < emptyRows; i++) {
       buffer.writeln('\t\t\t\t\t');
     }
@@ -56,6 +71,49 @@ class PresupuestoExporter {
       ..writeln('OBS: ${_value(budget.customer.notes)}')
       ..writeln('')
       ..writeln(_paymentLine(budget.paymentMethods));
+
+    return buffer.toString();
+  }
+
+  static String _urbanPlainText(Budget budget, PresupuestoBranding branding) {
+    final summary = PresupuestoSummary(budget);
+
+    final buffer = StringBuffer()
+      ..writeln(branding.companyName)
+      ..writeln(branding.addressLine)
+      ..writeln(branding.taxLine)
+      ..writeln(branding.phoneLine)
+      ..writeln('')
+      ..writeln(branding.documentTitle)
+      ..writeln(branding.documentSubtitle)
+      ..writeln('Fecha: ${formatDate(budget.date)}')
+      ..writeln('')
+      ..writeln('CLIENTE: ${_value(budget.customer.fullName)}')
+      ..writeln('NRO CLU: ${_value(budget.customer.clu)}')
+      ..writeln('TELEFONO: ${_value(budget.customer.phone)}')
+      ..writeln('DOMICILIO: ${_value(budget.customer.domicilioLine)}')
+      ..writeln('MÉTODO DE PAGO: ${summary.paymentAbbrevFor(branding)}')
+      ..writeln('CUIT: ${_value(budget.customer.dni)}')
+      ..writeln(
+        'CONDICION FISCAL: ${_value(summary.fiscalConditionFor(branding))}',
+      )
+      ..writeln('Obs: ${_value(budget.customer.notes)}')
+      ..writeln('')
+      ..writeln('Concepto\tCant\tValor');
+
+    for (final line in budget.lines) {
+      buffer.writeln(
+        '${line.detail}\t${line.quantity}\t${line.formattedLinePlain}',
+      );
+    }
+
+    buffer.writeln('');
+    if (budget.hasArsPayments) {
+      buffer.writeln('Total: ${formatArs(budget.totalArsLines)}');
+    }
+    if (budget.hasUsdPayments) {
+      buffer.writeln('Total: ${formatUsd(budget.totalUsdLines)}');
+    }
 
     return buffer.toString();
   }

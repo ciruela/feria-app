@@ -14,6 +14,10 @@ import '../../widgets/feria_shell.dart';
 import '../../widgets/section_header.dart';
 import 'admin_comprobantes_screen.dart';
 
+enum _DateMode { dia, rango }
+
+enum _CierreSection { resumen, ventas, stock, movimientos }
+
 class AdminCierreScreen extends StatefulWidget {
   const AdminCierreScreen({super.key});
 
@@ -26,6 +30,11 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
   SalesMetricsService? _salesService;
 
   DateTime _selectedDay = DateTime.now();
+  DateTime? _rangeFrom;
+  DateTime? _rangeTo;
+  _DateMode _dateMode = _DateMode.dia;
+  _CierreSection _section = _CierreSection.resumen;
+
   CierreResumen? _resumen;
   DaySalesMetrics? _ventas;
   StockAlCierre? _stockAlCierre;
@@ -33,6 +42,13 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
   bool _exporting = false;
   bool _didInitialLoad = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _rangeFrom = _selectedDay;
+    _rangeTo = _selectedDay;
+  }
 
   @override
   void didChangeDependencies() {
@@ -45,6 +61,29 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
       _load();
     }
   }
+
+  DateTime get _queryStart {
+    if (_dateMode == _DateMode.dia) {
+      return DateTime(_selectedDay.year, _selectedDay.month, _selectedDay.day);
+    }
+    final from = _rangeFrom ?? _selectedDay;
+    return DateTime(from.year, from.month, from.day);
+  }
+
+  DateTime get _queryEnd {
+    if (_dateMode == _DateMode.dia) {
+      return _queryStart.add(const Duration(days: 1));
+    }
+    final to = _rangeTo ?? _rangeFrom ?? _selectedDay;
+    return DateTime(to.year, to.month, to.day).add(const Duration(days: 1));
+  }
+
+  DateTime get _queryEndInclusive {
+    if (_dateMode == _DateMode.dia) return _selectedDay;
+    return _rangeTo ?? _rangeFrom ?? _selectedDay;
+  }
+
+  bool get _isRange => _dateMode == _DateMode.rango;
 
   Future<void> _load() async {
     setState(() {
@@ -63,8 +102,13 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
       }
 
       final results = await Future.wait([
-        _cierreService.cierreForDay(_selectedDay, products),
-        salesService.metricsForDay(_selectedDay),
+        _cierreService.cierreForRange(
+          _queryStart,
+          _queryEnd,
+          products,
+          endDateInclusive: _queryEndInclusive,
+        ),
+        salesService.metricsForRange(_queryStart, _queryEnd),
       ]);
 
       if (!mounted) return;
@@ -83,7 +127,7 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
     }
   }
 
-  Future<void> _pickDate() async {
+  Future<void> _pickDay() async {
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDay,
@@ -91,7 +135,39 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
       lastDate: DateTime.now(),
     );
     if (picked == null) return;
-    setState(() => _selectedDay = picked);
+    setState(() {
+      _selectedDay = picked;
+      _rangeFrom = picked;
+      _rangeTo = picked;
+    });
+    await _load();
+  }
+
+  Future<void> _pickRange({required bool isFrom}) async {
+    final initial = isFrom
+        ? (_rangeFrom ?? _selectedDay)
+        : (_rangeTo ?? _rangeFrom ?? _selectedDay);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2024),
+      lastDate: DateTime.now(),
+    );
+    if (picked == null) return;
+
+    setState(() {
+      if (isFrom) {
+        _rangeFrom = picked;
+        if (_rangeTo != null && picked.isAfter(_rangeTo!)) {
+          _rangeTo = picked;
+        }
+      } else {
+        _rangeTo = picked;
+        if (_rangeFrom != null && picked.isBefore(_rangeFrom!)) {
+          _rangeFrom = picked;
+        }
+      }
+    });
     await _load();
   }
 
@@ -108,7 +184,9 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
         ventas: ventas.sales,
         stockAlCierre: stock,
       );
-      final stamp = DateFormatCompat.file(_selectedDay);
+      final stamp = resumen.isSingleDay
+          ? DateFormatCompat.file(resumen.startDate)
+          : '${DateFormatCompat.file(resumen.startDate)}_${DateFormatCompat.file(resumen.endDate)}';
       await FilePicker.saveFile(
         fileName: 'cierre_completo_$stamp.xlsx',
         bytes: bytes,
@@ -117,7 +195,7 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cierre completo exportado')),
+        const SnackBar(content: Text('Cierre exportado a Excel')),
       );
     } catch (error) {
       if (!mounted) return;
@@ -132,9 +210,16 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
   void _openComprobantes() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => AdminComprobantesScreen(initialDate: _selectedDay),
+        builder: (_) => AdminComprobantesScreen(initialDate: _queryStart),
       ),
     );
+  }
+
+  String get _periodLabel {
+    if (!_isRange) return formatDate(_selectedDay);
+    final from = _rangeFrom ?? _selectedDay;
+    final to = _rangeTo ?? from;
+    return '${formatDate(from)} — ${formatDate(to)}';
   }
 
   @override
@@ -143,6 +228,18 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
       appBar: FeriaAppBar(
         title: const Text('Cierre de día'),
         actions: [
+          if (_resumen != null && AppConfig.useSupabase)
+            IconButton(
+              tooltip: 'Exportar Excel',
+              onPressed: _exporting ? null : _export,
+              icon: _exporting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.download_rounded),
+            ),
           IconButton(
             tooltip: 'Actualizar',
             onPressed: _loading ? null : _load,
@@ -150,22 +247,6 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
           ),
         ],
       ),
-      floatingActionButton: (_resumen == null || !AppConfig.useSupabase)
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: _exporting ? null : _export,
-              icon: _exporting
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.download_rounded),
-              label: const Text('EXPORTAR CIERRE'),
-            ),
       body: !AppConfig.useSupabase
           ? const Center(
               child: Padding(
@@ -182,9 +263,25 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
                     children: [
-                      _DateSelector(date: _selectedDay, onTap: _pickDate),
+                      _DateModeSelector(
+                        mode: _dateMode,
+                        onChanged: (mode) {
+                          setState(() => _dateMode = mode);
+                          _load();
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      if (_dateMode == _DateMode.dia)
+                        _DateChip(date: _selectedDay, onTap: _pickDay)
+                      else
+                        _RangeChips(
+                          from: _rangeFrom ?? _selectedDay,
+                          to: _rangeTo ?? _rangeFrom ?? _selectedDay,
+                          onPickFrom: () => _pickRange(isFrom: true),
+                          onPickTo: () => _pickRange(isFrom: false),
+                        ),
                       if (_error != null) ...[
                         const SizedBox(height: 16),
                         _Banner(message: _error!),
@@ -192,38 +289,18 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
                       if (_resumen != null &&
                           _ventas != null &&
                           _stockAlCierre != null) ...[
+                        const SizedBox(height: 16),
+                        _SectionSelector(
+                          section: _section,
+                          onChanged: (section) =>
+                              setState(() => _section = section),
+                        ),
                         const SizedBox(height: 20),
-                        _ResumenEjecutivo(
+                        ..._sectionContent(
                           resumen: _resumen!,
                           ventas: _ventas!,
                           stock: _stockAlCierre!,
                         ),
-                        const SizedBox(height: 24),
-                        const SectionHeader(
-                          title: 'Ventas del día',
-                          subtitle: 'Comprobantes emitidos y cobros',
-                        ),
-                        const SizedBox(height: 12),
-                        _VentasSection(
-                          metrics: _ventas!,
-                          onVerTodos: _openComprobantes,
-                        ),
-                        const SizedBox(height: 24),
-                        const SectionHeader(
-                          title: 'Stock al cierre',
-                          subtitle:
-                              'Inventario actual en catálogo (no histórico del día)',
-                        ),
-                        const SizedBox(height: 12),
-                        _StockAlCierreCard(stock: _stockAlCierre!),
-                        const SizedBox(height: 24),
-                        const SectionHeader(
-                          title: 'Movimientos de stock',
-                          subtitle:
-                              'Solo productos con ventas, cargas o ajustes hoy',
-                        ),
-                        const SizedBox(height: 12),
-                        ..._movimientoLines(_resumen!),
                       ],
                     ],
                   ),
@@ -231,11 +308,67 @@ class _AdminCierreScreenState extends State<AdminCierreScreen> {
     );
   }
 
+  List<Widget> _sectionContent({
+    required CierreResumen resumen,
+    required DaySalesMetrics ventas,
+    required StockAlCierre stock,
+  }) {
+    switch (_section) {
+      case _CierreSection.resumen:
+        return [
+          _ResumenEjecutivo(
+            resumen: resumen,
+            ventas: ventas,
+            stock: stock,
+            periodLabel: _periodLabel,
+            isRange: _isRange,
+          ),
+        ];
+      case _CierreSection.ventas:
+        return [
+          SectionHeader(
+            title: _isRange ? 'Ventas del período' : 'Ventas del día',
+            subtitle: 'Comprobantes emitidos y cobros · $_periodLabel',
+          ),
+          const SizedBox(height: 12),
+          _VentasSection(
+            metrics: ventas,
+            showDate: _isRange,
+            onVerTodos: _openComprobantes,
+          ),
+        ];
+      case _CierreSection.stock:
+        return [
+          const SectionHeader(
+            title: 'Stock al cierre',
+            subtitle: 'Inventario actual en catálogo (no histórico del período)',
+          ),
+          const SizedBox(height: 12),
+          _StockAlCierreCard(stock: stock),
+        ];
+      case _CierreSection.movimientos:
+        return [
+          SectionHeader(
+            title: 'Movimientos de stock',
+            subtitle: _isRange
+                ? 'Productos con ventas, cargas o ajustes en el período'
+                : 'Solo productos con ventas, cargas o ajustes hoy',
+          ),
+          const SizedBox(height: 12),
+          ..._movimientoLines(resumen),
+        ];
+    }
+  }
+
   List<Widget> _movimientoLines(CierreResumen resumen) {
     final activos = resumen.conActividad.toList();
     if (activos.isEmpty) {
-      return const [
-        _EmptyRow('Sin movimientos de stock en este día'),
+      return [
+        _EmptyRow(
+          _isRange
+              ? 'Sin movimientos de stock en el período'
+              : 'Sin movimientos de stock en este día',
+        ),
       ];
     }
 
@@ -274,11 +407,104 @@ class DateFormatCompat {
   static String _two(int n) => n.toString().padLeft(2, '0');
 }
 
-class _DateSelector extends StatelessWidget {
-  const _DateSelector({required this.date, required this.onTap});
+class _DateModeSelector extends StatelessWidget {
+  const _DateModeSelector({required this.mode, required this.onChanged});
+
+  final _DateMode mode;
+  final ValueChanged<_DateMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<_DateMode>(
+      segments: const [
+        ButtonSegment(value: _DateMode.dia, label: Text('Un día')),
+        ButtonSegment(value: _DateMode.rango, label: Text('Rango')),
+      ],
+      selected: {mode},
+      onSelectionChanged: (values) => onChanged(values.first),
+    );
+  }
+}
+
+class _SectionSelector extends StatelessWidget {
+  const _SectionSelector({required this.section, required this.onChanged});
+
+  final _CierreSection section;
+  final ValueChanged<_CierreSection> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SegmentedButton<_CierreSection>(
+        segments: const [
+          ButtonSegment(
+            value: _CierreSection.resumen,
+            label: Text('Resumen'),
+            icon: Icon(Icons.summarize_outlined, size: 18),
+          ),
+          ButtonSegment(
+            value: _CierreSection.ventas,
+            label: Text('Ventas'),
+            icon: Icon(Icons.receipt_long_outlined, size: 18),
+          ),
+          ButtonSegment(
+            value: _CierreSection.stock,
+            label: Text('Stock'),
+            icon: Icon(Icons.inventory_2_outlined, size: 18),
+          ),
+          ButtonSegment(
+            value: _CierreSection.movimientos,
+            label: Text('Movimientos'),
+            icon: Icon(Icons.swap_horiz_rounded, size: 18),
+          ),
+        ],
+        selected: {section},
+        onSelectionChanged: (values) => onChanged(values.first),
+      ),
+    );
+  }
+}
+
+class _RangeChips extends StatelessWidget {
+  const _RangeChips({
+    required this.from,
+    required this.to,
+    required this.onPickFrom,
+    required this.onPickTo,
+  });
+
+  final DateTime from;
+  final DateTime to;
+  final VoidCallback onPickFrom;
+  final VoidCallback onPickTo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _DateChip(label: 'Desde', date: from, onTap: onPickFrom),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _DateChip(label: 'Hasta', date: to, onTap: onPickTo),
+        ),
+      ],
+    );
+  }
+}
+
+class _DateChip extends StatelessWidget {
+  const _DateChip({
+    required this.date,
+    required this.onTap,
+    this.label,
+  });
 
   final DateTime date;
   final VoidCallback onTap;
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
@@ -301,9 +527,11 @@ class _DateSelector extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  formatDate(date),
+                  label != null
+                      ? '$label · ${formatDate(date)}'
+                      : formatDate(date),
                   style: const TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -323,11 +551,15 @@ class _ResumenEjecutivo extends StatelessWidget {
     required this.resumen,
     required this.ventas,
     required this.stock,
+    required this.periodLabel,
+    required this.isRange,
   });
 
   final CierreResumen resumen;
   final DaySalesMetrics ventas;
   final StockAlCierre stock;
+  final String periodLabel;
+  final bool isRange;
 
   @override
   Widget build(BuildContext context) {
@@ -341,13 +573,22 @@ class _ResumenEjecutivo extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'RESUMEN DEL DÍA',
-            style: TextStyle(
+          Text(
+            isRange ? 'RESUMEN DEL PERÍODO' : 'RESUMEN DEL DÍA',
+            style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w800,
               color: AppColors.primary,
               letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            periodLabel,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 14),
@@ -402,41 +643,31 @@ class _ResumenEjecutivo extends StatelessWidget {
 class _VentasSection extends StatelessWidget {
   const _VentasSection({
     required this.metrics,
+    required this.showDate,
     required this.onVerTodos,
   });
 
   final DaySalesMetrics metrics;
+  final bool showDate;
   final VoidCallback onVerTodos;
 
   @override
   Widget build(BuildContext context) {
     if (metrics.saleCount == 0) {
-      return const _EmptyRow('Sin ventas en este día');
+      return const _EmptyRow('Sin ventas en el período seleccionado');
     }
 
     final activas = metrics.sales.where((s) => !s.anulada).toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    final preview = activas.take(5).toList();
 
     return Column(
       children: [
-        ...preview.map(
+        ...activas.map(
           (sale) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: _VentaTile(sale: sale),
+            child: _VentaTile(sale: sale, showDate: showDate),
           ),
         ),
-        if (activas.length > preview.length)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              'y ${activas.length - preview.length} más…',
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
         const SizedBox(height: 8),
         SizedBox(
           width: double.infinity,
@@ -444,7 +675,7 @@ class _VentasSection extends StatelessWidget {
             onPressed: onVerTodos,
             icon: const Icon(Icons.receipt_long_rounded, size: 18),
             label: Text(
-              'Ver comprobantes (${metrics.saleCount})',
+              'Abrir comprobantes (${metrics.saleCount})',
             ),
           ),
         ),
@@ -454,15 +685,18 @@ class _VentasSection extends StatelessWidget {
 }
 
 class _VentaTile extends StatelessWidget {
-  const _VentaTile({required this.sale});
+  const _VentaTile({required this.sale, this.showDate = false});
 
   final SaleRecord sale;
+  final bool showDate;
 
   @override
   Widget build(BuildContext context) {
     final t = sale.createdAt;
     final hora =
         '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    final timeLabel =
+        showDate ? '${formatDate(t)} · $hora' : hora;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -474,7 +708,7 @@ class _VentaTile extends StatelessWidget {
       child: Row(
         children: [
           Text(
-            hora,
+            timeLabel,
             style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w800,

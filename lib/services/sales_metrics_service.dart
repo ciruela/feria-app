@@ -14,6 +14,11 @@ class SalesMetricsService {
     return DaySalesMetrics.fromSales(day, sales);
   }
 
+  Future<DaySalesMetrics> metricsForRange(DateTime start, DateTime end) async {
+    final sales = await _repository.fetchForRange(start, end);
+    return DaySalesMetrics.fromSales(start, sales);
+  }
+
   Future<List<SaleRecord>> salesForRange(DateTime start, DateTime end) {
     return _repository.fetchForRange(start, end);
   }

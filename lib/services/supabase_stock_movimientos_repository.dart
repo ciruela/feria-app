@@ -45,7 +45,10 @@ class SupabaseStockMovimientosRepository {
   Future<List<StockMovimiento>> fetchForDay(DateTime day) async {
     final start = DateTime(day.year, day.month, day.day);
     final end = start.add(const Duration(days: 1));
+    return fetchForRange(start, end);
+  }
 
+  Future<List<StockMovimiento>> fetchForRange(DateTime start, DateTime end) async {
     final rows = await SupabaseService.client
         .from(_table)
         .select()

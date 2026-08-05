@@ -115,6 +115,24 @@ class TeamService {
     return 'No se pudo invitar ($status)';
   }
 
+  Future<void> removeMember(String userId) async {
+    try {
+      final response = await SupabaseService.client.functions.invoke(
+        'remove-team-member',
+        body: {'user_id': userId},
+      );
+
+      final map = _asStringKeyedMap(response.data);
+      if (response.status >= 400) {
+        throw StateError(_errorMessage(map, response.status));
+      }
+    } on FunctionException catch (error) {
+      final map = _asStringKeyedMap(error.details);
+      throw StateError(_errorMessage(map, error.status));
+    }
+  }
+
+  /// @deprecated Usar [removeMember]. Mantenido por compatibilidad con RPC.
   Future<void> deactivate(String userId) async {
     try {
       await SupabaseService.client.rpc(
@@ -123,10 +141,8 @@ class TeamService {
       );
     } on PostgrestException catch (error) {
       if (error.code == 'PGRST202') {
-        throw StateError(
-          'Falta aplicar la migración de equipo en Supabase. '
-          'Ejecutá supabase/migrations/011_team_members.sql en el SQL Editor.',
-        );
+        await removeMember(userId);
+        return;
       }
       rethrow;
     }

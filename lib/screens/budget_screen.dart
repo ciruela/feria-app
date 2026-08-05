@@ -16,6 +16,7 @@ import '../services/seller_service.dart';
 import '../services/supabase_sales_repository.dart';
 import '../services/tenant_session_service.dart';
 import '../theme/app_theme.dart';
+import '../models/presupuesto_branding.dart';
 import '../utils/presupuesto_pdf.dart';
 import '../widgets/budget_payment_panel.dart';
 import '../widgets/feria_shell.dart';
@@ -48,6 +49,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
         cluExpiry: _controllers.cluExpiry.text.trim(),
         phone: _controllers.phone.text.trim(),
         email: _controllers.email.text.trim(),
+        fiscalCondition: _controllers.fiscalCondition.text.trim(),
         address: _controllers.address.text.trim(),
         city: _controllers.city.text.trim(),
         notes: _controllers.notes.text.trim(),
@@ -124,7 +126,14 @@ class _BudgetScreenState extends State<BudgetScreen> {
     }
 
     if (missing.isEmpty) {
-      _showMessage('Datos del DNI cargados. Revisá antes de generar.');
+      final session = context.read<TenantSessionService>();
+      final isUrban =
+          PresupuestoBranding.forTenant(slug: session.activeTenantSlug).isUrban;
+      _showMessage(
+        isUrban
+            ? 'DNI cargado (cliente, CUIT/DNI y domicilio). Revisá antes de generar.'
+            : 'Datos del DNI cargados. Revisá antes de generar.',
+      );
     } else if (result.side == DniScanSide.front) {
       _showMessage(
         'Frente leído. Escaneá el dorso para domicilio y localidad.',
@@ -233,7 +242,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
   Future<void> _exportPdf(Budget budget) async {
     try {
-      await PresupuestoPdf.share(budget);
+      final branding = resolvePresupuestoBranding(
+        context.read<TenantSessionService>(),
+      );
+      await PresupuestoPdf.share(budget, branding: branding);
     } catch (error) {
       if (!mounted) return;
       _showMessage('No se pudo exportar el PDF: $error');
@@ -242,7 +254,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
   Future<void> _printBudget(Budget budget) async {
     try {
-      await PresupuestoPdf.printBudget(budget);
+      final branding = resolvePresupuestoBranding(
+        context.read<TenantSessionService>(),
+      );
+      await PresupuestoPdf.printBudget(budget, branding: branding);
     } catch (error) {
       if (!mounted) return;
       _showMessage('No se pudo imprimir: $error');
@@ -289,6 +304,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
           snapshot,
           sellerId: sellerId,
           exchangeRate: exchangeRate,
+          branding: resolvePresupuestoBranding(
+            context.read<TenantSessionService>(),
+          ),
         );
       } else {
         final quantities = <String, int>{};
@@ -377,16 +395,20 @@ class _BudgetScreenState extends State<BudgetScreen> {
                   ),
                 ],
                 const SizedBox(height: 12),
-                PresupuestoPaper(
-                  budget: budget,
-                  controllers: _controllers,
-                  onChanged: () => setState(() {}),
-                  onSerialChanged: (lineKey, value) {
-                    context.read<CartService>().updateSerialNumber(lineKey, value);
-                  },
-                  onTcChanged: (lineKey, value) {
-                    context.read<CartService>().updateTarjetaConsumo(lineKey, value);
-                  },
+                Center(
+                  child: PresupuestoA4Preview(
+                    child: PresupuestoPaper(
+                      budget: budget,
+                      controllers: _controllers,
+                      onChanged: () => setState(() {}),
+                      onSerialChanged: (lineKey, value) {
+                        context.read<CartService>().updateSerialNumber(lineKey, value);
+                      },
+                      onTcChanged: (lineKey, value) {
+                        context.read<CartService>().updateTarjetaConsumo(lineKey, value);
+                      },
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton.icon(

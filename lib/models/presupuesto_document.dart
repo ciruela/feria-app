@@ -1,33 +1,8 @@
 import 'budget.dart';
+import 'presupuesto_branding.dart';
 import 'presupuesto_summary.dart';
 
-/// Textos y constantes compartidos entre el comprobante en pantalla y el PDF.
-abstract final class PresupuestoBranding {
-  static const paperRows = 14;
-  static const documentTitle = 'PRESUPUESTO';
-  static const documentSubtitle = '(DOC. NO VALIDO COMO FACTURA)';
-  static const companyName = 'WORLD GUNS S.R.L.';
-  static const businessLine = 'ARMERIA - CUCHILLERIA - ACCESORIOS';
-  static const servicesLine = 'GESTORIA ANMAC P/CIVILES - FUERZAS-EMPRESAS';
-  static const addressLine =
-      'Triunvirato 2589 1 Piso (Villa Luzuriaga - Pcia. Bs.As.)';
-  static const phoneLine = 'Tel: 4835-9420  Ventas WApp: 11-3864-4279';
-  static const adminLine = 'Adm./Gestoria WApp: 11-5147-1705  @wordguns.srl';
-  static const footerNote =
-      'Horario: Lun a Vie 10 a 13 y 15:30 a 19 · Sab 10 a 13\n'
-      'Los precios pueden variar sin previo aviso.\n'
-      'Reserva de mercaderia con seña del 30%.';
-  static const paymentAllocationTitle = 'FORMA DE PAGO ACORDADA';
-  static const creditCardsTitle = 'TARJETAS DE CREDITO';
-  static const tableHeaders = [
-    'COD',
-    'CANT',
-    'DETALLE',
-    'TC',
-    'P. UNIT',
-    'IMPORTE',
-  ];
-}
+export 'presupuesto_branding.dart';
 
 class PresupuestoItemRow {
   const PresupuestoItemRow({
@@ -106,13 +81,18 @@ class PresupuestoDocument {
     required this.customer,
     required this.summary,
     required this.tableRows,
+    required this.branding,
+    required this.formattedDate,
     this.sellerName,
   });
 
-  factory PresupuestoDocument.fromBudget(Budget budget) {
+  factory PresupuestoDocument.fromBudget(
+    Budget budget, {
+    required PresupuestoBranding branding,
+  }) {
     final date = budget.date;
     final rows = budget.lines.map(PresupuestoItemRow.fromLine).toList();
-    while (rows.length < PresupuestoBranding.paperRows) {
+    while (rows.length < branding.paperRows) {
       rows.add(const PresupuestoItemRow.empty());
     }
 
@@ -124,7 +104,32 @@ class PresupuestoDocument {
       summary: PresupuestoSummary(budget),
       tableRows: rows,
       sellerName: budget.sellerName,
+      branding: branding,
+      formattedDate: _formatDocumentDate(date, branding),
     );
+  }
+
+  static String _formatDocumentDate(DateTime date, PresupuestoBranding branding) {
+    if (branding.useSingleDateLine) {
+      const months = [
+        'ene',
+        'feb',
+        'mar',
+        'abr',
+        'may',
+        'jun',
+        'jul',
+        'ago',
+        'sep',
+        'oct',
+        'nov',
+        'dic',
+      ];
+      return '${date.day} ${months[date.month - 1]} ${date.year}';
+    }
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year}';
   }
 
   final String day;
@@ -133,5 +138,7 @@ class PresupuestoDocument {
   final BudgetCustomer customer;
   final PresupuestoSummary summary;
   final List<PresupuestoItemRow> tableRows;
+  final PresupuestoBranding branding;
+  final String formattedDate;
   final String? sellerName;
 }

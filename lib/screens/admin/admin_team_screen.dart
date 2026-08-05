@@ -108,16 +108,16 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
     return error.toString();
   }
 
-  Future<void> _deactivate(TeamMember member) async {
+  Future<void> _removeMember(TeamMember member) async {
     if (!_canManage || member.userId == _currentUserId) return;
 
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Quitar acceso'),
+        title: const Text('Eliminar del equipo'),
         content: Text(
-          '¿Sacar a ${member.displayName} de la armería? '
-          'No podrá entrar con su cuenta hasta que lo vuelvas a invitar.',
+          '¿Sacar a ${member.displayName} de la armería?\n\n'
+          'Perderá el acceso con su cuenta. Podés volver a invitarlo después.',
         ),
         actions: [
           TextButton(
@@ -127,7 +127,7 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Quitar acceso'),
+            child: const Text('Eliminar'),
           ),
         ],
       ),
@@ -136,17 +136,17 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
 
     setState(() => _loading = true);
     try {
-      await _service.deactivate(member.userId);
+      await _service.removeMember(member.userId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${member.displayName} ya no tiene acceso')),
+        SnackBar(content: Text('${member.displayName} fue eliminado del equipo')),
       );
       await _load();
     } catch (error) {
       if (!mounted) return;
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$error')),
+        SnackBar(content: Text(_formatInviteError(error))),
       );
     }
   }
@@ -199,6 +199,7 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
                     child: Text(
                       _canManage
                           ? 'Invitá por email a quienes administran la armería. '
+                              'Tocá Eliminar en cada persona para sacarla del equipo. '
                               'Si todavía no tienen cuenta, les llega un mail '
                               'para crearla. Los vendedores del mostrador '
                               'entran con “Entrar como vendedor”.'
@@ -254,7 +255,8 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
                   ],
                   const SizedBox(height: 20),
                   SectionHeader(
-                    title: '${_members.length} persona${_members.length == 1 ? '' : 's'}',
+                    title:
+                        '${_members.where((m) => m.activo).length} persona${_members.where((m) => m.activo).length == 1 ? '' : 's'}',
                     subtitle: 'Cuentas con acceso a esta armería',
                   ),
                   const SizedBox(height: 12),
@@ -266,15 +268,15 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
                   else if (_members.isEmpty)
                     const _EmptyTeam()
                   else
-                    ..._members.map(
+                    ..._members.where((m) => m.activo).map(
                       (member) => Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: _MemberTile(
                           member: member,
                           isSelf: member.userId == _currentUserId,
                           canManage: _canManage,
-                          onDeactivate:
-                              member.isOwner ? null : () => _deactivate(member),
+                          onRemove:
+                              member.isOwner ? null : () => _removeMember(member),
                         ),
                       ),
                     ),
@@ -307,13 +309,13 @@ class _MemberTile extends StatelessWidget {
     required this.member,
     required this.isSelf,
     required this.canManage,
-    this.onDeactivate,
+    this.onRemove,
   });
 
   final TeamMember member;
   final bool isSelf;
   final bool canManage;
-  final VoidCallback? onDeactivate;
+  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -364,16 +366,17 @@ class _MemberTile extends StatelessWidget {
         ),
         subtitle: Text(
           '${member.email.isEmpty ? 'sin email' : member.email} · '
-          '${member.isOwner ? 'Dueño' : 'Admin'}'
-          '${member.activo ? '' : ' · inactivo'}',
+          '${member.isOwner ? 'Dueño' : 'Admin'}',
           style: const TextStyle(fontSize: 12),
         ),
-        trailing: canManage && onDeactivate != null
-            ? IconButton(
-                tooltip: 'Quitar acceso',
-                onPressed: onDeactivate,
-                icon: const Icon(Icons.person_remove_outlined,
-                    color: AppColors.danger),
+        trailing: canManage && onRemove != null
+            ? TextButton.icon(
+                onPressed: onRemove,
+                icon: const Icon(Icons.person_remove_outlined, size: 18),
+                label: const Text('Eliminar'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.danger,
+                ),
               )
             : null,
       ),

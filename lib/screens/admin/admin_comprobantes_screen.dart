@@ -10,7 +10,9 @@ import '../../services/comprobante_pdf_service.dart';
 import '../../services/sales_metrics_service.dart';
 import '../../services/stock_cierre_service.dart';
 import '../../services/supabase_service.dart';
+import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/presupuesto/presupuesto_paper.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/feria_shell.dart';
 import '../../widgets/section_header.dart';
@@ -599,7 +601,10 @@ class _AdminComprobanteDetailScreenState
   Future<void> _viewPdf() async {
     setState(() => _pdfBusy = true);
     try {
-      await _pdfService.viewSalePdf(_effectiveSale);
+      final branding = resolvePresupuestoBranding(
+        context.read<TenantSessionService>(),
+      );
+      await _pdfService.viewSalePdf(_effectiveSale, branding: branding);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -613,7 +618,10 @@ class _AdminComprobanteDetailScreenState
   Future<void> _sharePdf() async {
     setState(() => _pdfBusy = true);
     try {
-      await _pdfService.shareSalePdf(_effectiveSale);
+      final branding = resolvePresupuestoBranding(
+        context.read<TenantSessionService>(),
+      );
+      await _pdfService.shareSalePdf(_effectiveSale, branding: branding);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -627,7 +635,13 @@ class _AdminComprobanteDetailScreenState
   Future<void> _savePdfToCloud() async {
     setState(() => _pdfBusy = true);
     try {
-      final path = await _pdfService.ensureStoredForSale(_effectiveSale);
+      final branding = resolvePresupuestoBranding(
+        context.read<TenantSessionService>(),
+      );
+      final path = await _pdfService.ensureStoredForSale(
+        _effectiveSale,
+        branding: branding,
+      );
       if (!mounted) return;
       setState(() => _pdfPathOverride = path);
       ScaffoldMessenger.of(context).showSnackBar(

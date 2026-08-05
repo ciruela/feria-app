@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'budget.dart';
+import 'urban_receipt_options.dart';
 
 class BudgetCustomerControllers {
   BudgetCustomerControllers()
@@ -10,6 +11,9 @@ class BudgetCustomerControllers {
         cluExpiry = TextEditingController(),
         phone = TextEditingController(),
         email = TextEditingController(),
+        fiscalCondition = TextEditingController(
+          text: UrbanReceiptOptions.defaultFiscalCondition,
+        ),
         address = TextEditingController(),
         city = TextEditingController(),
         notes = TextEditingController();
@@ -20,6 +24,7 @@ class BudgetCustomerControllers {
   final TextEditingController cluExpiry;
   final TextEditingController phone;
   final TextEditingController email;
+  final TextEditingController fiscalCondition;
   final TextEditingController address;
   final TextEditingController city;
   final TextEditingController notes;
@@ -51,6 +56,9 @@ class BudgetCustomerControllers {
     cluExpiry.text = customer.cluExpiry;
     phone.text = customer.phone;
     email.text = customer.email;
+    fiscalCondition.text = customer.fiscalCondition.isNotEmpty
+        ? customer.fiscalCondition
+        : UrbanReceiptOptions.defaultFiscalCondition;
     address.text = customer.address;
     city.text = customer.city;
     notes.text = customer.notes;
@@ -63,6 +71,7 @@ class BudgetCustomerControllers {
     cluExpiry.dispose();
     phone.dispose();
     email.dispose();
+    fiscalCondition.dispose();
     address.dispose();
     city.dispose();
     notes.dispose();

@@ -119,7 +119,8 @@ void main() {
 
   group('CierreResumen', () {
     final resumen = CierreResumen(
-      day: DateTime(2026, 1, 1),
+      startDate: DateTime(2026, 1, 1),
+      endDate: DateTime(2026, 1, 1),
       lines: [
         _line(
             product: _municion('m1', rpb: 50),
@@ -147,7 +148,8 @@ void main() {
 
     test('resumen vacío cuando no hay actividad', () {
       final vacio = CierreResumen(
-        day: DateTime(2026, 1, 1),
+        startDate: DateTime(2026, 1, 1),
+        endDate: DateTime(2026, 1, 1),
         lines: [_line(product: _municion('m3', rpb: 50), cierre: 3)],
       );
       expect(vacio.isEmpty, isTrue);
@@ -174,7 +176,8 @@ void main() {
   group('exportToExcel', () {
     test('genera bytes no vacíos', () {
       final resumen = CierreResumen(
-        day: DateTime(2026, 1, 1),
+        startDate: DateTime(2026, 1, 1),
+        endDate: DateTime(2026, 1, 1),
         lines: [
           _line(
               product: _municion('m1', rpb: 50),
@@ -189,7 +192,8 @@ void main() {
 
     test('exportCierreCompleto genera bytes con ventas y stock', () {
       final resumen = CierreResumen(
-        day: DateTime(2026, 1, 1),
+        startDate: DateTime(2026, 1, 1),
+        endDate: DateTime(2026, 1, 1),
         lines: [
           _line(
             product: _municion('m1', rpb: 50),
