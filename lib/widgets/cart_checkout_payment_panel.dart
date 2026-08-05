@@ -48,7 +48,7 @@ class CartCheckoutPaymentPanel extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              const Row(
                 children: [
                   Expanded(
                     child: Text(
@@ -56,7 +56,7 @@ class CartCheckoutPaymentPanel extends StatelessWidget {
                       style: AppText.label,
                     ),
                   ),
-                  const Icon(
+                  Icon(
                     Icons.edit_outlined,
                     size: 16,
                     color: AppColors.textMuted,
@@ -65,7 +65,7 @@ class CartCheckoutPaymentPanel extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               if (checkout == null)
-                Text(
+                const Text(
                   'Definí una o dos formas de pago para toda la venta.',
                   style: AppText.bodySmall,
                 )

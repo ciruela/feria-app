@@ -126,8 +126,8 @@ class _CartCheckoutPaymentDialog extends StatelessWidget {
                 ),
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
             child: Column(
               children: [
                 Text(
@@ -135,7 +135,7 @@ class _CartCheckoutPaymentDialog extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: AppText.heading,
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 Text(
                   'Elegí el precio de referencia para todo el carrito '
                   'y, si hace falta, dividí el cobro en dos formas.',

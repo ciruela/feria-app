@@ -159,7 +159,7 @@ class _HeroHeader extends StatelessWidget {
             style: AppText.heading,
           ),
           const SizedBox(height: 4),
-          Text(
+          const Text(
             'Armas cortas · largas · munición',
             style: AppText.bodySmall,
           ),
@@ -215,7 +215,7 @@ class _AdminPinDialogState extends State<_AdminPinDialog> {
           width: AppDecorations.hairline,
         ),
       ),
-      title: Text('PIN de administración', style: AppText.heading),
+      title: const Text('PIN de administración', style: AppText.heading),
       content: AdminPinEntry(
         key: _pinKey,
         wrong: _wrong,

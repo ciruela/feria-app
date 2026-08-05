@@ -87,7 +87,7 @@ class CartScreen extends StatelessWidget {
           if (!cart.isEmpty)
             TextButton(
               onPressed: cart.clear,
-              child: Text(
+              child: const Text(
                 'Vaciar',
                 style: TextStyle(
                   color: AppColors.textMuted,

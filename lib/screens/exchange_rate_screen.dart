@@ -79,7 +79,7 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('1 USD =', style: AppText.heading),
+                  const Text('1 USD =', style: AppText.heading),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _controller,

@@ -110,13 +110,13 @@ class _SellerSelectScreenState extends State<SellerSelectScreen> {
                                 color: AppColors.textMuted.withValues(alpha: 0.7),
                               ),
                               const SizedBox(height: 16),
-                              Text(
+                              const Text(
                                 'Todavía no hay vendedores',
                                 textAlign: TextAlign.center,
                                 style: AppText.heading,
                               ),
                               const SizedBox(height: 8),
-                              Text(
+                              const Text(
                                 'Un administrador debe cargarlos en '
                                 'Administración → Vendedores.',
                                 textAlign: TextAlign.center,
