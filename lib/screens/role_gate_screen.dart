@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/admin_user.dart';
@@ -7,6 +8,8 @@ import '../services/admin_service.dart';
 import '../services/auth_service.dart';
 import '../services/tenant_session_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/admin_pin_entry.dart';
+import '../widgets/armenext_brand.dart';
 import '../widgets/big_action_button.dart';
 import '../widgets/feria_shell.dart';
 import '../widgets/section_header.dart';
@@ -64,29 +67,50 @@ class RoleGateScreen extends StatelessWidget {
           const SupabaseConfigBanner(),
           _HeroHeader(),
           const SizedBox(height: 28),
-          const SectionHeader(
+          SectionHeader(
             title: '¿Cómo entrás?',
-            subtitle: 'Empleados consultan precios. Administración edita catálogo.',
+            subtitle: session.isSellerPortalSession
+                ? 'Sesión de vendedor: ventas y consulta de precios.'
+                : session.isTenantManager
+                    ? 'Tu cuenta ya es administración en el servidor. El PIN solo identifica quién opera.'
+                    : 'Empleados consultan precios. Administración edita catálogo.',
           ),
           const SizedBox(height: 22),
           BigActionButton(
             label: AppRole.employee.label,
             subtitle: 'Consultar precios, stock y carrito',
-            icon: Icons.storefront_rounded,
+            icon: Icons.search_rounded,
             accentColor: AppColors.accent,
+            primary: true,
             onTap: () {
               context.read<AuthService>().loginAs(AppRole.employee);
               onEmployee();
             },
           ),
-          const SizedBox(height: 16),
-          BigActionButton(
-            label: AppRole.admin.label,
-            subtitle: 'Editar productos, stock y tipo de cambio',
-            icon: Icons.admin_panel_settings_rounded,
-            accentColor: AppColors.goldDark,
-            onTap: () => _askAdminPin(context),
-          ),
+          if (!session.isSellerPortalSession) ...[
+            const SizedBox(height: 16),
+            BigActionButton(
+              label: AppRole.admin.label,
+              subtitle: session.isTenantManager
+                  ? 'Panel completo (rol server: ${session.appRole})'
+                  : 'Requiere rol owner/admin en el servidor',
+              icon: Icons.tune_rounded,
+              accentColor: AppColors.goldDark,
+              onTap: () {
+                if (!session.isTenantManager && session.isSignedIn) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Tu sesión no tiene rol de administración en el servidor.',
+                      ),
+                    ),
+                  );
+                  return;
+                }
+                _askAdminPin(context);
+              },
+            ),
+          ],
         ],
       ),
     );
@@ -116,48 +140,28 @@ class _HeroHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: AppDecorations.cardGradient,
-        borderRadius: AppDecorations.radiusLg,
-        boxShadow: [AppDecorations.cardShadow],
+        color: AppColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(AppDecorations.radius),
+        border: Border.all(
+          color: AppColors.border,
+          width: AppDecorations.hairline,
+        ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              gradient: AppDecorations.goldGradient,
-              borderRadius: AppDecorations.radiusMd,
-            ),
-            child: const Icon(
-              Icons.local_mall_rounded,
-              color: AppColors.primaryDark,
-              size: 38,
-            ),
+          const ArmenextLockup(width: 150, height: 36),
+          const SizedBox(height: 14),
+          Text(
+            tenantName,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: AppText.heading,
           ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  tenantName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                        letterSpacing: 1.4,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Caza · Pesca · Munición',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.82),
-                      ),
-                ),
-              ],
-            ),
+          const SizedBox(height: 4),
+          Text(
+            'Armas cortas · largas · munición',
+            style: AppText.bodySmall,
           ),
         ],
       ),
@@ -173,23 +177,10 @@ class _AdminPinDialog extends StatefulWidget {
 }
 
 class _AdminPinDialogState extends State<_AdminPinDialog> {
-  late final TextEditingController _controller;
-  final _formKey = GlobalKey<FormState>();
+  final _pinKey = GlobalKey<AdminPinEntryState>();
+  bool _wrong = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  AdminUser? _resolve() {
-    final pin = _controller.text.trim();
+  AdminUser? _resolve(String pin) {
     final named = context.read<AdminService>().verifyPin(pin);
     if (named != null) return named;
     if (context.read<AuthService>().verifyAdminPin(pin)) {
@@ -202,65 +193,41 @@ class _AdminPinDialogState extends State<_AdminPinDialog> {
     return null;
   }
 
-  void _submit() {
-    final admin = _resolve();
+  void _submit(String pin) {
+    final admin = _resolve(pin);
     if (admin != null) {
       Navigator.of(context).pop(admin);
-    } else {
-      _formKey.currentState?.validate();
+      return;
     }
+    HapticFeedback.lightImpact();
+    setState(() => _wrong = true);
+    _pinKey.currentState?.clear();
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      icon: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          color: AppColors.gold.withValues(alpha: 0.15),
-          shape: BoxShape.circle,
+      backgroundColor: AppColors.surfaceRaised,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppDecorations.radius),
+        side: const BorderSide(
+          color: AppColors.border,
+          width: AppDecorations.hairline,
         ),
-        child: const Icon(Icons.lock_rounded, color: AppColors.goldDark, size: 28),
       ),
-      title: const Text('PIN de administración'),
-      content: Form(
-        key: _formKey,
-        child: TextFormField(
-          controller: _controller,
-          obscureText: true,
-          keyboardType: TextInputType.number,
-          autofocus: true,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 8,
-          ),
-          decoration: const InputDecoration(
-            labelText: 'Ingresá el PIN',
-            hintText: '••••',
-          ),
-          validator: (value) {
-            if (_resolve() == null) {
-              return 'PIN incorrecto';
-            }
-            return null;
-          },
-          onFieldSubmitted: (_) => _submit(),
-        ),
+      title: Text('PIN de administración', style: AppText.heading),
+      content: AdminPinEntry(
+        key: _pinKey,
+        wrong: _wrong,
+        onChanged: (_) {
+          if (_wrong) setState(() => _wrong = false);
+        },
+        onSubmit: _submit,
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('CANCELAR'),
-        ),
-        ElevatedButton(
-          onPressed: _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.goldDark,
-          ),
-          child: const Text('ENTRAR'),
+          child: const Text('Volver'),
         ),
       ],
     );
@@ -270,24 +237,21 @@ class _AdminPinDialogState extends State<_AdminPinDialog> {
 Widget roleBadge(AppRole role) {
   final isAdmin = role == AppRole.admin;
   return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
     decoration: BoxDecoration(
-      gradient: isAdmin ? AppDecorations.goldGradient : null,
-      color: isAdmin ? null : Colors.white.withValues(alpha: 0.18),
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(
-        color: isAdmin
-            ? AppColors.goldDark.withValues(alpha: 0.4)
-            : Colors.white.withValues(alpha: 0.25),
-      ),
+      color: isAdmin ? AppColors.accent : AppColors.surfaceTouch,
+      borderRadius: BorderRadius.circular(AppDecorations.radius),
+      border: isAdmin
+          ? null
+          : Border.all(
+              color: AppColors.border,
+              width: AppDecorations.hairline,
+            ),
     ),
     child: Text(
       role.label.toUpperCase(),
-      style: TextStyle(
-        color: isAdmin ? AppColors.primaryDark : Colors.white,
-        fontSize: 11,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 0.8,
+      style: AppText.label.copyWith(
+        color: isAdmin ? AppColors.onAccent : AppColors.textMuted,
       ),
     ),
   );

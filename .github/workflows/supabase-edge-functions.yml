@@ -41,6 +41,14 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          for fn in platform-metrics register-tenant-subdomain invite-team-member remove-team-member; do
+          for fn in \
+            platform-metrics \
+            register-tenant-subdomain \
+            invite-team-member \
+            remove-team-member \
+            storefront-catalog \
+            storefront-order \
+            seller-portal-validate
+          do
             supabase functions deploy "$fn" --project-ref ihotjvimurztbhrsiabs
           done

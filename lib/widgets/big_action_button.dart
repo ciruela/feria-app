@@ -10,6 +10,7 @@ class BigActionButton extends StatelessWidget {
     required this.onTap,
     this.subtitle,
     this.accentColor,
+    this.primary = false,
   });
 
   final String label;
@@ -17,100 +18,71 @@ class BigActionButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
   final Color? accentColor;
+  /// Tarjeta destacada (empleado): fondo surfaceTouch sin borde.
+  final bool primary;
 
   @override
   Widget build(BuildContext context) {
-    final accent = accentColor ?? AppColors.primary;
+    final accent = accentColor ?? AppColors.accent;
+    final highlighted = primary || accent == AppColors.accent;
 
     return Material(
-      color: Colors.transparent,
+      color: highlighted ? AppColors.surfaceTouch : AppColors.surfaceRaised,
+      borderRadius: BorderRadius.circular(AppDecorations.radius),
       child: InkWell(
         onTap: onTap,
-        borderRadius: AppDecorations.radiusLg,
-        child: Ink(
+        borderRadius: BorderRadius.circular(AppDecorations.radius),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: AppDecorations.tapMin),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: AppDecorations.radiusLg,
-            border: Border.all(color: AppColors.border),
-            boxShadow: [AppDecorations.cardShadow],
+            borderRadius: BorderRadius.circular(AppDecorations.radius),
+            border: highlighted
+                ? null
+                : Border.all(
+                    color: AppColors.border,
+                    width: AppDecorations.hairline,
+                  ),
           ),
-          child: ClipRRect(
-            borderRadius: AppDecorations.radiusLg,
-            child: Stack(
-              children: [
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: 6,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [accent, accent.withValues(alpha: 0.55)],
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: highlighted ? AppColors.accent : AppColors.surfaceTouch,
+                  borderRadius: BorderRadius.circular(AppDecorations.radius),
+                ),
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: highlighted ? AppColors.onAccent : AppColors.textMuted,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: AppText.bodyLarge.copyWith(
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 20, 24),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 68,
-                        height: 68,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              accent.withValues(alpha: 0.18),
-                              accent.withValues(alpha: 0.06),
-                            ],
-                          ),
-                          borderRadius: AppDecorations.radiusMd,
-                          border: Border.all(color: accent.withValues(alpha: 0.22)),
-                        ),
-                        child: Icon(icon, size: 34, color: accent),
-                      ),
-                      const SizedBox(width: 18),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              label,
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                            if (subtitle != null) ...[
-                              const SizedBox(height: 6),
-                              Text(
-                                subtitle!,
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: accent.withValues(alpha: 0.10),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.arrow_forward_rounded,
-                          color: accent,
-                          size: 24,
-                        ),
-                      ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 3),
+                      Text(subtitle!, style: AppText.bodySmall),
                     ],
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 16,
+                color: AppColors.textMuted,
+              ),
+            ],
           ),
         ),
       ),

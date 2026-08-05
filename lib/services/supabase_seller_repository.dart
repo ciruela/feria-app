@@ -34,11 +34,8 @@ class SupabaseSellerRepository {
   }
 
   Future<void> delete(String id) async {
-    await SupabaseService.client
-        .from('ventas')
-        .update({'vendedor_id': null})
-        .eq('vendedor_id', id);
-
+    // No se reescribe ventas.vendedor_id (inmutable / PII-audit trail).
+    // Las ventas históricas conservan la referencia al id del vendedor.
     await SupabaseService.client.from(_table).delete().eq('id', id);
   }
 

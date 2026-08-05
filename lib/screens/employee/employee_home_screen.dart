@@ -114,10 +114,14 @@ class EmployeeHomeScreen extends StatelessWidget {
           StatCard(
             icon: Icons.currency_exchange_rounded,
             label: 'Tipo de cambio hoy',
-            value: '1 USD = ${formatArs(exchangeRate.rate)}',
-            subtitle: exchangeRate.updatedAt == null
-                ? null
-                : 'Actualizado: ${formatDateTime(exchangeRate.updatedAt!)}',
+            value: exchangeRate.hasServerRate
+                ? '1 USD = ${formatArs(exchangeRate.rate)}'
+                : 'Sin tipo de cambio',
+            subtitle: !exchangeRate.hasServerRate
+                ? 'Administración debe configurarlo; no se usan precios ARS inventados'
+                : exchangeRate.updatedAt == null
+                    ? null
+                    : 'Actualizado: ${formatDateTime(exchangeRate.updatedAt!)}',
             accentColor: AppColors.goldDark,
           ),
           if (AppConfig.usesRemoteCatalog) ...[

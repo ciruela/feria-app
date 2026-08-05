@@ -12,8 +12,8 @@ class SupabaseAuditRepository {
     String entidadId = '',
     String detalle = '',
   }) async {
+    // actor_id y created_at los fija el servidor (AR-7). actorId se ignora.
     await SupabaseService.client.from(_table).insert({
-      if (actorId != null && actorId.isNotEmpty) 'actor_id': actorId,
       'actor_nombre': actorNombre,
       'accion': accion,
       'entidad': entidad,

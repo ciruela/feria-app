@@ -55,5 +55,8 @@ app.*.map.json
 # Local env (Supabase credentials)
 .env
 
+# Supabase CLI local link/cache
+supabase/.temp/
+
 # CI local (API keys Apple — no commitear)
 .secrets/

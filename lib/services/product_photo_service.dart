@@ -5,18 +5,32 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';
 import '../models/product.dart';
+import '../utils/jwt.dart';
 import 'supabase_service.dart';
 
-/// Fotos en Storage: `feria-fotos/{tipo}/{producto_id}/{timestamp}.jpg`
-/// Ej: `arma_corta/ac-001/1734567890123.jpg`
+/// Fotos en Storage: `feria-fotos/{tenant_id}/{tipo}/{producto_id}/{timestamp}.jpg`
+/// Ej: `0853ba51-.../arma_corta/ac-001/1734567890123.jpg` (AR-12).
 class ProductPhotoService {
   final _picker = ImagePicker();
 
   static String folderFor(Product product) => product.type.key;
 
-  static String newStoragePath(Product product) {
+  static String newStoragePath(Product product, {String? tenantId}) {
     final ts = DateTime.now().millisecondsSinceEpoch;
-    return '${product.type.key}/${product.id}/$ts.jpg';
+    final leaf = '${product.type.key}/${product.id}/$ts.jpg';
+    final tenant = (tenantId ?? _tenantIdFromJwt())?.trim();
+    if (tenant == null || tenant.isEmpty) {
+      throw StateError('Sesión sin tenant: no se puede subir la foto.');
+    }
+    return '$tenant/$leaf';
+  }
+
+  static String? _tenantIdFromJwt() {
+    final session = SupabaseService.client.auth.currentSession;
+    if (session == null) return null;
+    final claim = decodeJwtPayload(session.accessToken)['tenant_id'];
+    final id = (claim is String ? claim : claim?.toString())?.trim();
+    return id == null || id.isEmpty ? null : id;
   }
 
   static String stripVersion(String path) {
@@ -127,6 +141,10 @@ class ProductPhotoService {
     }
 
     final path = newStoragePath(product);
+    const maxBytes = 5 * 1024 * 1024;
+    if (bytes.length > maxBytes) {
+      throw StateError('La foto supera el máximo de 5 MB.');
+    }
 
     await SupabaseService.client.storage
         .from(AppConfig.productPhotosBucket)

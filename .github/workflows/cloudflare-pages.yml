@@ -1,9 +1,11 @@
 name: Deploy Web (Cloudflare Pages)
 
 # Flutter no está en el builder nativo de Cloudflare Pages: compilamos acá y subimos build/web.
+# - main    → branch production (prod)
+# - staging → branch staging (preview)
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
     paths:
       - 'lib/**'
       - 'web/**'
@@ -52,9 +54,18 @@ jobs:
           npx --yes wrangler pages project create feria-app \
             --production-branch=production || true
 
+      - name: Resolve Pages branch
+        id: pages
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "branch=production" >> "$GITHUB_OUTPUT"
+          else
+            echo "branch=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy build/web --project-name=feria-app --branch=production --commit-dirty=true
+          command: pages deploy build/web --project-name=feria-app --branch=${{ steps.pages.outputs.branch }} --commit-dirty=true

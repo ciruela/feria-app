@@ -24,8 +24,8 @@ class CartCheckoutPaymentPanel extends StatelessWidget {
     final checkout = cart.checkoutPayment;
 
     return Material(
-      color: AppColors.surface,
-      borderRadius: AppDecorations.radiusMd,
+      color: AppColors.surfaceRaised,
+      borderRadius: BorderRadius.circular(AppDecorations.radius),
       child: InkWell(
         onTap: () async {
           final selected = await showCartCheckoutPaymentDialog(
@@ -35,54 +35,39 @@ class CartCheckoutPaymentPanel extends StatelessWidget {
           if (selected == null || !context.mounted) return;
           context.read<CartService>().setCheckoutPayment(selected);
         },
-        borderRadius: AppDecorations.radiusMd,
+        borderRadius: BorderRadius.circular(AppDecorations.radius),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            borderRadius: AppDecorations.radiusMd,
+            borderRadius: BorderRadius.circular(AppDecorations.radius),
             border: Border.all(
-              color: checkout == null ? AppColors.goldDark : AppColors.border,
-              width: checkout == null ? 1.5 : 1,
+              color: AppColors.border,
+              width: AppDecorations.hairline,
             ),
-            boxShadow: checkout == null ? [AppDecorations.softShadow] : null,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  const Icon(
-                    Icons.account_balance_wallet_outlined,
-                    color: AppColors.goldDark,
-                  ),
-                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      checkout == null
-                          ? 'Configurar cómo abona el cliente'
-                          : 'Cómo abona el cliente',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
-                      ),
+                      'CÓMO ABONA EL CLIENTE',
+                      style: AppText.label,
                     ),
                   ),
                   const Icon(
                     Icons.edit_outlined,
-                    size: 18,
-                    color: AppColors.textSecondary,
+                    size: 16,
+                    color: AppColors.textMuted,
                   ),
                 ],
               ),
               const SizedBox(height: 8),
               if (checkout == null)
-                const Text(
-                  'Definí una o dos formas de pago para toda la venta. '
-                  'Los montos se reflejan en el comprobante.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                  ),
+                Text(
+                  'Definí una o dos formas de pago para toda la venta.',
+                  style: AppText.bodySmall,
                 )
               else
                 _CheckoutSummary(
@@ -132,44 +117,26 @@ class _CheckoutSummary extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Precio de referencia: ${checkout.pricingMethod.label}',
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textSecondary,
-          ),
+          'Referencia: ${checkout.pricingMethod.label}',
+          style: AppText.bodySmall,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         ...allocations.map((allocation) {
           final amount = allocation.paysInUsd
               ? formatUsd(allocation.amountUsd)
               : formatArs(allocation.amountArs);
 
           return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: 6),
             child: Row(
               children: [
-                Icon(
-                  allocation.paysInUsd
-                      ? Icons.paid_rounded
-                      : Icons.payments_outlined,
-                  size: 18,
-                  color: AppColors.goldDark,
-                ),
-                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    allocation.method.label.toUpperCase(),
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    allocation.method.label,
+                    style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w500),
                   ),
                 ),
-                Text(
-                  amount,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
-                  ),
-                ),
+                Text(amount, style: AppText.number),
               ],
             ),
           );

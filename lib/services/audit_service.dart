@@ -28,8 +28,8 @@ class AuditService {
   }
 
   /// Registra una acción. Best-effort: nunca lanza (no bloquea la operación).
-  /// [actorNombre]/[actorId] permiten sobreescribir el actor de la sesión
-  /// (por ejemplo, ventas hechas por un vendedor).
+  /// [actorNombre] puede sobreescribir el nombre visible (ej. vendedor).
+  /// La identidad (`actor_id`) la fija el servidor con `auth.uid()` (AR-7).
   Future<void> log({
     required String accion,
     String entidad = '',
@@ -47,6 +47,7 @@ class AuditService {
     try {
       await _repo.insert(
         accion: accion,
+        // Conservado en la firma por callers existentes; el server lo ignora.
         actorId: actorId ?? _actorId,
         actorNombre: nombre,
         entidad: entidad,

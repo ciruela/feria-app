@@ -134,7 +134,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           const SizedBox(height: 20),
           _InfoBlock(product: product),
           const SizedBox(height: 16),
-          ProductPricesPanel(prices: prices),
+          ProductPricesPanel(
+            prices: prices,
+            showArs: exchangeRate.hasServerRate,
+          ),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,

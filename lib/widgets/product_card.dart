@@ -117,9 +117,19 @@ class ProductCard extends StatelessWidget {
           ),
           if (showAddButton) _buildActionRow(context, canAdd),
           if (_isList)
-            _buildListBody(context, prices)
+            _buildListBody(
+              context,
+              prices,
+              showArs: exchangeRate.hasServerRate,
+            )
           else
-            Expanded(child: _buildGridBody(context, prices)),
+            Expanded(
+              child: _buildGridBody(
+                context,
+                prices,
+                showArs: exchangeRate.hasServerRate,
+              ),
+            ),
         ],
       ),
     );
@@ -187,7 +197,11 @@ class ProductCard extends StatelessWidget {
     );
   }
 
-  Widget _buildListBody(BuildContext context, ProductPrices prices) {
+  Widget _buildListBody(
+    BuildContext context,
+    ProductPrices prices, {
+    required bool showArs,
+  }) {
     final photoUrls = ProductPhotoService.displayUrls(product.fotoUrls);
     final photoUrl = photoUrls.isNotEmpty ? photoUrls.first : null;
 
@@ -198,15 +212,11 @@ class ProductCard extends StatelessWidget {
         children: [
           Material(
             color: Colors.transparent,
-            child: InkWell(
-              onTap: () => _openDetail(context),
-              borderRadius: AppDecorations.radiusMd,
-              child: ProductSellerThumb(
-                product: product,
-                accent: _accent,
-                photoUrl: photoUrl,
-                size: 88,
-              ),
+            child: ProductSellerThumb(
+              product: product,
+              accent: _accent,
+              photoUrl: photoUrl,
+              size: 88,
             ),
           ),
           const SizedBox(width: 12),
@@ -271,7 +281,11 @@ class ProductCard extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 8),
-                ProductPricesPanel(prices: prices, compact: true),
+                ProductPricesPanel(
+                  prices: prices,
+                  compact: true,
+                  showArs: showArs,
+                ),
               ],
             ),
           ),
@@ -280,7 +294,11 @@ class ProductCard extends StatelessWidget {
     );
   }
 
-  Widget _buildGridBody(BuildContext context, ProductPrices prices) {
+  Widget _buildGridBody(
+    BuildContext context,
+    ProductPrices prices, {
+    required bool showArs,
+  }) {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
       child: Column(
@@ -318,7 +336,11 @@ class ProductCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          ProductPricesPanel(prices: prices, compact: true),
+          ProductPricesPanel(
+            prices: prices,
+            compact: true,
+            showArs: showArs,
+          ),
         ],
       ),
     );

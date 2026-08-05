@@ -136,10 +136,13 @@ class ComprobantePdfService {
       branding: branding,
     );
 
-    await SupabaseService.client
-        .from('ventas')
-        .update({'pdf_path': path})
-        .eq('id', sale.id);
+    await SupabaseService.client.rpc(
+      'set_venta_pdf_path',
+      params: {
+        'p_venta_id': sale.id,
+        'p_path': path,
+      },
+    );
 
     return path;
   }

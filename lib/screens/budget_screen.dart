@@ -291,7 +291,6 @@ class _BudgetScreenState extends State<BudgetScreen> {
     setState(() => _finalizing = true);
     final snapshot = budget.copyWithCustomer(_customer);
     final sellerId = context.read<SellerService>().selected?.id;
-    final exchangeRate = context.read<ExchangeRateService>().rate;
     final catalog = context.read<CatalogService>();
 
     try {
@@ -303,7 +302,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
         await SupabaseSalesRepository(catalog: catalog).insert(
           snapshot,
           sellerId: sellerId,
-          exchangeRate: exchangeRate,
+          pricingSettings: context.read<PricingSettingsService>(),
           branding: resolvePresupuestoBranding(
             context.read<TenantSessionService>(),
           ),

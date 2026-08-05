@@ -93,6 +93,10 @@ class TenantSessionService extends ChangeNotifier {
   bool get isSellerPortalSession =>
       isSignedIn && _appRole == 'seller' && effectiveTenantId != null;
 
+  /// Dueño/admin de membership (JWT). El PIN local no cambia este valor (AR-9).
+  bool get isTenantManager =>
+      isSignedIn && (_appRole == 'owner' || _appRole == 'admin');
+
   bool get busy => _busy;
   String? get error => _error;
 
