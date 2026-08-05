@@ -10,14 +10,15 @@ import '../../services/comprobante_pdf_service.dart';
 import '../../services/sales_metrics_service.dart';
 import '../../services/stock_cierre_service.dart';
 import '../../services/supabase_service.dart';
+import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/presupuesto/presupuesto_paper.dart';
 import '../../utils/formatters.dart';
+import '../../widgets/admin_date_filter.dart';
 import '../../widgets/feria_shell.dart';
 import '../../widgets/section_header.dart';
 
 enum _FacturadaFilter { todos, pendientes, facturados }
-
-enum _DateMode { dia, rango }
 
 /// Listado de comprobantes con control de facturación AFIP.
 class AdminComprobantesScreen extends StatefulWidget {
@@ -38,7 +39,7 @@ class _AdminComprobantesScreenState extends State<AdminComprobantesScreen> {
   late DateTime _selectedDay;
   DateTime? _rangeFrom;
   DateTime? _rangeTo;
-  _DateMode _dateMode = _DateMode.dia;
+  AdminDateMode _dateMode = AdminDateMode.dia;
   _FacturadaFilter _filter = _FacturadaFilter.todos;
 
   List<SaleRecord> _sales = const [];
@@ -88,7 +89,7 @@ class _AdminComprobantesScreenState extends State<AdminComprobantesScreen> {
   }
 
   DateTime get _queryStart {
-    if (_dateMode == _DateMode.dia) {
+    if (_dateMode == AdminDateMode.dia) {
       return DateTime(_selectedDay.year, _selectedDay.month, _selectedDay.day);
     }
     final from = _rangeFrom ?? _selectedDay;
@@ -96,7 +97,7 @@ class _AdminComprobantesScreenState extends State<AdminComprobantesScreen> {
   }
 
   DateTime get _queryEnd {
-    if (_dateMode == _DateMode.dia) {
+    if (_dateMode == AdminDateMode.dia) {
       return _queryStart.add(const Duration(days: 1));
     }
     final to = _rangeTo ?? _rangeFrom ?? _selectedDay;
@@ -344,7 +345,7 @@ class _AdminComprobantesScreenState extends State<AdminComprobantesScreen> {
   }
 
   String _fileStamp() {
-    if (_dateMode == _DateMode.dia) {
+    if (_dateMode == AdminDateMode.dia) {
       final d = _selectedDay;
       return '${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
     }
@@ -450,7 +451,7 @@ class _AdminComprobantesScreenState extends State<AdminComprobantesScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
                 children: [
-                  _DateModeSelector(
+                  AdminDateModeSelector(
                     mode: _dateMode,
                     onChanged: (mode) {
                       setState(() => _dateMode = mode);
@@ -458,10 +459,10 @@ class _AdminComprobantesScreenState extends State<AdminComprobantesScreen> {
                     },
                   ),
                   const SizedBox(height: 10),
-                  if (_dateMode == _DateMode.dia)
-                    _DateChip(date: _selectedDay, onTap: _pickDay)
+                  if (_dateMode == AdminDateMode.dia)
+                    AdminDateChip(date: _selectedDay, onTap: _pickDay)
                   else
-                    _RangeChips(
+                    AdminRangeChips(
                       from: _rangeFrom ?? _selectedDay,
                       to: _rangeTo ?? _rangeFrom ?? _selectedDay,
                       onPickFrom: () => _pickRange(isFrom: true),
@@ -599,7 +600,10 @@ class _AdminComprobanteDetailScreenState
   Future<void> _viewPdf() async {
     setState(() => _pdfBusy = true);
     try {
-      await _pdfService.viewSalePdf(_effectiveSale);
+      final branding = resolvePresupuestoBranding(
+        context.read<TenantSessionService>(),
+      );
+      await _pdfService.viewSalePdf(_effectiveSale, branding: branding);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -613,7 +617,10 @@ class _AdminComprobanteDetailScreenState
   Future<void> _sharePdf() async {
     setState(() => _pdfBusy = true);
     try {
-      await _pdfService.shareSalePdf(_effectiveSale);
+      final branding = resolvePresupuestoBranding(
+        context.read<TenantSessionService>(),
+      );
+      await _pdfService.shareSalePdf(_effectiveSale, branding: branding);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -627,7 +634,13 @@ class _AdminComprobanteDetailScreenState
   Future<void> _savePdfToCloud() async {
     setState(() => _pdfBusy = true);
     try {
-      final path = await _pdfService.ensureStoredForSale(_effectiveSale);
+      final branding = resolvePresupuestoBranding(
+        context.read<TenantSessionService>(),
+      );
+      final path = await _pdfService.ensureStoredForSale(
+        _effectiveSale,
+        branding: branding,
+      );
       if (!mounted) return;
       setState(() => _pdfPathOverride = path);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -960,54 +973,6 @@ class _SummaryChip extends StatelessWidget {
   }
 }
 
-class _DateModeSelector extends StatelessWidget {
-  const _DateModeSelector({required this.mode, required this.onChanged});
-
-  final _DateMode mode;
-  final ValueChanged<_DateMode> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return SegmentedButton<_DateMode>(
-      segments: const [
-        ButtonSegment(value: _DateMode.dia, label: Text('Un día')),
-        ButtonSegment(value: _DateMode.rango, label: Text('Rango')),
-      ],
-      selected: {mode},
-      onSelectionChanged: (values) => onChanged(values.first),
-    );
-  }
-}
-
-class _RangeChips extends StatelessWidget {
-  const _RangeChips({
-    required this.from,
-    required this.to,
-    required this.onPickFrom,
-    required this.onPickTo,
-  });
-
-  final DateTime from;
-  final DateTime to;
-  final VoidCallback onPickFrom;
-  final VoidCallback onPickTo;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _DateChip(label: 'Desde', date: from, onTap: onPickFrom),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _DateChip(label: 'Hasta', date: to, onTap: onPickTo),
-        ),
-      ],
-    );
-  }
-}
-
 class _FacturadaFilterBar extends StatelessWidget {
   const _FacturadaFilterBar({required this.filter, required this.onChanged});
 
@@ -1037,56 +1002,6 @@ class _FacturadaFilterBar extends StatelessWidget {
       ],
     );
   }
-}
-
-class _DateChip extends StatelessWidget {
-  const _DateChip({
-    required this.date,
-    required this.onTap,
-    this.label,
-  });
-
-  final DateTime date;
-  final VoidCallback onTap;
-  final String? label;
-
-  @override
-  Widget build(BuildContext context) {
-    final isToday = _isSameDay(date, DateTime.now());
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.calendar_today_rounded, color: AppColors.goldDark),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  label != null
-                      ? '$label · ${formatDate(date)}'
-                      : (isToday ? 'Hoy · ${formatDate(date)}' : formatDate(date)),
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                ),
-              ),
-              const Icon(Icons.chevron_right_rounded),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  bool _isSameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
 }
 
 class _ComprobanteListTile extends StatelessWidget {

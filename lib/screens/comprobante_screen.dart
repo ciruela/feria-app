@@ -6,6 +6,7 @@ import '../models/budget.dart';
 import '../models/budget_customer_controllers.dart';
 import '../screens/category_catalog_screen.dart';
 import '../services/cart_service.dart';
+import '../services/tenant_session_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/presupuesto_exporter.dart';
 import '../utils/presupuesto_pdf.dart';
@@ -41,7 +42,10 @@ class _ComprobanteScreenState extends State<ComprobanteScreen> {
 
   Future<void> _exportPdf() async {
     try {
-      await PresupuestoPdf.share(budget);
+      final branding = resolvePresupuestoBranding(
+        context.read<TenantSessionService>(),
+      );
+      await PresupuestoPdf.share(budget, branding: branding);
     } catch (error) {
       if (!mounted) return;
       _showMessage('No se pudo exportar el PDF: $error');
@@ -50,7 +54,10 @@ class _ComprobanteScreenState extends State<ComprobanteScreen> {
 
   Future<void> _printBudget() async {
     try {
-      await PresupuestoPdf.printBudget(budget);
+      final branding = resolvePresupuestoBranding(
+        context.read<TenantSessionService>(),
+      );
+      await PresupuestoPdf.printBudget(budget, branding: branding);
     } catch (error) {
       if (!mounted) return;
       _showMessage('No se pudo imprimir: $error');
@@ -58,8 +65,11 @@ class _ComprobanteScreenState extends State<ComprobanteScreen> {
   }
 
   Future<void> _copyText() async {
+    final branding = resolvePresupuestoBranding(
+      context.read<TenantSessionService>(),
+    );
     await Clipboard.setData(
-      ClipboardData(text: PresupuestoExporter.toPlainText(budget)),
+      ClipboardData(text: PresupuestoExporter.toPlainText(budget, branding: branding)),
     );
     if (!mounted) return;
     _showMessage('Comprobante copiado');
@@ -159,8 +169,7 @@ class _ComprobanteScreenState extends State<ComprobanteScreen> {
                 padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
                 children: [
                   Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 820),
+                    child: PresupuestoA4Preview(
                       child: Material(
                         elevation: 6,
                         shadowColor: Colors.black.withValues(alpha: 0.25),

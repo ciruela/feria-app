@@ -67,6 +67,7 @@ class BudgetCustomer {
     this.cluExpiry = '',
     this.phone = '',
     this.email = '',
+    this.fiscalCondition = '',
     this.address = '',
     this.city = '',
     this.notes = '',
@@ -78,9 +79,20 @@ class BudgetCustomer {
   final String cluExpiry;
   final String phone;
   final String email;
+  /// Condición fiscal en recibo Urban (ej. Cons. final).
+  final String fiscalCondition;
   final String address;
   final String city;
   final String notes;
+
+  /// Domicilio para comprobantes que usan una sola línea (Urban).
+  String get domicilioLine {
+    final parts = [
+      address.trim(),
+      city.trim(),
+    ].where((part) => part.isNotEmpty);
+    return parts.join(' · ');
+  }
 
   BudgetCustomer copyWith({
     String? fullName,
@@ -89,6 +101,7 @@ class BudgetCustomer {
     String? cluExpiry,
     String? phone,
     String? email,
+    String? fiscalCondition,
     String? address,
     String? city,
     String? notes,
@@ -100,6 +113,7 @@ class BudgetCustomer {
       cluExpiry: cluExpiry ?? this.cluExpiry,
       phone: phone ?? this.phone,
       email: email ?? this.email,
+      fiscalCondition: fiscalCondition ?? this.fiscalCondition,
       address: address ?? this.address,
       city: city ?? this.city,
       notes: notes ?? this.notes,

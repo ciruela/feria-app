@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';
 import '../models/budget.dart';
+import '../models/presupuesto_branding.dart';
 import '../models/sale_record.dart';
 import '../utils/app_logger.dart';
 import '../utils/jwt.dart';
@@ -17,12 +18,13 @@ class ComprobantePdfService {
     String saleId,
     Budget budget, {
     String? tenantId,
+    required PresupuestoBranding branding,
   }) async {
     if (!SupabaseService.isConfigured) {
       throw StateError('Supabase no configurado');
     }
 
-    final bytes = await PresupuestoPdf.generate(budget);
+    final bytes = await PresupuestoPdf.generate(budget, branding: branding);
     final path = storagePath(
       saleId: saleId,
       date: budget.date,
@@ -77,29 +79,38 @@ class ComprobantePdfService {
     }
   }
 
-  Future<Uint8List> bytesForSale(SaleRecord sale) async {
+  Future<Uint8List> bytesForSale(
+    SaleRecord sale, {
+    required PresupuestoBranding branding,
+  }) async {
     if (sale.hasPdf) {
       return fetchPdfBytes(sale.pdfPath!);
     }
-    return PresupuestoPdf.generate(sale.toBudget());
+    return PresupuestoPdf.generate(sale.toBudget(), branding: branding);
   }
 
-  Future<void> viewSalePdf(SaleRecord sale) async {
-    final bytes = await bytesForSale(sale);
+  Future<void> viewSalePdf(
+    SaleRecord sale, {
+    required PresupuestoBranding branding,
+  }) async {
+    final bytes = await bytesForSale(sale, branding: branding);
     final name = sale.hasPdf
         ? sale.pdfPath!.split('/').last
-        : PresupuestoPdf.fileName(sale.toBudget());
+        : PresupuestoPdf.fileName(sale.toBudget(), branding: branding);
     await Printing.layoutPdf(
       name: name,
       onLayout: (_) async => bytes,
     );
   }
 
-  Future<void> shareSalePdf(SaleRecord sale) async {
-    final bytes = await bytesForSale(sale);
+  Future<void> shareSalePdf(
+    SaleRecord sale, {
+    required PresupuestoBranding branding,
+  }) async {
+    final bytes = await bytesForSale(sale, branding: branding);
     final name = sale.hasPdf
         ? sale.pdfPath!.split('/').last
-        : PresupuestoPdf.fileName(sale.toBudget());
+        : PresupuestoPdf.fileName(sale.toBudget(), branding: branding);
     await Printing.sharePdf(bytes: bytes, filename: name);
   }
 
@@ -107,6 +118,7 @@ class ComprobantePdfService {
   Future<String> ensureStoredForSale(
     SaleRecord sale, {
     String? tenantId,
+    required PresupuestoBranding branding,
   }) async {
     if (sale.hasPdf) return sale.pdfPath!;
 
@@ -121,6 +133,7 @@ class ComprobantePdfService {
       sale.id,
       budget,
       tenantId: resolvedTenant,
+      branding: branding,
     );
 
     await SupabaseService.client

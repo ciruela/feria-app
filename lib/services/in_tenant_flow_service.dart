@@ -36,6 +36,11 @@ class InTenantFlowService extends ChangeNotifier {
     notifyListeners();
   }
 
+  void backToRoleGate() {
+    _phase = TenantAppPhase.roleGate;
+    notifyListeners();
+  }
+
   void openEmployeeHome() {
     _phase = TenantAppPhase.employeeHome;
     notifyListeners();

@@ -119,7 +119,8 @@ void main() {
 
   group('CierreResumen', () {
     final resumen = CierreResumen(
-      day: DateTime(2026, 1, 1),
+      startDate: DateTime(2026, 1, 1),
+      endDate: DateTime(2026, 1, 1),
       lines: [
         _line(
             product: _municion('m1', rpb: 50),
@@ -147,10 +148,26 @@ void main() {
 
     test('resumen vacío cuando no hay actividad', () {
       final vacio = CierreResumen(
-        day: DateTime(2026, 1, 1),
+        startDate: DateTime(2026, 1, 1),
+        endDate: DateTime(2026, 1, 1),
         lines: [_line(product: _municion('m3', rpb: 50), cierre: 3)],
       );
       expect(vacio.isEmpty, isTrue);
+    });
+
+    test('isSingleDay distingue un día vs rango', () {
+      final single = CierreResumen(
+        startDate: DateTime(2026, 8, 4),
+        endDate: DateTime(2026, 8, 4),
+        lines: const [],
+      );
+      final range = CierreResumen(
+        startDate: DateTime(2026, 8, 2),
+        endDate: DateTime(2026, 8, 4),
+        lines: const [],
+      );
+      expect(single.isSingleDay, isTrue);
+      expect(range.isSingleDay, isFalse);
     });
   });
 
@@ -174,7 +191,8 @@ void main() {
   group('exportToExcel', () {
     test('genera bytes no vacíos', () {
       final resumen = CierreResumen(
-        day: DateTime(2026, 1, 1),
+        startDate: DateTime(2026, 1, 1),
+        endDate: DateTime(2026, 1, 1),
         lines: [
           _line(
               product: _municion('m1', rpb: 50),
@@ -189,7 +207,8 @@ void main() {
 
     test('exportCierreCompleto genera bytes con ventas y stock', () {
       final resumen = CierreResumen(
-        day: DateTime(2026, 1, 1),
+        startDate: DateTime(2026, 1, 1),
+        endDate: DateTime(2026, 1, 1),
         lines: [
           _line(
             product: _municion('m1', rpb: 50),
@@ -210,6 +229,55 @@ void main() {
         ventas: const [],
         stockAlCierre: stock,
       );
+      expect(bytes.length, greaterThan(0));
+    });
+
+    test('exportCierreCompleto con rango de fechas genera bytes', () {
+      final resumen = CierreResumen(
+        startDate: DateTime(2026, 8, 2),
+        endDate: DateTime(2026, 8, 4),
+        lines: [
+          _line(
+            product: _municion('m1', rpb: 50),
+            apertura: 5,
+            vendido: 2,
+            cierre: 3,
+          ),
+        ],
+      );
+      final bytes = StockCierreService().exportCierreCompleto(
+        resumen: resumen,
+        ventas: const [],
+        stockAlCierre: const StockAlCierre(
+          cajasMunicion: 0,
+          balasMunicion: 0,
+          unidadesArmas: 0,
+          productosConStock: 0,
+        ),
+      );
+      expect(bytes.length, greaterThan(0));
+    });
+
+    test('exportVentasList genera bytes con comprobantes', () {
+      final bytes = StockCierreService().exportVentasList(const []);
+      expect(bytes.length, greaterThan(0));
+    });
+
+    test('exportMovimientosExcel genera bytes', () {
+      final resumen = CierreResumen(
+        startDate: DateTime(2026, 1, 1),
+        endDate: DateTime(2026, 1, 1),
+        lines: [
+          _line(
+            product: _municion('m1', rpb: 50),
+            apertura: 5,
+            vendido: 2,
+            carga: 1,
+            cierre: 4,
+          ),
+        ],
+      );
+      final bytes = StockCierreService().exportMovimientosExcel(resumen);
       expect(bytes.length, greaterThan(0));
     });
   });

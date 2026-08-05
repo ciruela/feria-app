@@ -129,6 +129,7 @@ class SaleRecord {
       cluExpiry: raw['cluExpiry'] as String? ?? '',
       phone: raw['phone'] as String? ?? '',
       email: raw['email'] as String? ?? '',
+      fiscalCondition: raw['fiscalCondition'] as String? ?? '',
       address: raw['address'] as String? ?? '',
       city: raw['city'] as String? ?? '',
       notes: raw['notes'] as String? ?? '',

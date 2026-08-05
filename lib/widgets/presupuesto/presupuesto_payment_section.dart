@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../models/presupuesto_branding.dart';
 import '../../models/presupuesto_document.dart';
 import '../../models/presupuesto_summary.dart';
 
@@ -7,12 +8,31 @@ class PresupuestoTotalsSection extends StatelessWidget {
   const PresupuestoTotalsSection({
     super.key,
     required this.summary,
+    this.compact = false,
   });
 
   final PresupuestoSummary summary;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    if (compact) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          const Text(
+            'Total:',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            summary.formattedCombinedTotal,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+          ),
+        ],
+      );
+    }
+
     final totals = <Widget>[];
 
     if (summary.hasUsdTotal) {
@@ -76,29 +96,40 @@ class _TotalBox extends StatelessWidget {
 class PresupuestoPaymentSection extends StatelessWidget {
   const PresupuestoPaymentSection({
     super.key,
+    required this.branding,
     required this.summary,
   });
 
+  final PresupuestoBranding branding;
   final PresupuestoSummary summary;
 
   @override
   Widget build(BuildContext context) {
+    if (!branding.showsPaymentChecks) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (summary.paymentAllocationLines.isNotEmpty) ...[
-          _PaymentAllocationSection(lines: summary.paymentAllocationLines),
+          _PaymentAllocationSection(
+            branding: branding,
+            lines: summary.paymentAllocationLines,
+          ),
           const SizedBox(height: 8),
         ],
-        _PaymentChecks(summary: summary),
+        _PaymentChecks(branding: branding, summary: summary),
       ],
     );
   }
 }
 
 class _PaymentAllocationSection extends StatelessWidget {
-  const _PaymentAllocationSection({required this.lines});
+  const _PaymentAllocationSection({
+    required this.branding,
+    required this.lines,
+  });
 
+  final PresupuestoBranding branding;
   final List<PaymentAllocationLine> lines;
 
   @override
@@ -111,9 +142,9 @@ class _PaymentAllocationSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            PresupuestoBranding.paymentAllocationTitle,
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900),
+          Text(
+            branding.paymentAllocationTitle,
+            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 6),
           ...lines.map(
@@ -135,8 +166,12 @@ class _PaymentAllocationSection extends StatelessWidget {
 }
 
 class _PaymentChecks extends StatelessWidget {
-  const _PaymentChecks({required this.summary});
+  const _PaymentChecks({
+    required this.branding,
+    required this.summary,
+  });
 
+  final PresupuestoBranding branding;
   final PresupuestoSummary summary;
 
   @override
@@ -155,9 +190,9 @@ class _PaymentChecks extends StatelessWidget {
         const SizedBox(height: 6),
         Row(
           children: [
-            const Text(
-              PresupuestoBranding.creditCardsTitle,
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900),
+            Text(
+              branding.creditCardsTitle,
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900),
             ),
             const SizedBox(width: 8),
             Expanded(

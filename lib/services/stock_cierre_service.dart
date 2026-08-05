@@ -42,12 +42,19 @@ class CierreLine {
 
 class CierreResumen {
   const CierreResumen({
-    required this.day,
+    required this.startDate,
+    required this.endDate,
     required this.lines,
   });
 
-  final DateTime day;
+  final DateTime startDate;
+  final DateTime endDate;
   final List<CierreLine> lines;
+
+  bool get isSingleDay =>
+      startDate.year == endDate.year &&
+      startDate.month == endDate.month &&
+      startDate.day == endDate.day;
 
   Iterable<CierreLine> get municion => lines.where((l) => l.isMunicion);
   Iterable<CierreLine> get armas => lines.where((l) => !l.isMunicion);
@@ -93,7 +100,20 @@ class StockCierreService {
     DateTime day,
     List<Product> products,
   ) async {
-    final movimientos = await _movimientos.fetchForDay(day);
+    final start = DateTime(day.year, day.month, day.day);
+    final end = start.add(const Duration(days: 1));
+    return cierreForRange(start, end, products, endDateInclusive: day);
+  }
+
+  Future<CierreResumen> cierreForRange(
+    DateTime start,
+    DateTime end,
+    List<Product> products, {
+    DateTime? endDateInclusive,
+  }) async {
+    final movimientos = await _movimientos.fetchForRange(start, end);
+    final inclusiveEnd = endDateInclusive ??
+        end.subtract(const Duration(days: 1));
 
     final byProduct = <String, List<StockMovimiento>>{};
     for (final mov in movimientos) {
@@ -133,7 +153,11 @@ class StockCierreService {
       return a.product.codigo.compareTo(b.product.codigo);
     });
 
-    return CierreResumen(day: day, lines: lines);
+    return CierreResumen(
+      startDate: start,
+      endDate: inclusiveEnd,
+      lines: lines,
+    );
   }
 
   /// Expuesto para tests unitarios de reconciliación.
@@ -291,8 +315,12 @@ class StockCierreService {
       }
     }
 
+    final periodLabel = resumen.isSingleDay
+        ? _formatDay(resumen.startDate)
+        : '${_formatDay(resumen.startDate)} — ${_formatDay(resumen.endDate)}';
+
     final rows = <List<String>>[
-      ['Fecha', _formatDay(resumen.day)],
+      ['Período', periodLabel],
       ['Comprobantes', '$comprobantes'],
       ['Facturadas', '$facturadas'],
       ['Pendientes facturar', '$pendientes'],

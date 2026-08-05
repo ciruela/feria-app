@@ -39,22 +39,49 @@ Budget _sampleBudget() {
 }
 
 void main() {
-  test('pads table rows to paperRows', () {
-    final document = PresupuestoDocument.fromBudget(_sampleBudget());
+  test('pads table rows to paperRows for world guns', () {
+    final document = PresupuestoDocument.fromBudget(
+      _sampleBudget(),
+      branding: PresupuestoBranding.worldGuns,
+    );
 
-    expect(document.tableRows, hasLength(PresupuestoBranding.paperRows));
+    expect(document.tableRows, hasLength(PresupuestoBranding.worldGuns.paperRows));
     expect(document.tableRows.first.code, 'M001');
     expect(document.tableRows[1].isEmpty, isTrue);
   });
 
+  test('pads table rows to urban paperRows', () {
+    final document = PresupuestoDocument.fromBudget(
+      _sampleBudget(),
+      branding: PresupuestoBranding.urbanTactical,
+    );
+
+    expect(
+      document.tableRows,
+      hasLength(PresupuestoBranding.urbanTactical.paperRows),
+    );
+  });
+
   test('formats date parts and summary', () {
-    final document = PresupuestoDocument.fromBudget(_sampleBudget());
+    final document = PresupuestoDocument.fromBudget(
+      _sampleBudget(),
+      branding: PresupuestoBranding.worldGuns,
+    );
 
     expect(document.day, '22');
     expect(document.month, '07');
     expect(document.year, '2026');
     expect(document.summary.paymentAllocationLines, hasLength(1));
     expect(document.summary.primaryPaymentChecks.length, 5);
+  });
+
+  test('urban uses single-line formatted date', () {
+    final document = PresupuestoDocument.fromBudget(
+      _sampleBudget(),
+      branding: PresupuestoBranding.urbanTactical,
+    );
+
+    expect(document.formattedDate, '22 jul 2026');
   });
 
   test('includes serial in detailWithSerial', () {
@@ -85,8 +112,8 @@ void main() {
     expect(row.detailWithSerial, contains('SERIE: ABC123'));
   });
 
-  test('table headers include TC between detalle and unit price', () {
-    expect(PresupuestoBranding.tableHeaders, [
+  test('world guns table headers include TC between detalle and unit price', () {
+    expect(PresupuestoBranding.worldGuns.tableHeaders, [
       'COD',
       'CANT',
       'DETALLE',
@@ -94,6 +121,31 @@ void main() {
       'P. UNIT',
       'IMPORTE',
     ]);
+  });
+
+  test('urban table headers are concepto/cant/valor', () {
+    expect(PresupuestoBranding.urbanTactical.tableHeaders, [
+      'Concepto',
+      'Cant',
+      'Valor',
+    ]);
+  });
+
+  test('resolves branding by tenant slug', () {
+    expect(
+      PresupuestoBranding.forTenant(slug: 'world-guns').kind,
+      PresupuestoTemplateKind.worldGuns,
+    );
+    expect(
+      PresupuestoBranding.forTenant(slug: 'urban-tactical').kind,
+      PresupuestoTemplateKind.urbanTactical,
+    );
+    final generic = PresupuestoBranding.forTenant(
+      slug: 'nueva-armeria',
+      displayName: 'Nueva Armería',
+    );
+    expect(generic.kind, PresupuestoTemplateKind.standard);
+    expect(generic.companyName, 'NUEVA ARMERÍA');
   });
 
   test('TC muestra tarjeta de consumo por línea', () {

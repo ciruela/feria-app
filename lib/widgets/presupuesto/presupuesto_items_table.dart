@@ -3,23 +3,193 @@ import 'package:flutter/services.dart';
 
 import '../../models/presupuesto_document.dart';
 import '../../utils/uppercase_input.dart';
+import 'urban_table_watermark.dart';
 
 class PresupuestoItemsTable extends StatelessWidget {
   const PresupuestoItemsTable({
     super.key,
+    required this.branding,
     required this.rows,
     required this.readOnly,
     required this.onSerialChanged,
     required this.onTcChanged,
+    this.bodyHeight,
   });
 
+  final PresupuestoBranding branding;
   final List<PresupuestoItemRow> rows;
   final bool readOnly;
   final void Function(String lineKey, String value) onSerialChanged;
   final void Function(String lineKey, String value) onTcChanged;
+  final double? bodyHeight;
+
+  static const _headerHeight = 26.0;
+
+  static double rowHeightFor({
+    required double bodyHeight,
+    required int rowCount,
+  }) {
+    if (rowCount <= 0) return 22;
+    return ((bodyHeight - _headerHeight) / rowCount).clamp(18, 48);
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (branding.showsDetailedTable) {
+      return _DetailedItemsTable(
+        branding: branding,
+        rows: rows,
+        readOnly: readOnly,
+        onSerialChanged: onSerialChanged,
+        onTcChanged: onTcChanged,
+        bodyHeight: bodyHeight,
+      );
+    }
+
+    return _SimpleItemsTable(
+      branding: branding,
+      rows: rows,
+      readOnly: readOnly,
+      onSerialChanged: onSerialChanged,
+      bodyHeight: bodyHeight,
+    );
+  }
+}
+
+class _SimpleItemsTable extends StatelessWidget {
+  const _SimpleItemsTable({
+    required this.branding,
+    required this.rows,
+    required this.readOnly,
+    required this.onSerialChanged,
+    this.bodyHeight,
+  });
+
+  final PresupuestoBranding branding;
+  final List<PresupuestoItemRow> rows;
+  final bool readOnly;
+  final void Function(String lineKey, String value) onSerialChanged;
+  final double? bodyHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final rowHeight = bodyHeight == null
+        ? (branding.isUrban ? 28.0 : 22.0)
+        : PresupuestoItemsTable.rowHeightFor(
+            bodyHeight: bodyHeight!,
+            rowCount: rows.length,
+          );
+
+    return UrbanTableWatermark(
+      branding: branding,
+      child: Table(
+        border: TableBorder.all(color: Colors.black, width: 1.2),
+        columnWidths: const {
+          0: FlexColumnWidth(),
+          1: FixedColumnWidth(52),
+          2: FixedColumnWidth(96),
+        },
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+        children: [
+          TableRow(
+            decoration: BoxDecoration(color: Colors.grey.shade300),
+            children: [
+              for (final header in branding.tableHeaders)
+                SizedBox(
+                  height: PresupuestoItemsTable._headerHeight,
+                  child: _HeaderCell(header),
+                ),
+            ],
+          ),
+          ...rows.map((row) {
+            final cellHeight =
+                row.isArma ? (rowHeight + 16).clamp(rowHeight, 52.0) : rowHeight;
+
+            if (row.isEmpty) {
+              return TableRow(
+                children: List.generate(
+                  3,
+                  (_) => SizedBox(
+                    height: rowHeight,
+                    child: const _BodyCell(''),
+                  ),
+                ),
+              );
+            }
+
+            return TableRow(
+              children: [
+                SizedBox(
+                  height: cellHeight,
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          row.detail,
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (row.isArma) ...[
+                          const SizedBox(height: 4),
+                          _SerialInlineField(
+                            lineKey: row.lineKey,
+                            initialValue: row.serialNumber,
+                            readOnly: readOnly,
+                            onChanged: onSerialChanged,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  height: cellHeight,
+                  child: _BodyCell('${row.quantity}', align: TextAlign.center),
+                ),
+                SizedBox(
+                  height: cellHeight,
+                  child: _BodyCell(row.lineTotal, align: TextAlign.right),
+                ),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailedItemsTable extends StatelessWidget {
+  const _DetailedItemsTable({
+    required this.branding,
+    required this.rows,
+    required this.readOnly,
+    required this.onSerialChanged,
+    required this.onTcChanged,
+    this.bodyHeight,
+  });
+
+  final PresupuestoBranding branding;
+  final List<PresupuestoItemRow> rows;
+  final bool readOnly;
+  final void Function(String lineKey, String value) onSerialChanged;
+  final void Function(String lineKey, String value) onTcChanged;
+  final double? bodyHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final rowHeight = bodyHeight == null
+        ? 22.0
+        : PresupuestoItemsTable.rowHeightFor(
+            bodyHeight: bodyHeight!,
+            rowCount: rows.length,
+          );
+
     return Table(
       border: TableBorder.all(color: Colors.black, width: 1.2),
       columnWidths: const {
@@ -35,68 +205,89 @@ class PresupuestoItemsTable extends StatelessWidget {
         TableRow(
           decoration: BoxDecoration(color: Colors.grey.shade300),
           children: [
-            for (final header in PresupuestoBranding.tableHeaders)
-              _HeaderCell(header),
+            for (final header in branding.tableHeaders)
+              SizedBox(
+                height: PresupuestoItemsTable._headerHeight,
+                child: _HeaderCell(header),
+              ),
           ],
         ),
-        ...rows.map(_buildRow),
+        ...rows.map((row) => _buildRow(row, rowHeight)),
       ],
     );
   }
 
-  TableRow _buildRow(PresupuestoItemRow row) {
+  TableRow _buildRow(PresupuestoItemRow row, double rowHeight) {
+    final cellHeight =
+        row.isArma ? (rowHeight + 16).clamp(rowHeight, 52.0) : rowHeight;
+
     if (row.isEmpty) {
-      return const TableRow(
-        children: [
-          _BodyCell(''),
-          _BodyCell(''),
-          _BodyCell(''),
-          _BodyCell(''),
-          _BodyCell(''),
-          _BodyCell(''),
-        ],
+      return TableRow(
+        children: List.generate(
+          6,
+          (_) => SizedBox(height: rowHeight, child: const _BodyCell('')),
+        ),
       );
     }
 
     return TableRow(
       children: [
-        _BodyCell(row.code, align: TextAlign.center),
-        _BodyCell('${row.quantity}', align: TextAlign.center),
-        Padding(
-          padding: const EdgeInsets.all(4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                row.detail,
-                style: const TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
+        SizedBox(
+          height: cellHeight,
+          child: _BodyCell(row.code, align: TextAlign.center),
+        ),
+        SizedBox(
+          height: cellHeight,
+          child: _BodyCell('${row.quantity}', align: TextAlign.center),
+        ),
+        SizedBox(
+          height: cellHeight,
+          child: Padding(
+            padding: const EdgeInsets.all(4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  row.detail,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-              if (row.isArma) ...[
-                const SizedBox(height: 4),
-                _SerialInlineField(
-                  lineKey: row.lineKey,
-                  initialValue: row.serialNumber,
-                  readOnly: readOnly,
-                  onChanged: onSerialChanged,
-                ),
+                if (row.isArma) ...[
+                  const SizedBox(height: 4),
+                  _SerialInlineField(
+                    lineKey: row.lineKey,
+                    initialValue: row.serialNumber,
+                    readOnly: readOnly,
+                    onChanged: onSerialChanged,
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.all(2),
-          child: _TcInlineField(
-            lineKey: row.lineKey,
-            initialValue: row.tc,
-            readOnly: readOnly,
-            onChanged: onTcChanged,
+        SizedBox(
+          height: cellHeight,
+          child: Padding(
+            padding: const EdgeInsets.all(2),
+            child: _TcInlineField(
+              lineKey: row.lineKey,
+              initialValue: row.tc,
+              readOnly: readOnly,
+              onChanged: onTcChanged,
+            ),
           ),
         ),
-        _BodyCell(row.unitPrice, align: TextAlign.right),
-        _BodyCell(row.lineTotal, align: TextAlign.right),
+        SizedBox(
+          height: cellHeight,
+          child: _BodyCell(row.unitPrice, align: TextAlign.right),
+        ),
+        SizedBox(
+          height: cellHeight,
+          child: _BodyCell(row.lineTotal, align: TextAlign.right),
+        ),
       ],
     );
   }

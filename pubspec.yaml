@@ -35,3 +35,4 @@ flutter:
     - assets/data/products.json
     - assets/data/sellers.json
     - assets/images/
+    - assets/branding/

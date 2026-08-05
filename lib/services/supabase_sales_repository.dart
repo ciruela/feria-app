@@ -1,6 +1,7 @@
 import '../models/audit_entry.dart';
 import '../models/budget.dart';
 import '../models/sale_record.dart';
+import '../models/presupuesto_branding.dart';
 import '../utils/app_logger.dart';
 import '../utils/jwt.dart';
 import 'audit_service.dart';
@@ -41,6 +42,7 @@ class SupabaseSalesRepository {
     Budget budget, {
     String? sellerId,
     double? exchangeRate,
+    required PresupuestoBranding branding,
   }) async {
     final quantities = _quantitiesFromBudgetLines(budget.lines);
     if (_catalog != null) {
@@ -83,6 +85,7 @@ class SupabaseSalesRepository {
         saleId: saleId,
         budget: budget,
         tenantId: tenantId,
+        branding: branding,
       );
     } catch (error, stackTrace) {
       await _rollbackSale(
@@ -268,6 +271,7 @@ class SupabaseSalesRepository {
     required String saleId,
     required Budget budget,
     String? tenantId,
+    required PresupuestoBranding branding,
   }) async {
     Object? lastError;
     StackTrace? lastStack;
@@ -278,6 +282,7 @@ class SupabaseSalesRepository {
           saleId,
           budget,
           tenantId: tenantId,
+          branding: branding,
         );
         await SupabaseService.client
             .from(_table)
@@ -325,6 +330,7 @@ class SupabaseSalesRepository {
         'cluExpiry': budget.customer.cluExpiry,
         'phone': budget.customer.phone,
         'email': budget.customer.email,
+        'fiscalCondition': budget.customer.fiscalCondition,
         'address': budget.customer.address,
         'city': budget.customer.city,
         'notes': budget.customer.notes,
