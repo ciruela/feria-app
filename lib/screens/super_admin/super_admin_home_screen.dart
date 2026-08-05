@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../services/supabase_service.dart';
+import '../../models/platform_metrics.dart';
+import '../../services/platform_metrics_service.dart';
 import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
@@ -9,9 +10,8 @@ import '../../widgets/feria_shell.dart';
 import '../../widgets/section_header.dart';
 
 /// Panel global del super admin de la plataforma (vos). Ve datos agregados de
-/// TODAS las armerias. Las metricas se calculan del lado del servidor con
-/// service-role (Edge Function `platform-metrics`), nunca con la clave en el
-/// cliente.
+/// TODAS las armerias. Preferentemente vía Edge Function `platform-metrics`;
+/// si no está deployada, agrega con RLS de platform admin.
 class SuperAdminHomeScreen extends StatefulWidget {
   const SuperAdminHomeScreen({super.key});
 
@@ -20,7 +20,8 @@ class SuperAdminHomeScreen extends StatefulWidget {
 }
 
 class _SuperAdminHomeScreenState extends State<SuperAdminHomeScreen> {
-  Map<String, dynamic>? _metrics;
+  final _service = PlatformMetricsService();
+  PlatformMetrics? _metrics;
   bool _loading = false;
   String? _error;
 
@@ -36,12 +37,10 @@ class _SuperAdminHomeScreenState extends State<SuperAdminHomeScreen> {
       _error = null;
     });
     try {
-      final res = await SupabaseService.client.functions.invoke(
-        'platform-metrics',
-      );
+      final metrics = await _service.load();
       if (!mounted) return;
       setState(() {
-        _metrics = (res.data as Map).cast<String, dynamic>();
+        _metrics = metrics;
         _loading = false;
       });
     } catch (error) {
@@ -55,7 +54,7 @@ class _SuperAdminHomeScreenState extends State<SuperAdminHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final tenants = (_metrics?['tenants'] as List<dynamic>?) ?? const [];
+    final tenants = _metrics?.tenants ?? const <PlatformTenantMetrics>[];
 
     return FeriaScaffold(
       appBar: FeriaAppBar(
@@ -89,8 +88,7 @@ class _SuperAdminHomeScreenState extends State<SuperAdminHomeScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
                 children: [
-                  if (_error != null)
-                    _ErrorCard(message: _error!),
+                  if (_error != null) _ErrorCard(message: _error!),
                   const SectionHeader(
                     title: 'Resumen de la plataforma',
                     subtitle: 'Datos agregados de todas las armerías',
@@ -109,11 +107,7 @@ class _SuperAdminHomeScreenState extends State<SuperAdminHomeScreen> {
                       style: TextStyle(color: AppColors.textSecondary),
                     )
                   else
-                    ...tenants.map(
-                      (t) => _TenantTile(
-                        data: (t as Map).cast<String, dynamic>(),
-                      ),
-                    ),
+                    ...tenants.map((tenant) => _TenantTile(tenant: tenant)),
                 ],
               ),
             ),
@@ -124,24 +118,20 @@ class _SuperAdminHomeScreenState extends State<SuperAdminHomeScreen> {
 class _StatGrid extends StatelessWidget {
   const _StatGrid({required this.metrics});
 
-  final Map<String, dynamic>? metrics;
-
-  int _int(String k) => (metrics?[k] as num?)?.toInt() ?? 0;
-  double _double(String k) => (metrics?[k] as num?)?.toDouble() ?? 0;
+  final PlatformMetrics? metrics;
 
   @override
   Widget build(BuildContext context) {
     final items = [
-      _Stat('Armerías', _int('tenant_count').toString(), Icons.store_rounded),
-      _Stat('Activas', _int('active_tenants').toString(),
+      _Stat('Armerías', '${metrics?.tenantCount ?? 0}', Icons.store_rounded),
+      _Stat('Activas', '${metrics?.activeTenants ?? 0}',
           Icons.check_circle_rounded),
-      _Stat('Vendedores', _int('seller_count').toString(),
-          Icons.badge_rounded),
-      _Stat('Ventas (total)', _int('sales_count').toString(),
+      _Stat('Vendedores', '${metrics?.sellerCount ?? 0}', Icons.badge_rounded),
+      _Stat('Ventas (total)', '${metrics?.salesCount ?? 0}',
           Icons.receipt_long_rounded),
-      _Stat('Facturado ARS', formatArs(_double('total_ars')),
+      _Stat('Facturado ARS', formatArs(metrics?.totalArs ?? 0),
           Icons.payments_rounded),
-      _Stat('Facturado USD', formatUsd(_double('total_usd')),
+      _Stat('Facturado USD', formatUsd(metrics?.totalUsd ?? 0),
           Icons.attach_money_rounded),
     ];
 
@@ -198,18 +188,12 @@ class _Stat {
 }
 
 class _TenantTile extends StatelessWidget {
-  const _TenantTile({required this.data});
+  const _TenantTile({required this.tenant});
 
-  final Map<String, dynamic> data;
+  final PlatformTenantMetrics tenant;
 
   @override
   Widget build(BuildContext context) {
-    final nombre = data['nombre'] as String? ?? 'Armería';
-    final slug = data['slug'] as String? ?? '';
-    final sales = (data['sales_count'] as num?)?.toInt() ?? 0;
-    final ars = (data['total_ars'] as num?)?.toDouble() ?? 0;
-    final activo = data['activo'] as bool? ?? true;
-
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Container(
@@ -226,11 +210,12 @@ class _TenantTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    nombre,
+                    tenant.nombre,
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                   Text(
-                    '$slug · $sales ventas · ${formatArs(ars)}',
+                    '${tenant.slug} · ${tenant.salesCount} ventas · '
+                    '${formatArs(tenant.totalArs)}',
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 13,
@@ -242,17 +227,17 @@ class _TenantTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: activo
+                color: tenant.activo
                     ? AppColors.accent.withValues(alpha: 0.15)
                     : AppColors.danger.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
-                activo ? 'ACTIVA' : 'INACTIVA',
+                tenant.activo ? 'ACTIVA' : 'INACTIVA',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
-                  color: activo ? AppColors.accent : AppColors.danger,
+                  color: tenant.activo ? AppColors.accent : AppColors.danger,
                 ),
               ),
             ),

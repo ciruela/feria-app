@@ -690,7 +690,21 @@ class TenantSessionService extends ChangeNotifier {
     if (!canAccessPlatformAdmin) return;
     _view = WorkspaceView.platform;
     _preferWorkspaceSelector = false;
+    _selectedTenantId = null;
     notifyListeners();
+    unawaited(_refreshSessionForPlatformView());
+  }
+
+  Future<void> _refreshSessionForPlatformView() async {
+    if (!isConfigured || !isSignedIn) return;
+    try {
+      await SupabaseService.client.auth.refreshSession();
+      _readClaims();
+      notifyListeners();
+    } catch (e, s) {
+      AppLogger.warn('refreshSession en panel plataforma falló',
+          error: e, stackTrace: s);
+    }
   }
 
   List<TenantOption> _applyUrlTenantBinding(List<TenantOption> loaded) {
