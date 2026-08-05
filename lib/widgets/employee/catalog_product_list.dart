@@ -168,14 +168,14 @@ class CatalogProductTable extends StatelessWidget {
           decoration: const BoxDecoration(
             border: Border(bottom: BorderSide(color: AppColors.border)),
           ),
-          child: Row(
+          child: const Row(
             children: [
               Expanded(flex: 4, child: _HeaderCell('PRODUCTO')),
               Expanded(flex: 2, child: _HeaderCell('CÓDIGO')),
               Expanded(flex: 2, child: _HeaderCell('STOCK')),
               Expanded(flex: 2, child: _HeaderCell('USD')),
               Expanded(flex: 2, child: _HeaderCell('LISTA')),
-              const SizedBox(width: 88),
+              SizedBox(width: 88),
             ],
           ),
         ),

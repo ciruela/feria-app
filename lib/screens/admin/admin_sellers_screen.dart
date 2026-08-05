@@ -70,11 +70,14 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
 
     if (name == null || name.trim().isEmpty || !mounted) return;
 
+    final tenantSession = context.read<TenantSessionService>();
+    final sellerService = context.read<SellerService>();
+
     try {
       if (AppConfig.useSupabase) {
-        await context.read<TenantSessionService>().ensureSupabaseWriteContext();
+        await tenantSession.ensureSupabaseWriteContext();
       }
-      await context.read<SellerService>().addSeller(name);
+      await sellerService.addSeller(name);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${name.trim()} agregado')),
@@ -97,11 +100,14 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
     if (name == null || name.trim().isEmpty || !mounted) return;
     if (name.trim().toLowerCase() == seller.nombre.toLowerCase()) return;
 
+    final tenantSession = context.read<TenantSessionService>();
+    final sellerService = context.read<SellerService>();
+
     try {
       if (AppConfig.useSupabase) {
-        await context.read<TenantSessionService>().ensureSupabaseWriteContext();
+        await tenantSession.ensureSupabaseWriteContext();
       }
-      await context.read<SellerService>().updateSellerName(seller.id, name);
+      await sellerService.updateSellerName(seller.id, name);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Nombre actualizado a ${name.trim()}')),
@@ -142,11 +148,14 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
 
     if (ok != true || !mounted) return;
 
+    final tenantSession = context.read<TenantSessionService>();
+    final sellerService = context.read<SellerService>();
+
     try {
       if (AppConfig.useSupabase) {
-        await context.read<TenantSessionService>().ensureSupabaseWriteContext();
+        await tenantSession.ensureSupabaseWriteContext();
       }
-      await context.read<SellerService>().deleteSeller(seller.id);
+      await sellerService.deleteSeller(seller.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${seller.nombre} eliminado')),
@@ -187,11 +196,14 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
 
     if (ok != true || !mounted) return;
 
+    final tenantSession = context.read<TenantSessionService>();
+    final sellerService = context.read<SellerService>();
+
     try {
       if (AppConfig.useSupabase) {
-        await context.read<TenantSessionService>().ensureSupabaseWriteContext();
+        await tenantSession.ensureSupabaseWriteContext();
       }
-      await context.read<SellerService>().deactivateSeller(seller.id);
+      await sellerService.deactivateSeller(seller.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${seller.nombre} desactivado')),
@@ -205,11 +217,14 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
   }
 
   Future<void> _reactivate(Seller seller) async {
+    final tenantSession = context.read<TenantSessionService>();
+    final sellerService = context.read<SellerService>();
+
     try {
       if (AppConfig.useSupabase) {
-        await context.read<TenantSessionService>().ensureSupabaseWriteContext();
+        await tenantSession.ensureSupabaseWriteContext();
       }
-      await context.read<SellerService>().reactivateSeller(seller.id);
+      await sellerService.reactivateSeller(seller.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${seller.nombre} reactivado')),

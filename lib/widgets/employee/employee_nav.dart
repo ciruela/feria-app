@@ -33,7 +33,7 @@ class EmployeeSidebar extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(20, 24, 20, 28),
             child: ArmenextMonogram(size: 32),
           ),
-          _SectionLabel('OPERACIÓN'),
+          const _SectionLabel('OPERACIÓN'),
           _NavTile(
             label: 'Catálogo',
             icon: Icons.search_rounded,

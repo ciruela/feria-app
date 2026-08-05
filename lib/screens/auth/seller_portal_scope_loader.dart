@@ -55,14 +55,18 @@ class _SellerPortalScopeLoaderState extends State<SellerPortalScopeLoader> {
     context.read<SellerService>().bindTenant(tenantId);
     context.read<AuthService>().loginAs(AppRole.employee);
 
+    final catalogService = context.read<CatalogService>();
+    final exchangeRateService = context.read<ExchangeRateService>();
+    final sellerService = context.read<SellerService>();
+
     try {
       await Future.wait([
-        context.read<CatalogService>().load(),
-        context.read<ExchangeRateService>().load(),
+        catalogService.load(),
+        exchangeRateService.load(),
       ]);
 
       try {
-        await context.read<SellerService>().load();
+        await sellerService.load();
       } catch (sellerError) {
         // Si el listado remoto falla, igual podemos usar el vendedor del JWT.
         if (session.sellerId == null || session.sellerId!.isEmpty) {
@@ -73,12 +77,12 @@ class _SellerPortalScopeLoaderState extends State<SellerPortalScopeLoader> {
       final sellerId = session.sellerId;
       if (!mounted) return;
       if (sellerId != null && sellerId.isNotEmpty) {
-        final sellers = context.read<SellerService>().sellers;
+        final sellers = sellerService.sellers;
         final match = sellers.where((s) => s.id == sellerId).toList();
         if (match.isNotEmpty) {
-          await context.read<SellerService>().selectSeller(match.first);
+          await sellerService.selectSeller(match.first);
         } else if (session.sellerNombre.isNotEmpty) {
-          await context.read<SellerService>().selectSeller(
+          await sellerService.selectSeller(
                 Seller(id: sellerId, nombre: session.sellerNombre),
               );
         }
