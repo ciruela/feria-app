@@ -9,6 +9,7 @@ import '../services/exchange_rate_service.dart';
 import '../services/pricing_service.dart';
 import '../services/pricing_settings_service.dart';
 import '../services/seller_service.dart';
+import '../theme/app_theme.dart';
 import '../widgets/cart/cart_item_card.dart';
 import '../widgets/cart/cart_total_footer.dart';
 import '../widgets/cart_checkout_payment_panel.dart';
@@ -87,10 +88,10 @@ class CartScreen extends StatelessWidget {
             TextButton(
               onPressed: cart.clear,
               child: const Text(
-                'VACIAR',
+                'Vaciar',
                 style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),

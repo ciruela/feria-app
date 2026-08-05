@@ -9,10 +9,14 @@ class ProductPricesPanel extends StatelessWidget {
     super.key,
     required this.prices,
     this.compact = false,
+    this.showArs = true,
   });
 
   final ProductPrices prices;
   final bool compact;
+
+  /// Si es false, no se inventan precios ARS (AR-11: falta tipo de cambio server).
+  final bool showArs;
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +38,17 @@ class ProductPricesPanel extends StatelessWidget {
             highlight: true,
             compact: compact,
           ),
+          if (!showArs) ...[
+            const Divider(height: 18),
+            Text(
+              'Precios en pesos no disponibles: falta el tipo de cambio de esta armería.',
+              style: TextStyle(
+                color: AppColors.textMuted,
+                fontSize: compact ? 12 : 13,
+                height: 1.35,
+              ),
+            ),
+          ] else ...[
           const Divider(height: 18),
           _PriceLine(
             label: 'LISTA',
@@ -97,6 +112,7 @@ class ProductPricesPanel extends StatelessWidget {
             compact: compact,
             multiline: compact,
           ),
+          ],
         ],
       ),
     );

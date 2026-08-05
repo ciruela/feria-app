@@ -10,16 +10,23 @@ import 'supabase_service.dart';
 class ExchangeRateService extends ChangeNotifier {
   static const _rateKey = 'exchange_rate_ars';
   static const _updatedAtKey = 'exchange_rate_updated_at';
+  static const _fromServerKey = 'exchange_rate_from_server';
   static const defaultRate = 1500.0;
 
   double _rate = defaultRate;
   DateTime? _updatedAt;
+  bool _hasServerRate = false;
   RealtimeChannel? _realtimeChannel;
 
   final SupabaseConfigRepository _configRepo = SupabaseConfigRepository();
 
   double get rate => _rate;
   DateTime? get updatedAt => _updatedAt;
+
+  /// True si el tipo de cambio viene del servidor (o modo local sin Supabase).
+  /// Si es false con Supabase, no inventar precios ARS con el default 1500 (AR-11).
+  bool get hasServerRate =>
+      !SupabaseService.isConfigured || _hasServerRate;
 
   Future<void> load() async {
     await _loadFromCache();
@@ -38,10 +45,13 @@ class ExchangeRateService extends ChangeNotifier {
     final previous = _rate;
     _rate = newRate;
     _updatedAt = DateTime.now();
+    _hasServerRate = !SupabaseService.isConfigured;
     await _persistCache();
 
     if (SupabaseService.isConfigured) {
       await _configRepo.upsertExchangeRate(newRate);
+      _hasServerRate = true;
+      await _persistCache();
     }
 
     if ((previous - newRate).abs() > 0.0001) {
@@ -74,13 +84,22 @@ class ExchangeRateService extends ChangeNotifier {
     try {
       final remote = await _configRepo.fetchExchangeRate();
       if (remote == null) {
-        if (SupabaseService.client.auth.currentSession != null) {
-          await _configRepo.upsertExchangeRate(_rate);
+        // AR-11: lista vacía / sin fila del tenant ≠ "crear".
+        // No hacer upsert desde el sync (evita el bucle cada 5s).
+        if (_hasServerRate) {
+          _hasServerRate = false;
+          await _persistCache();
+          notifyListeners();
         }
         return;
       }
 
-      _applyRate(remote.rate, updatedAt: remote.updatedAt, persist: true);
+      _applyRate(
+        remote.rate,
+        updatedAt: remote.updatedAt,
+        persist: true,
+        fromServer: true,
+      );
     } catch (error) {
       debugPrint('ExchangeRateService sync: $error');
     }
@@ -109,7 +128,12 @@ class ExchangeRateService extends ChangeNotifier {
               updatedAt = DateTime.tryParse(rawUpdatedAt);
             }
 
-            _applyRate(rate, updatedAt: updatedAt, persist: true);
+            _applyRate(
+              rate,
+              updatedAt: updatedAt,
+              persist: true,
+              fromServer: true,
+            );
           },
         )
         .subscribe();
@@ -119,14 +143,19 @@ class ExchangeRateService extends ChangeNotifier {
     double rate, {
     DateTime? updatedAt,
     bool persist = false,
+    bool fromServer = false,
   }) {
     if (rate <= 0) return;
 
     final changed = (_rate - rate).abs() > 0.0001 ||
-        updatedAt != _updatedAt;
+        updatedAt != _updatedAt ||
+        (fromServer && !_hasServerRate);
 
     _rate = rate;
     _updatedAt = updatedAt ?? DateTime.now();
+    if (fromServer) {
+      _hasServerRate = true;
+    }
 
     if (persist) {
       _persistCache();
@@ -139,6 +168,7 @@ class ExchangeRateService extends ChangeNotifier {
 
   Future<void> _loadFromCache() async {
     final prefs = await SharedPreferences.getInstance();
+    _hasServerRate = prefs.getBool(_fromServerKey) ?? false;
     _rate = prefs.getDouble(_rateKey) ?? defaultRate;
     final timestamp = prefs.getInt(_updatedAtKey);
     _updatedAt = timestamp == null
@@ -149,6 +179,7 @@ class ExchangeRateService extends ChangeNotifier {
   Future<void> _persistCache() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_rateKey, _rate);
+    await prefs.setBool(_fromServerKey, _hasServerRate);
     if (_updatedAt != null) {
       await prefs.setInt(_updatedAtKey, _updatedAt!.millisecondsSinceEpoch);
     }

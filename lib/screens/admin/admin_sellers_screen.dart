@@ -502,8 +502,12 @@ class _SellerPortalAccessCardState extends State<_SellerPortalAccessCard> {
 
   Future<void> _saveCode() async {
     final code = _codeController.text.trim();
-    if (code.length < 4) {
-      setState(() => _message = 'Usá al menos 4 caracteres');
+    if (code.length < 10) {
+      setState(() => _message = 'Usá al menos 10 caracteres (letras y números)');
+      return;
+    }
+    if (!RegExp(r'^[A-Za-z0-9]+$').hasMatch(code)) {
+      setState(() => _message = 'Usá solo letras y números');
       return;
     }
 
@@ -580,7 +584,7 @@ class _SellerPortalAccessCardState extends State<_SellerPortalAccessCard> {
             obscureText: true,
             decoration: const InputDecoration(
               labelText: 'Nueva clave de vendedores',
-              hintText: 'Mínimo 4 caracteres',
+              hintText: 'Mínimo 10 caracteres (letras y números)',
               border: OutlineInputBorder(),
               filled: true,
               fillColor: AppColors.surface,

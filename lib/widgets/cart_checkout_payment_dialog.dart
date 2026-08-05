@@ -17,6 +17,38 @@ Future<CartCheckoutPayment?> showCartCheckoutPaymentDialog(
   BuildContext context, {
   CartCheckoutPayment? current,
 }) {
+  final useSheet = MediaQuery.sizeOf(context).width < 720;
+
+  if (useSheet) {
+    return showModalBottomSheet<CartCheckoutPayment>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surfaceRaised,
+      barrierColor: AppColors.scrim,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppDecorations.radiusSheet),
+        ),
+      ),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.88,
+          minChildSize: 0.5,
+          maxChildSize: 0.92,
+          builder: (_, scrollController) => _CartCheckoutPaymentDialog(
+            current: current,
+            scrollController: scrollController,
+            asSheet: true,
+          ),
+        ),
+      ),
+    );
+  }
+
   return showDialog<CartCheckoutPayment>(
     context: context,
     builder: (context) => _CartCheckoutPaymentDialog(current: current),
@@ -24,9 +56,15 @@ Future<CartCheckoutPayment?> showCartCheckoutPaymentDialog(
 }
 
 class _CartCheckoutPaymentDialog extends StatelessWidget {
-  const _CartCheckoutPaymentDialog({this.current});
+  const _CartCheckoutPaymentDialog({
+    this.current,
+    this.scrollController,
+    this.asSheet = false,
+  });
 
   final CartCheckoutPayment? current;
+  final ScrollController? scrollController;
+  final bool asSheet;
 
   @override
   Widget build(BuildContext context) {
@@ -35,56 +73,85 @@ class _CartCheckoutPaymentDialog extends StatelessWidget {
     final pricingSettings = context.watch<PricingSettingsService>();
     final totalsService = context.read<CartTotalsService>();
 
+    final content = _buildContent(
+      context,
+      cart,
+      exchangeRate,
+      pricingSettings,
+      totalsService,
+    );
+
+    if (asSheet) return content;
+
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: 420,
-          maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+      backgroundColor: AppColors.surfaceRaised,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppDecorations.radius),
+        side: const BorderSide(
+          color: AppColors.border,
+          width: AppDecorations.hairline,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      ),
+      child: content,
+    );
+  }
+
+  Widget _buildContent(
+    BuildContext context,
+    CartService cart,
+    ExchangeRateService exchangeRate,
+    PricingSettingsService pricingSettings,
+    CartTotalsService totalsService,
+  ) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: 420,
+        maxHeight: asSheet
+            ? double.infinity
+            : MediaQuery.sizeOf(context).height * 0.82,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (asSheet)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-              child: Column(
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: AppColors.gold.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.payments_rounded,
-                      color: AppColors.goldDark,
-                      size: 26,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '¿Cómo abona el cliente?',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Elegí el precio de referencia para todo el carrito '
-                    'y, si hace falta, dividí el cobro en dos formas.',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
+              padding: const EdgeInsets.only(top: 10, bottom: 4),
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-            const SizedBox(height: 12),
-            Flexible(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                shrinkWrap: true,
-                children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
+            child: Column(
+              children: [
+                Text(
+                  '¿Cómo abona el cliente?',
+                  textAlign: TextAlign.center,
+                  style: AppText.heading,
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Elegí el precio de referencia para todo el carrito '
+                  'y, si hace falta, dividí el cobro en dos formas.',
+                  textAlign: TextAlign.center,
+                  style: AppText.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Flexible(
+            child: ListView(
+              controller: scrollController,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              shrinkWrap: true,
+              children: [
                   FilterChipButton(
                     label: 'PAGAR EN DOS FORMAS',
                     selected: current?.isDual ?? false,
@@ -144,17 +211,19 @@ class _CartCheckoutPaymentDialog extends StatelessWidget {
                 ],
               ),
             ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('CANCELAR'),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(asSheet ? 'Listo' : 'Cancelar'),
+                ),
               ),
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 }
 

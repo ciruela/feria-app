@@ -190,17 +190,17 @@ class CatalogService extends ChangeNotifier {
     await _pushToSupabase(updated);
 
     if (SupabaseService.isConfigured &&
-        previous.stock != null &&
         updated.stock != null &&
         previous.stock != updated.stock) {
-      await _supabaseCatalog.logStockChange(
-        productId: updated.id,
-        delta: updated.stock! - previous.stock!,
-        motivo: StockMotivo.ajuste,
-        stockAntes: previous.stock,
-        stockDespues: updated.stock,
+      final next = await _supabaseCatalog.setStock(
+        updated.id,
+        updated.stock!,
+        motivo: previous.stock == null ? StockMotivo.carga : StockMotivo.ajuste,
         nota: 'Ajuste manual desde admin',
+        label: _productStockLabel(updated),
       );
+      _products[index] = updated.copyWith(stock: next);
+      await _persistCache();
     }
 
     _auditProductUpdate(previous, updated);
@@ -377,15 +377,19 @@ class CatalogService extends ChangeNotifier {
     await _persistCache();
     await _pushToSupabase(product);
 
-    if (SupabaseService.isConfigured && stock != null && stock > 0) {
-      await _supabaseCatalog.logStockChange(
-        productId: product.id,
-        delta: stock,
+    if (SupabaseService.isConfigured && stock != null) {
+      final next = await _supabaseCatalog.setStock(
+        product.id,
+        stock,
         motivo: StockMotivo.carga,
-        stockAntes: 0,
-        stockDespues: stock,
         nota: 'Alta de producto',
+        label: _productStockLabel(product),
       );
+      final index = _products.indexWhere((item) => item.id == product.id);
+      if (index != -1) {
+        _products[index] = product.copyWith(stock: next);
+        await _persistCache();
+      }
     }
 
     final label = isArma ? product.modeloDisplay : product.codigo;
@@ -541,7 +545,25 @@ class CatalogService extends ChangeNotifier {
     var added = 0;
     var skipped = 0;
     final changedProducts = <Product>[];
-    final stockBeforeImport = <String, int?>{};
+    final stockTargetById = <String, int?>{};
+    final matchedIds = <String>[];
+
+    // Pre-scan para leer stock del servidor (no de la caché local).
+    for (final raw in rows) {
+      try {
+        final row = ExcelProductRow.fromMap(raw);
+        final existing = _findMatchingRow(row);
+        if (existing != null) matchedIds.add(existing.id);
+      } catch (_) {
+        // Se contabiliza skipped en el loop principal.
+      }
+    }
+
+    Map<String, int?> serverStocks = {};
+    if (SupabaseService.isConfigured && matchedIds.isNotEmpty) {
+      await _ensureSupabaseWriteContext();
+      serverStocks = await _supabaseCatalog.fetchStocksByIds(matchedIds);
+    }
 
     for (var i = 0; i < rows.length; i++) {
       try {
@@ -549,9 +571,13 @@ class CatalogService extends ChangeNotifier {
         final existing = _findMatchingRow(row);
 
         if (existing != null) {
-          final index = _products.indexWhere((product) => product.id == existing.id);
-          stockBeforeImport.putIfAbsent(existing.id, () => existing.stock);
-          final newStock = row.stock ?? existing.stock;
+          final index =
+              _products.indexWhere((product) => product.id == existing.id);
+          final serverStock = serverStocks.containsKey(existing.id)
+              ? serverStocks[existing.id]
+              : existing.stock;
+          final newStock = row.stock ?? serverStock;
+          stockTargetById[existing.id] = newStock;
           final product = existing.copyWith(
             precioUsd: row.precioUsd > 0 ? row.precioUsd : existing.precioUsd,
             stock: newStock,
@@ -570,7 +596,7 @@ class CatalogService extends ChangeNotifier {
           updated++;
         } else if (_canCreateFromRow(row)) {
           final product = _productFromExcelRow(row);
-          stockBeforeImport[product.id] = 0;
+          stockTargetById[product.id] = product.stock;
           _products.add(product);
           changedProducts.add(product);
           added++;
@@ -590,22 +616,29 @@ class CatalogService extends ChangeNotifier {
       await _supabaseCatalog.upsertAll(changedProducts);
 
       for (final product in changedProducts) {
-        final newStock = product.stock;
+        final newStock = stockTargetById[product.id];
         if (newStock == null) continue;
 
-        final before = stockBeforeImport[product.id];
-        if (before == null) continue;
+        final before = serverStocks.containsKey(product.id)
+            ? serverStocks[product.id]
+            : null;
         if (before == newStock) continue;
 
-        await _supabaseCatalog.logStockChange(
-          productId: product.id,
-          delta: newStock - before,
-          motivo: before == 0 ? StockMotivo.carga : StockMotivo.ajuste,
-          stockAntes: before,
-          stockDespues: newStock,
+        final next = await _supabaseCatalog.setStock(
+          product.id,
+          newStock,
+          motivo: before == null || before == 0
+              ? StockMotivo.carga
+              : StockMotivo.ajuste,
           nota: 'Importación Excel',
+          label: _productStockLabel(product),
         );
+        final index = _products.indexWhere((item) => item.id == product.id);
+        if (index != -1) {
+          _products[index] = _products[index].copyWith(stock: next);
+        }
       }
+      await _persistCache();
     }
 
     AuditService.instance.log(
@@ -723,6 +756,40 @@ class CatalogService extends ChangeNotifier {
       await _supabaseCatalog.upsert(product);
     } catch (error) {
       _lastError = error.toString();
+    }
+  }
+
+  /// Ajusta solo la cache local tras un descuento server-side (register_sale).
+  Future<void> applyLocalSaleStockDecrement(Map<String, int> quantities) async {
+    if (quantities.isEmpty) return;
+    var changed = false;
+    for (final entry in quantities.entries) {
+      if (entry.value <= 0) continue;
+      final product = productById(entry.key);
+      if (product?.stock == null) continue;
+      _setLocalStock(entry.key, product!.stock! - entry.value);
+      changed = true;
+    }
+    if (changed) {
+      await _persistCache();
+      notifyListeners();
+    }
+  }
+
+  /// Ajusta solo la cache local tras una restitución server-side (void_sale).
+  Future<void> applyLocalSaleStockRestore(Map<String, int> quantities) async {
+    if (quantities.isEmpty) return;
+    var changed = false;
+    for (final entry in quantities.entries) {
+      if (entry.value <= 0) continue;
+      final product = productById(entry.key);
+      if (product?.stock == null) continue;
+      _setLocalStock(entry.key, product!.stock! + entry.value);
+      changed = true;
+    }
+    if (changed) {
+      await _persistCache();
+      notifyListeners();
     }
   }
 

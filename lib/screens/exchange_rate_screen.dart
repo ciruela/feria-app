@@ -16,20 +16,34 @@ class ExchangeRateScreen extends StatefulWidget {
 
 class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
   late final TextEditingController _controller;
+  double? _parsed;
 
   @override
   void initState() {
     super.initState();
     final rate = context.read<ExchangeRateService>().rate;
-    _controller = TextEditingController(
-      text: rate.toStringAsFixed(0),
-    );
+    _controller = TextEditingController(text: rate.toStringAsFixed(0));
+    _parsed = rate;
+    _controller.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    final parsed = double.tryParse(_controller.text.replaceAll(',', '.'));
+    setState(() => _parsed = parsed);
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_onTextChanged);
     _controller.dispose();
     super.dispose();
+  }
+
+  bool get _canSave {
+    final next = _parsed;
+    final current = context.read<ExchangeRateService>().rate;
+    if (next == null || next <= 0) return false;
+    return (next - current).abs() >= 0.01;
   }
 
   @override
@@ -45,46 +59,40 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SectionHeader(
+            SectionHeader(
               title: 'Tipo de cambio de hoy',
-              subtitle:
-                  'Se sincroniza en tiempo real con todos los celulares conectados a Supabase.',
+              subtitle: exchangeRate.hasServerRate
+                  ? 'Se sincroniza en tiempo real con todos los celulares de esta armería.'
+                  : 'Todavía no hay tipo de cambio guardado para esta armería. Guardalo acá para habilitar precios en pesos.',
             ),
             const SizedBox(height: 24),
             Container(
               padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: AppDecorations.radiusLg,
-                border: Border.all(color: AppColors.border),
-                boxShadow: [AppDecorations.cardShadow],
+                color: AppColors.surfaceRaised,
+                borderRadius: BorderRadius.circular(AppDecorations.radius),
+                border: Border.all(
+                  color: AppColors.border,
+                  width: AppDecorations.hairline,
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    '1 USD =',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                  const Text('1 USD =', style: AppText.heading),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _controller,
                     keyboardType: TextInputType.number,
-                    style: const TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.w800,
+                    style: AppText.displayDesktop.copyWith(
+                      color: AppColors.accent,
                     ),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       suffixText: 'ARS',
-                      suffixStyle: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
+                      suffixStyle: AppText.numberLarge.copyWith(
+                        color: AppColors.textMuted,
                       ),
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(
+                      contentPadding: const EdgeInsets.symmetric(
                         horizontal: 20,
                         vertical: 18,
                       ),
@@ -94,56 +102,29 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: AppDecorations.goldGradient,
-                borderRadius: AppDecorations.radiusMd,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.gold.withValues(alpha: 0.35),
-                    blurRadius: 14,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
+            SizedBox(
+              height: AppDecorations.buttonPrimary,
               child: ElevatedButton(
-                onPressed: () async {
-                final parsed = double.tryParse(
-                  _controller.text.replaceAll(',', '.'),
-                );
-
-                if (parsed == null || parsed <= 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Ingresá un tipo de cambio válido.'),
-                    ),
-                  );
-                  return;
-                }
-
-                await context.read<ExchangeRateService>().saveRate(parsed);
-
-                if (!context.mounted) return;
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Tipo de cambio guardado.'),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                foregroundColor: AppColors.primaryDark,
+                onPressed: _canSave
+                    ? () async {
+                        final parsed = _parsed!;
+                        await exchangeRate.saveRate(parsed);
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Tipo de cambio guardado.'),
+                          ),
+                        );
+                      }
+                    : null,
+                child: const Text('GUARDAR'),
               ),
-              child: const Text('GUARDAR'),
-            ),
             ),
             const SizedBox(height: 16),
             if (exchangeRate.updatedAt != null)
               Text(
                 'Última actualización: ${formatDateTime(exchangeRate.updatedAt!)}',
-                style: Theme.of(context).textTheme.bodyMedium,
+                style: AppText.bodySmall,
                 textAlign: TextAlign.center,
               ),
           ],

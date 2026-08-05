@@ -3,20 +3,18 @@ import '../models/budget.dart';
 import '../models/sale_record.dart';
 import '../models/presupuesto_branding.dart';
 import '../utils/app_logger.dart';
+import '../utils/ids.dart';
 import '../utils/jwt.dart';
 import 'audit_service.dart';
 import 'catalog_service.dart';
-import 'supabase_catalog_repository.dart';
+import 'pricing_settings_service.dart';
 import 'supabase_service.dart';
 import 'comprobante_pdf_service.dart';
 
 class SupabaseSalesRepository {
   SupabaseSalesRepository({CatalogService? catalog}) : _catalog = catalog;
 
-  static const _table = 'ventas';
-
   final CatalogService? _catalog;
-  final SupabaseCatalogRepository _catalogRepo = SupabaseCatalogRepository();
   final ComprobantePdfService _pdfService = ComprobantePdfService();
 
   Future<List<SaleRecord>> fetchForDay(DateTime day) async {
@@ -26,12 +24,26 @@ class SupabaseSalesRepository {
   }
 
   Future<List<SaleRecord>> fetchForRange(DateTime start, DateTime end) async {
-    final rows = await SupabaseService.client
-        .from(_table)
-        .select()
-        .gte('created_at', start.toUtc().toIso8601String())
-        .lt('created_at', end.toUtc().toIso8601String())
-        .order('created_at');
+    // AR-14: sin SELECT PostgREST sobre ventas (PII); listado vía RPC gestor.
+    final rows = await SupabaseService.client.rpc(
+      'list_ventas_for_range',
+      params: {
+        'p_from': start.toUtc().toIso8601String(),
+        'p_to': end.toUtc().toIso8601String(),
+      },
+    );
+
+    return (rows as List<dynamic>)
+        .map((row) => SaleRecord.fromRow(row as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Búsqueda por DNI con auditoría server-side (body RPC, no query string).
+  Future<List<SaleRecord>> searchByDni(String dni) async {
+    final rows = await SupabaseService.client.rpc(
+      'search_ventas_by_dni',
+      params: {'p_dni': dni.trim()},
+    );
 
     return (rows as List<dynamic>)
         .map((row) => SaleRecord.fromRow(row as Map<String, dynamic>))
@@ -41,7 +53,7 @@ class SupabaseSalesRepository {
   Future<void> insert(
     Budget budget, {
     String? sellerId,
-    double? exchangeRate,
+    PricingSettingsService? pricingSettings,
     required PresupuestoBranding branding,
   }) async {
     final quantities = _quantitiesFromBudgetLines(budget.lines);
@@ -54,33 +66,40 @@ class SupabaseSalesRepository {
         budget.paymentMethods.map((method) => method.key).join(', ');
 
     final items = _itemsPayload(budget);
+    // Una sola clave por intento de confirmación (reintento reutiliza la misma).
+    final idempotencyKey = newId('sale');
+    final pricing = _pricingPayload(pricingSettings);
+    final rpcParams = {
+      'p_items': items,
+      'p_metodo_pago': paymentMethods.isNotEmpty ? paymentMethods : 'lista',
+      'p_cliente_nombre': budget.customer.fullName,
+      'p_cliente_dni': budget.customer.dni,
+      'p_vendedor_id': sellerId,
+      'p_idempotency_key': idempotencyKey,
+      'p_pricing': pricing,
+    };
 
-    final row = await SupabaseService.client
-        .from(_table)
-        .insert({
-          if (sellerId != null && sellerId.isNotEmpty) 'vendedor_id': sellerId,
-          'items': items,
-          'metodo_pago':
-              paymentMethods.isNotEmpty ? paymentMethods : 'lista',
-          'total_usd': budget.totalUsdLines,
-          'total_ars': budget.totalArsLines,
-          'tipo_cambio': exchangeRate,
-          'cliente_nombre': budget.customer.fullName,
-          'cliente_dni': budget.customer.dni,
-        })
-        .select('id')
-        .single();
+    Map<String, dynamic> result;
+    try {
+      result = await _registerSaleWithRetry(rpcParams);
+    } catch (error, stackTrace) {
+      throw _mapRegisterSaleError(error, stackTrace);
+    }
 
-    final saleId = row['id'] as String;
+    final saleId = result['id'] as String?;
+    if (saleId == null || saleId.isEmpty) {
+      throw StateError('La venta no devolvió id.');
+    }
+
+    // Stock server-side ya aplicado; no volver a descontar en reintento idempotente.
+    final idempotent = result['idempotent'] == true;
+    if (_catalog != null && !idempotent) {
+      await _catalog.applyLocalSaleStockDecrement(quantities);
+    }
+
     final tenantId = _currentTenantId();
 
     try {
-      await _applyStockDecrement(
-        budget,
-        saleId: saleId,
-        sellerId: sellerId,
-      );
-
       await _uploadPdfWithRetry(
         saleId: saleId,
         budget: budget,
@@ -90,8 +109,7 @@ class SupabaseSalesRepository {
     } catch (error, stackTrace) {
       await _rollbackSale(
         saleId: saleId,
-        budget: budget,
-        sellerId: sellerId,
+        quantities: quantities,
         error: error,
         stackTrace: stackTrace,
       );
@@ -99,12 +117,14 @@ class SupabaseSalesRepository {
     }
 
     final itemsCount = budget.lines.fold<int>(0, (sum, l) => sum + l.quantity);
+    final totalUsd = (result['total_usd'] as num?)?.toDouble() ??
+        budget.totalUsdLines;
     AuditService.instance.log(
       accion: 'Registró venta',
       entidad: AuditEntidad.venta,
       entidadId: saleId,
-      detalle: '$itemsCount ítems · USD ${budget.totalUsdLines.toStringAsFixed(0)}'
-          ' · ${budget.customer.fullName.isEmpty ? 'sin cliente' : budget.customer.fullName}',
+      // AR-14: no repetir PII del comprador en audit_log.detalle.
+      detalle: '$itemsCount ítems · USD ${totalUsd.toStringAsFixed(0)}',
       actorId: sellerId,
       actorNombre: budget.sellerName ?? 'Vendedor',
     );
@@ -112,38 +132,33 @@ class SupabaseSalesRepository {
 
   Future<void> _rollbackSale({
     required String saleId,
-    required Budget budget,
-    String? sellerId,
+    required Map<String, int> quantities,
     required Object error,
     StackTrace? stackTrace,
   }) async {
     AppLogger.warn(
-      'Revirtiendo venta $saleId tras error en stock/PDF',
+      'Anulando venta $saleId tras error en PDF',
       error: error,
       stackTrace: stackTrace,
     );
 
     try {
-      await _applyStockRestore(
-        budget,
-        saleId: saleId,
-        sellerId: sellerId,
+      await SupabaseService.client.rpc(
+        'void_sale',
+        params: {
+          'p_venta_id': saleId,
+          'p_motivo': 'Rollback automático: fallo al guardar PDF',
+          'p_actor_nombre': 'sistema',
+        },
       );
-    } catch (restoreError, restoreStack) {
+      if (_catalog != null) {
+        await _catalog.applyLocalSaleStockRestore(quantities);
+      }
+    } catch (voidError, voidStack) {
       AppLogger.error(
-        'No se pudo restituir stock al revertir venta $saleId',
-        error: restoreError,
-        stackTrace: restoreStack,
-      );
-    }
-
-    try {
-      await SupabaseService.client.from(_table).delete().eq('id', saleId);
-    } catch (deleteError, deleteStack) {
-      AppLogger.error(
-        'No se pudo borrar venta $saleId tras fallo',
-        error: deleteError,
-        stackTrace: deleteStack,
+        'No se pudo anular venta $saleId tras fallo de PDF',
+        error: voidError,
+        stackTrace: voidStack,
       );
     }
   }
@@ -154,46 +169,38 @@ class SupabaseSalesRepository {
     String? actorId,
     String? actorNombre,
   }) async {
-    final existing = await SupabaseService.client
-        .from(_table)
-        .select('anulada')
-        .eq('id', sale.id)
-        .maybeSingle();
-    if (existing == null) return false;
-    if (existing['anulada'] as bool? ?? false) return false;
-
-    await SupabaseService.client.from(_table).update({
-      'anulada': true,
-      'anulada_motivo': motivo,
-      'anulada_por': actorNombre ?? '',
-      'anulada_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', sale.id);
-
-    final quantities = _quantitiesFromSaleLines(sale.lines);
+    // RPC atómica (AR-8): segunda anulación no restituye stock.
+    final dynamic raw;
+    try {
+      raw = await SupabaseService.client.rpc(
+        'void_sale',
+        params: {
+          'p_venta_id': sale.id,
+          'p_motivo': motivo,
+          'p_actor_nombre': actorNombre ?? '',
+        },
+      );
+    } catch (error) {
+      final message = error.toString();
+      if (message.contains('cannot_reactivate_sale')) {
+        throw StateError('No se puede reactivar una venta anulada.');
+      }
+      rethrow;
+    }
+    final ok = raw == true;
+    if (!ok) return false;
 
     if (_catalog != null) {
-      await _catalog.applySaleStockRestore(
-        quantities,
-        saleId: sale.id,
-        sellerId: sale.vendedorId,
+      await _catalog.applyLocalSaleStockRestore(
+        _quantitiesFromSaleLines(sale.lines),
       );
-    } else {
-      for (final entry in quantities.entries) {
-        await _catalogRepo.restoreStock(
-          entry.key,
-          entry.value,
-          ventaId: sale.id,
-          vendedorId: sale.vendedorId,
-        );
-      }
     }
 
     AuditService.instance.log(
       accion: 'Anuló venta',
       entidad: AuditEntidad.venta,
       entidadId: sale.id,
-      detalle:
-          'Motivo: $motivo · ${sale.clienteNombre.trim().isEmpty ? 'sin cliente' : sale.clienteNombre.trim()}',
+      detalle: 'Motivo: $motivo',
       actorId: actorId,
       actorNombre: actorNombre,
     );
@@ -207,40 +214,25 @@ class SupabaseSalesRepository {
     String? facturaNumero,
     String? actorNombre,
   }) async {
-    final existing = await SupabaseService.client
-        .from(_table)
-        .select('anulada, facturada')
-        .eq('id', sale.id)
-        .maybeSingle();
-    if (existing == null) return false;
-    if (existing['anulada'] as bool? ?? false) return false;
-
-    final now = DateTime.now().toUtc().toIso8601String();
-    if (facturada) {
-      await SupabaseService.client.from(_table).update({
-        'facturada': true,
-        'facturada_at': now,
-        'facturada_por': actorNombre ?? '',
-        'factura_numero': facturaNumero?.trim() ?? '',
-      }).eq('id', sale.id);
-    } else {
-      await SupabaseService.client.from(_table).update({
-        'facturada': false,
-        'facturada_at': null,
-        'facturada_por': '',
-        'factura_numero': '',
-      }).eq('id', sale.id);
-    }
+    final raw = await SupabaseService.client.rpc(
+      'set_venta_facturada',
+      params: {
+        'p_venta_id': sale.id,
+        'p_facturada': facturada,
+        'p_factura_numero': facturaNumero?.trim() ?? '',
+        'p_actor_nombre': actorNombre ?? '',
+      },
+    );
+    final ok = raw == true;
+    if (!ok) return false;
 
     AuditService.instance.log(
       accion: facturada ? 'Marcó facturada' : 'Desmarcó facturada',
       entidad: AuditEntidad.venta,
       entidadId: sale.id,
       detalle: facturada && (facturaNumero?.trim().isNotEmpty ?? false)
-          ? 'Factura ${facturaNumero!.trim()} · ${sale.clienteNombre.trim().isEmpty ? 'sin cliente' : sale.clienteNombre.trim()}'
-          : sale.clienteNombre.trim().isEmpty
-              ? 'sin cliente'
-              : sale.clienteNombre.trim(),
+          ? 'Factura ${facturaNumero!.trim()}'
+          : '',
       actorNombre: actorNombre,
     );
 
@@ -284,10 +276,13 @@ class SupabaseSalesRepository {
           tenantId: tenantId,
           branding: branding,
         );
-        await SupabaseService.client
-            .from(_table)
-            .update({'pdf_path': pdfPath})
-            .eq('id', saleId);
+        await SupabaseService.client.rpc(
+          'set_venta_pdf_path',
+          params: {
+            'p_venta_id': saleId,
+            'p_path': pdfPath,
+          },
+        );
         return;
       } catch (error, stackTrace) {
         lastError = error;
@@ -343,10 +338,7 @@ class SupabaseSalesRepository {
               'code': line.code,
               'quantity': line.quantity,
               'detail': line.detail,
-              'unitArs': line.unitArs,
-              'lineArs': line.lineArs,
-              'unitUsd': line.unitUsd,
-              'lineUsd': line.lineUsd,
+              // Precios solo como referencia UI; el servidor los recalcula.
               'paymentMethod': line.paymentMethod.key,
               'isArma': line.isArma,
               'serialNumber': line.serialNumber,
@@ -357,61 +349,113 @@ class SupabaseSalesRepository {
           .toList(),
       'sellerName': budget.sellerName,
       'date': budget.date.toUtc().toIso8601String(),
+      if (budget.paymentAllocations.isNotEmpty)
+        'allocations': _allocationShares(budget),
     };
   }
 
-  Future<void> _applyStockDecrement(
-    Budget budget, {
-    String? saleId,
-    String? sellerId,
-  }) async {
-    final quantities = _quantitiesFromBudgetLines(budget.lines);
-    if (quantities.isEmpty) return;
+  List<Map<String, dynamic>> _allocationShares(Budget budget) {
+    final allocations = budget.paymentAllocations;
+    final totalUsd = allocations.fold<double>(
+      0,
+      (sum, a) => sum + a.amountUsd,
+    );
+    final totalArs = allocations.fold<double>(
+      0,
+      (sum, a) => sum + a.amountArs,
+    );
 
-    if (_catalog != null) {
-      await _catalog.applySaleStockDecrement(
-        quantities,
-        saleId: saleId,
-        sellerId: sellerId,
-      );
-      return;
-    }
-
-    for (final entry in quantities.entries) {
-      await _catalogRepo.decrementStock(
-        entry.key,
-        entry.value,
-        ventaId: saleId,
-        vendedorId: sellerId,
-      );
-    }
+    return allocations.map((allocation) {
+      final share = allocation.paysInUsd
+          ? (totalUsd > 0 ? allocation.amountUsd / totalUsd : 0.0)
+          : (totalArs > 0 ? allocation.amountArs / totalArs : 0.0);
+      return {
+        'method': allocation.method.key,
+        'share': share,
+      };
+    }).toList();
   }
 
-  Future<void> _applyStockRestore(
-    Budget budget, {
-    String? saleId,
-    String? sellerId,
-  }) async {
-    final quantities = _quantitiesFromBudgetLines(budget.lines);
-    if (quantities.isEmpty) return;
+  Map<String, dynamic> _pricingPayload(PricingSettingsService? settings) {
+    if (settings == null) return <String, dynamic>{};
+    return {
+      'efectivo': settings.descuentoEfectivoPct,
+      'debito': settings.recargoDebitoPct,
+      'tarjeta1': settings.recargoTarjeta1Pct,
+      'tarjeta3': settings.recargoTarjeta3Pct,
+      'tarjeta6': settings.recargoTarjeta6Pct,
+      'tarjeta9': settings.recargoTarjeta9Pct,
+      'tarjeta12': settings.recargoTarjeta12Pct,
+      'tarjeta18': settings.recargoTarjeta18Pct,
+    };
+  }
 
-    if (_catalog != null) {
-      await _catalog.applySaleStockRestore(
-        quantities,
-        saleId: saleId,
-        sellerId: sellerId,
-      );
-      return;
+  Future<Map<String, dynamic>> _registerSaleWithRetry(
+    Map<String, dynamic> params,
+  ) async {
+    Object? lastError;
+    StackTrace? lastStack;
+    for (var attempt = 1; attempt <= 2; attempt++) {
+      try {
+        final raw = await SupabaseService.client.rpc(
+          'register_sale',
+          params: params,
+        );
+        return _asStringKeyedMap(raw);
+      } catch (error, stackTrace) {
+        lastError = error;
+        lastStack = stackTrace;
+        final message = error.toString().toLowerCase();
+        final transient = message.contains('socket') ||
+            message.contains('timeout') ||
+            message.contains('network') ||
+            message.contains('connection');
+        if (!transient || attempt == 2) break;
+        AppLogger.warn(
+          'Reintento register_sale (mismo idempotency_key)',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
     }
+    Error.throwWithStackTrace(
+      lastError ?? StateError('register_sale falló'),
+      lastStack ?? StackTrace.current,
+    );
+  }
 
-    for (final entry in quantities.entries) {
-      await _catalogRepo.restoreStock(
-        entry.key,
-        entry.value,
-        ventaId: saleId,
-        vendedorId: sellerId,
+  Map<String, dynamic> _asStringKeyedMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) {
+      return raw.map((key, value) => MapEntry(key.toString(), value));
+    }
+    throw StateError('Respuesta inválida de register_sale.');
+  }
+
+  StateError _mapRegisterSaleError(Object error, StackTrace stackTrace) {
+    AppLogger.error('register_sale falló', error: error, stackTrace: stackTrace);
+    final message = error.toString();
+    if (message.contains('insufficient_stock')) {
+      return StateError('Stock insuficiente para completar la venta.');
+    }
+    if (message.contains('product_not_found')) {
+      return StateError('Hay productos que ya no existen en el catálogo.');
+    }
+    if (message.contains('exchange_rate_missing')) {
+      return StateError('Falta configurar el tipo de cambio.');
+    }
+    if (message.contains('tenant_required')) {
+      return StateError('Sesión sin tenant activo. Volvé a ingresar.');
+    }
+    if (message.contains('forbidden_role')) {
+      return StateError('Tu rol no permite registrar ventas.');
+    }
+    if (message.contains('sale_missing_stock_movements')) {
+      return StateError(
+        'La venta no pudo confirmarse con su descuento de stock.',
       );
     }
+    return StateError('No se pudo registrar la venta. $message');
   }
 
   Map<String, int> _quantitiesFromBudgetLines(List<BudgetLine> lines) {

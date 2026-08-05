@@ -23,6 +23,11 @@ class SalesMetricsService {
     return _repository.fetchForRange(start, end);
   }
 
+  /// Búsqueda auditada por DNI (RPC; no filtro PostgREST).
+  Future<List<SaleRecord>> salesByDni(String dni) {
+    return _repository.searchByDni(dni);
+  }
+
   Future<bool> voidSale(
     SaleRecord sale, {
     required String motivo,

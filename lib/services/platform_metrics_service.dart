@@ -40,9 +40,8 @@ class PlatformMetricsService {
     final tenantsRes = await client
         .from('tenants')
         .select('id,nombre,slug,activo');
-    final ventasRes = await client
-        .from('ventas')
-        .select('tenant_id,total_ars,total_usd,anulada');
+    // AR-14: ventas sin SELECT PostgREST; agregados vía RPC (sin PII).
+    final ventasRes = await client.rpc('list_ventas_platform_metrics');
     final vendedoresRes = await client
         .from('vendedores')
         .select('tenant_id,activo');

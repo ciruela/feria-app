@@ -13,61 +13,9 @@ class FeriaBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFFF5F0E8),
-                AppColors.background,
-                AppColors.backgroundDark,
-              ],
-            ),
-          ),
-        ),
-        Positioned(
-          top: -80,
-          right: -60,
-          child: _GlowCircle(
-            size: 220,
-            color: AppColors.gold.withValues(alpha: 0.12),
-          ),
-        ),
-        Positioned(
-          bottom: 120,
-          left: -40,
-          child: _GlowCircle(
-            size: 180,
-            color: AppColors.accent.withValues(alpha: 0.10),
-          ),
-        ),
-        Positioned.fill(child: child),
-      ],
-    );
-  }
-}
-
-class _GlowCircle extends StatelessWidget {
-  const _GlowCircle({
-    required this.size,
-    required this.color,
-  });
-
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-      ),
+    return ColoredBox(
+      color: AppColors.surface,
+      child: child,
     );
   }
 }
@@ -86,7 +34,8 @@ class FeriaPageConstraint extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth > maxWidth ? maxWidth : constraints.maxWidth;
+        final width =
+            constraints.maxWidth > maxWidth ? maxWidth : constraints.maxWidth;
         return Align(
           alignment: Alignment.topCenter,
           child: SizedBox(
@@ -107,23 +56,28 @@ class FeriaScaffold extends StatelessWidget {
     required this.body,
     this.bottomNavigationBar,
     this.floatingActionButton,
+    this.constrainBody = true,
+    this.maxContentWidth = 960,
   });
 
   final PreferredSizeWidget? appBar;
   final Widget body;
   final Widget? bottomNavigationBar;
   final Widget? floatingActionButton;
+  final bool constrainBody;
+  final double maxContentWidth;
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final constrainBody = kIsWeb && width >= 720;
+    final shouldConstrain = constrainBody && kIsWeb && width >= 720;
 
     return Scaffold(
+      backgroundColor: AppColors.surface,
       appBar: appBar,
       body: FeriaBackground(
-        child: constrainBody
-            ? FeriaPageConstraint(child: body)
+        child: shouldConstrain
+            ? FeriaPageConstraint(maxWidth: maxContentWidth, child: body)
             : body,
       ),
       bottomNavigationBar: bottomNavigationBar,
@@ -158,21 +112,21 @@ class FeriaAppBar extends StatelessWidget implements PreferredSizeWidget {
     final canPop = Navigator.canPop(context);
 
     return AppBar(
+      backgroundColor: AppColors.surface,
+      foregroundColor: AppColors.textPrimary,
+      elevation: 0,
+      scrolledUnderElevation: 0,
       leading: leading ??
-          (showBackButton && canPop
-              ? const _FeriaBackButton()
-              : null),
+          (showBackButton && canPop ? const _FeriaBackButton() : null),
       automaticallyImplyLeading: false,
       centerTitle: false,
       titleSpacing: canPop ? 0 : NavigationToolbar.kMiddleSpacing,
-      title: title,
+      title: DefaultTextStyle.merge(
+        style: AppText.heading,
+        child: title,
+      ),
       actions: actions,
       bottom: bottom,
-      flexibleSpace: Container(
-        decoration: const BoxDecoration(
-          gradient: AppDecorations.appBarGradient,
-        ),
-      ),
     );
   }
 }
@@ -200,6 +154,7 @@ class FeriaAppBarTitle extends StatelessWidget {
                 text,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                style: AppText.heading,
               ),
             ),
             if (showBadge) ...[
@@ -224,14 +179,14 @@ class _FeriaBackButton extends StatelessWidget {
         onPressed: () => Navigator.maybePop(context),
         tooltip: 'Volver',
         style: IconButton.styleFrom(
-          backgroundColor: Colors.white.withValues(alpha: 0.14),
-          foregroundColor: Colors.white,
+          backgroundColor: AppColors.surfaceTouch,
+          foregroundColor: AppColors.textMuted,
           fixedSize: const Size(44, 44),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppDecorations.radius),
           ),
         ),
-        icon: const Icon(Icons.arrow_back_rounded, size: 24),
+        icon: const Icon(Icons.chevron_left_rounded, size: 24),
       ),
     );
   }

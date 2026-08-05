@@ -20,22 +20,19 @@ class SectionHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 5,
+          width: AppDecorations.accentBar,
           height: subtitle == null ? 34 : 52,
           margin: const EdgeInsets.only(top: 4, right: 14),
-          decoration: BoxDecoration(
-            gradient: AppDecorations.goldGradient,
-            borderRadius: BorderRadius.circular(99),
-          ),
+          color: AppColors.textPrimary,
         ),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: Theme.of(context).textTheme.headlineMedium),
+              Text(title, style: AppText.heading),
               if (subtitle != null) ...[
                 const SizedBox(height: 4),
-                Text(subtitle!, style: Theme.of(context).textTheme.bodyMedium),
+                Text(subtitle!, style: AppText.bodySmall),
               ],
             ],
           ),

@@ -1,3 +1,5 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../models/seller.dart';
 import 'supabase_service.dart';
 
@@ -34,15 +36,27 @@ class SellerPortalService {
     required String slug,
     required String codigo,
   }) async {
-    final raw = await SupabaseService.client.rpc(
-      'validate_seller_portal',
-      params: {
-        'p_slug': slug.trim(),
-        'p_codigo': codigo.trim(),
+    // AR-15: POST Edge (rate limit + sin RPC anon).
+    final res = await SupabaseService.client.functions.invoke(
+      'seller-portal-validate',
+      body: {
+        'slug': slug.trim(),
+        'codigo': codigo.trim(),
       },
     );
 
-    final map = raw as Map<String, dynamic>;
+    if (res.status == 429) {
+      throw StateError('Demasiados intentos. Proba más tarde.');
+    }
+    if (res.status >= 400) {
+      final data = res.data;
+      final message = data is Map && data['error'] != null
+          ? data['error'].toString()
+          : 'Dominio o clave incorrectos';
+      throw StateError(message);
+    }
+
+    final map = (res.data as Map).cast<String, dynamic>();
     final sellersJson = map['sellers'] as List<dynamic>? ?? const [];
 
     return SellerPortalValidation(
@@ -84,10 +98,18 @@ class SellerPortalService {
   }
 
   Future<void> setPortalCode(String codigo) async {
-    await SupabaseService.client.rpc(
-      'set_seller_portal_code',
-      params: {'p_codigo': codigo.trim()},
-    );
+    try {
+      await SupabaseService.client.rpc(
+        'set_seller_portal_code',
+        params: {'p_codigo': codigo.trim()},
+      );
+    } on FunctionException catch (error) {
+      final details = error.details;
+      final message = details is Map && details['message'] != null
+          ? details['message'].toString()
+          : (details?.toString() ?? error.toString());
+      throw StateError(message);
+    }
   }
 
   Future<String?> fetchCurrentTenantSlug() async {
