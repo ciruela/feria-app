@@ -6,6 +6,7 @@ import '../../models/seller.dart';
 import '../../services/seller_portal_service.dart';
 import '../../services/seller_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/tenant_slug.dart';
 import '../../utils/uppercase_input.dart';
 import '../../widgets/feria_shell.dart';
 import '../../widgets/section_header.dart';
@@ -555,7 +556,9 @@ class _SellerPortalAccessCardState extends State<_SellerPortalAccessCard> {
           Text(
             _loading
                 ? 'Cargando dominio…'
-                : 'Dominio: ${_slug ?? '—'}',
+                : _slug == null
+                    ? 'Dominio: —'
+                    : 'URL: ${tenantPortalUrl(_slug!)}',
             style: const TextStyle(
               fontWeight: FontWeight.w700,
               color: AppColors.primary,

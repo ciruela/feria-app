@@ -9,6 +9,7 @@ import '../../services/seller_portal_service.dart';
 import '../../services/seller_service.dart';
 import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/tenant_slug.dart';
 import '../../widgets/feria_shell.dart';
 
 /// Acceso de vendedor sin registro: dominio + clave + elegir nombre.
@@ -28,6 +29,15 @@ class _SellerPortalScreenState extends State<SellerPortalScreen> {
   bool _loading = false;
   String? _error;
   SellerPortalValidation? _validation;
+
+  @override
+  void initState() {
+    super.initState();
+    final fromHost = detectTenantSlug();
+    if (fromHost != null && fromHost.isNotEmpty) {
+      _slugController.text = fromHost;
+    }
+  }
 
   @override
   void dispose() {
@@ -166,7 +176,7 @@ class _SellerPortalScreenState extends State<SellerPortalScreen> {
                     textInputAction: TextInputAction.next,
                     decoration: const InputDecoration(
                       labelText: 'Dominio de la armería',
-                      hintText: 'ej: world-guns',
+                      hintText: 'ej: worldguns',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.language_rounded),
                     ),

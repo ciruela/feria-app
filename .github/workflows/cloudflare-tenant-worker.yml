@@ -1,0 +1,33 @@
+name: Deploy Tenant Subdomain Worker
+
+# Pages no acepta *.armenext.com; este Worker enruta *.armenext.com → feria-app.pages.dev.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloudflare/tenant-subdomain-proxy/**'
+      - 'scripts/deploy_tenant_subdomain_worker.sh'
+      - '.github/workflows/cloudflare-tenant-worker.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: cloudflare-tenant-worker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy Worker (feria-tenant-subdomains)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+          workingDirectory: cloudflare/tenant-subdomain-proxy

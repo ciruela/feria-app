@@ -118,7 +118,7 @@ class _RegisterOrganizationScreenState
               prefixIcon: const Icon(Icons.store_rounded),
               helperText: _companyController.text.trim().isEmpty
                   ? null
-                  : 'Identificador: $slugPreview',
+                  : 'Tu URL: ${tenantPortalUrl(slugPreview)}',
             ),
             validator: (value) {
               if ((value ?? '').trim().length < 2) {

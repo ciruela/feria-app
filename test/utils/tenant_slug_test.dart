@@ -26,4 +26,30 @@ void main() {
       expect(slugifyTenantName('default'), 'default-shop');
     });
   });
+
+  group('tenantSlugKey', () {
+    test('ignora guiones al comparar', () {
+      expect(tenantSlugMatches('urban-tactical', 'urbantactical'), isTrue);
+      expect(tenantSlugMatches('world-guns', 'worldguns'), isTrue);
+    });
+  });
+
+  group('tenantPortalUrl', () {
+    test('genera subdominio sin guiones', () {
+      expect(
+        tenantPortalUrl('urban-tactical'),
+        'https://urbantactical.armenext.com',
+      );
+      expect(
+        tenantPortalUrl('world-guns'),
+        'https://worldguns.armenext.com',
+      );
+    });
+  });
+
+  group('tenantSlugToSubdomain', () {
+    test('quita guiones del slug', () {
+      expect(tenantSlugToSubdomain('mi-armeria'), 'miarmeria');
+    });
+  });
 }

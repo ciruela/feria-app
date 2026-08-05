@@ -11,6 +11,7 @@ on:
       - 'pubspec.yaml'
       - 'pubspec.lock'
       - 'scripts/build_web.sh'
+      - 'lib/utils/tenant_slug.dart'
       - '.github/workflows/cloudflare-pages.yml'
   workflow_dispatch:
 

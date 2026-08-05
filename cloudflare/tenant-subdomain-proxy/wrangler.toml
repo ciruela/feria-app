@@ -1,0 +1,8 @@
+name = "feria-tenant-subdomains"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# Ruta wildcard: todos los subdominios de armenext.com
+[[routes]]
+pattern = "*.armenext.com/*"
+zone_name = "armenext.com"
