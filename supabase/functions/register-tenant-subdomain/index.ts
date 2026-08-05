@@ -125,7 +125,7 @@ async function registerPagesDomain(opts: {
   }
 
   const errors = JSON.stringify(body?.errors ?? body);
-  if (/already exists|duplicate|already been taken/i.test(errors)) {
+  if (/already exists|duplicate|already been taken|already added this custom domain|8000018/i.test(errors)) {
     return { status: "exists" };
   }
 

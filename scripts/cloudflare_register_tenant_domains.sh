@@ -36,7 +36,7 @@ register_domain() {
     return 0
   fi
 
-  if echo "$body" | grep -qi 'already exists\|duplicate\|already been taken'; then
+  if echo "$body" | grep -qi 'already exists\|duplicate\|already been taken\|already added this custom domain\|8000018'; then
     echo "  Ya existía (OK)"
     return 0
   fi

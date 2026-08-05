@@ -1,13 +1,8 @@
 name: Deploy Tenant Subdomain Worker
 
-# Pages no acepta *.armenext.com; este Worker enruta *.armenext.com → feria-app.pages.dev.
+# Opcional: requiere CLOUDFLARE_API_TOKEN con Workers Scripts → Edit.
+# Sin ese permiso usá Register Tenant Domains (API Pages) + edge function.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'cloudflare/tenant-subdomain-proxy/**'
-      - 'scripts/deploy_tenant_subdomain_worker.sh'
-      - '.github/workflows/cloudflare-tenant-worker.yml'
   workflow_dispatch:
 
 concurrency:
