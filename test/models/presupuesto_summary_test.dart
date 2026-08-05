@@ -217,6 +217,36 @@ void main() {
     );
   });
 
+  test('urban payment abbrev empty returns dash', () {
+    final budget = Budget(
+      date: DateTime(2026, 7, 22),
+      customer: const BudgetCustomer(),
+      lines: const [],
+      totalArs: 0,
+      totalUsd: 0,
+    );
+    expect(
+      PresupuestoSummary(budget)
+          .paymentAbbrevFor(PresupuestoBranding.urbanTactical),
+      '—',
+    );
+  });
+
+  test('usesPesos detects lista and tarjeta methods', () {
+    expect(
+      PresupuestoSummary(
+        _budgetWithMethods({PaymentMethod.lista}),
+      ).usesPesos,
+      isTrue,
+    );
+    expect(
+      PresupuestoSummary(
+        _budgetWithMethods({PaymentMethod.dolarBillete}),
+      ).usesPesos,
+      isFalse,
+    );
+  });
+
   test('credit card checks reflect selected methods', () {
     final budget = Budget(
       date: DateTime(2026, 7, 22),

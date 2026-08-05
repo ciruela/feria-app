@@ -257,5 +257,28 @@ void main() {
       );
       expect(bytes.length, greaterThan(0));
     });
+
+    test('exportVentasList genera bytes con comprobantes', () {
+      final bytes = StockCierreService().exportVentasList(const []);
+      expect(bytes.length, greaterThan(0));
+    });
+
+    test('exportMovimientosExcel genera bytes', () {
+      final resumen = CierreResumen(
+        startDate: DateTime(2026, 1, 1),
+        endDate: DateTime(2026, 1, 1),
+        lines: [
+          _line(
+            product: _municion('m1', rpb: 50),
+            apertura: 5,
+            vendido: 2,
+            carga: 1,
+            cierre: 4,
+          ),
+        ],
+      );
+      final bytes = StockCierreService().exportMovimientosExcel(resumen);
+      expect(bytes.length, greaterThan(0));
+    });
   });
 }

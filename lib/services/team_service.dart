@@ -77,31 +77,21 @@ class TeamService {
     String nombre = '',
     String rol = 'admin',
   }) async {
-    try {
-      final response = await SupabaseService.client.functions.invoke(
-        'invite-team-member',
-        body: {
-          'email': email.trim(),
-          'nombre': nombre.trim(),
-          'rol': rol,
-        },
-      );
+    final map = await _invokeFunction(
+      'invite-team-member',
+      {
+        'email': email.trim(),
+        'nombre': nombre.trim(),
+        'rol': rol,
+      },
+    );
 
-      final map = _asStringKeyedMap(response.data);
-      if (response.status >= 400) {
-        throw StateError(_errorMessage(map, response.status));
-      }
-
-      final status = map['status'] as String? ?? 'added';
-      return TeamInviteResult(
-        email: map['email'] as String? ?? email.trim(),
-        emailSent: map['email_sent'] == true || status == 'invited',
-        invitedNewUser: status == 'invited',
-      );
-    } on FunctionException catch (error) {
-      final map = _asStringKeyedMap(error.details);
-      throw StateError(_errorMessage(map, error.status));
-    }
+    final status = map['status'] as String? ?? 'added';
+    return TeamInviteResult(
+      email: map['email'] as String? ?? email.trim(),
+      emailSent: map['email_sent'] == true || status == 'invited',
+      invitedNewUser: status == 'invited',
+    );
   }
 
   static Map<String, dynamic> _asStringKeyedMap(Object? data) {
@@ -116,20 +106,10 @@ class TeamService {
   }
 
   Future<void> removeMember(String userId) async {
-    try {
-      final response = await SupabaseService.client.functions.invoke(
-        'remove-team-member',
-        body: {'user_id': userId},
-      );
-
-      final map = _asStringKeyedMap(response.data);
-      if (response.status >= 400) {
-        throw StateError(_errorMessage(map, response.status));
-      }
-    } on FunctionException catch (error) {
-      final map = _asStringKeyedMap(error.details);
-      throw StateError(_errorMessage(map, error.status));
-    }
+    await _invokeFunction(
+      'remove-team-member',
+      {'user_id': userId},
+    );
   }
 
   /// @deprecated Usar [removeMember]. Mantenido por compatibilidad con RPC.
@@ -145,6 +125,26 @@ class TeamService {
         return;
       }
       rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> _invokeFunction(
+    String name,
+    Map<String, dynamic> body,
+  ) async {
+    try {
+      final response = await SupabaseService.client.functions.invoke(
+        name,
+        body: body,
+      );
+      final map = _asStringKeyedMap(response.data);
+      if (response.status >= 400) {
+        throw StateError(_errorMessage(map, response.status));
+      }
+      return map;
+    } on FunctionException catch (error) {
+      final map = _asStringKeyedMap(error.details);
+      throw StateError(_errorMessage(map, error.status));
     }
   }
 }
