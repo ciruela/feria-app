@@ -18,6 +18,7 @@ Future<void> showDniScanSheet(
   if (useDialog) {
     return showDialog<void>(
       context: context,
+      barrierColor: AppColors.scrim,
       builder: (context) => Dialog(
         backgroundColor: AppColors.surfaceRaised,
         shape: RoundedRectangleBorder(
@@ -25,7 +26,7 @@ Future<void> showDniScanSheet(
           side: const BorderSide(color: AppColors.border),
         ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 440),
+          constraints: const BoxConstraints(maxWidth: 480),
           child: _DniScanContent(
             onScanSide: onScanSide,
             onScanBoth: onScanBoth,

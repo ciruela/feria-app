@@ -12,13 +12,12 @@ import '../theme/app_theme.dart';
 import '../utils/layout_breakpoints.dart';
 import '../widgets/admin_pin_entry.dart';
 import '../widgets/employee/employee_role_widgets.dart';
-import '../widgets/feria_shell.dart';
+import '../widgets/employee/role_gate_desktop.dart';
 import '../widgets/supabase_config_banner.dart';
-import '../widgets/tenant_app_title.dart';
 
 typedef AdminEntryCallback = void Function(AdminUser admin);
 
-/// Selector empleado / administración. Navegación vía callbacks (declarativa).
+/// Selector empleado / administración. Marca Armenext — igual en todas las armerías.
 class RoleGateScreen extends StatelessWidget {
   const RoleGateScreen({
     super.key,
@@ -29,6 +28,16 @@ class RoleGateScreen extends StatelessWidget {
   final VoidCallback onEmployee;
   final AdminEntryCallback onAdmin;
 
+  String _subtitle(TenantSessionService session, {required bool isDesktop}) {
+    if (session.isSellerPortalSession) {
+      return 'Sesión de vendedor: ventas y consulta de precios.';
+    }
+    if (!isDesktop && session.isTenantManager) {
+      return 'Tu cuenta ya es administración en el servidor. El PIN solo identifica quién opera.';
+    }
+    return 'Empleados consultan precios. Administración edita catálogo.';
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = context.watch<TenantSessionService>();
@@ -37,155 +46,75 @@ class RoleGateScreen extends StatelessWidget {
     final isDesktop = LayoutBreakpoints.isDesktop(width);
 
     if (isDesktop) {
-      return Scaffold(
-        backgroundColor: AppColors.surface,
-        body: Stack(
-          children: [
-            Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 48),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SupabaseConfigBanner(),
-                      const RoleGateHero(),
-                      const SizedBox(height: 32),
-                      Text(
-                        '¿Cómo entrás?',
-                        style: AppText.heading.copyWith(fontSize: 32),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        session.isSellerPortalSession
-                            ? 'Sesión de vendedor: ventas y consulta de precios.'
-                            : session.isTenantManager
-                                ? 'Tu cuenta ya es administración en el servidor. El PIN solo identifica quién opera.'
-                                : 'Empleados consultan precios. Administración edita catálogo.',
-                        style: AppText.bodySmall,
-                      ),
-                      const SizedBox(height: 28),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: RoleEntryCard(
-                              label: AppRole.employee.label,
-                              subtitle: 'Consultar precios, stock y carrito',
-                              icon: Icons.search_rounded,
-                              highlighted: true,
-                              onTap: () {
-                                context.read<AuthService>().loginAs(AppRole.employee);
-                                onEmployee();
-                              },
-                            ),
-                          ),
-                          if (!session.isSellerPortalSession) ...[
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: RoleEntryCard(
-                                label: AppRole.admin.label,
-                                subtitle: session.isTenantManager
-                                    ? 'Panel completo (rol server: ${session.appRole})'
-                                    : 'Editar productos, stock y tipo de cambio',
-                                icon: Icons.tune_rounded,
-                                onTap: () => _askAdminPin(context),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            if (session.isSignedIn)
-              Positioned(
-                top: 16,
-                right: 16,
-                child: _SessionActions(session: session),
-              ),
-          ],
-        ),
+      return RoleGateDesktopLayout(
+        subtitle: _subtitle(session, isDesktop: true),
+        showAdminCard: !session.isSellerPortalSession,
+        onEmployee: () {
+          context.read<AuthService>().loginAs(AppRole.employee);
+          onEmployee();
+        },
+        onAdmin: () => _askAdminPin(context),
       );
     }
 
-    return FeriaScaffold(
-      constrainBody: false,
-      appBar: FeriaAppBar(
-        title: const TenantAppTitle(),
-        showBackButton: false,
-        leading: session.isSignedIn && session.destinationCount > 1
-            ? IconButton(
-                tooltip: 'Elegir otra armería',
-                onPressed: () =>
-                    context.read<TenantSessionService>().backToSelector(),
-                icon: const Icon(Icons.arrow_back_rounded),
-              )
-            : null,
-        actions: [
-          if (session.isSignedIn && session.destinationCount > 1)
-            IconButton(
-              tooltip: 'Cambiar de armería',
-              onPressed: () =>
-                  context.read<TenantSessionService>().backToSelector(),
-              icon: const Icon(Icons.swap_horiz_rounded),
-            ),
-          if (session.isSignedIn)
-            IconButton(
-              tooltip: 'Cerrar sesión',
-              onPressed: () => context.read<TenantSessionService>().signOut(),
-              icon: const Icon(Icons.logout_rounded),
-            ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+    return Scaffold(
+      backgroundColor: AppColors.canvas,
+      body: Stack(
         children: [
-          const SupabaseConfigBanner(),
-          const RoleGateHero(),
-          const SizedBox(height: 28),
-          Text('¿Cómo entrás?', style: AppText.heading.copyWith(fontSize: 26)),
-          const SizedBox(height: 8),
-          Text(
-            session.isSellerPortalSession
-                ? 'Sesión de vendedor: ventas y consulta de precios.'
-                : session.isTenantManager
-                    ? 'Tu cuenta ya es administración en el servidor. El PIN solo identifica quién opera.'
-                    : 'Empleados consultan precios. Administración edita catálogo.',
-            style: AppText.bodySmall,
-          ),
-          const SizedBox(height: 24),
-          RoleEntryCard(
-            label: AppRole.employee.label,
-            subtitle: 'Consultar precios, stock y carrito',
-            icon: Icons.search_rounded,
-            highlighted: true,
-            onTap: () {
-              context.read<AuthService>().loginAs(AppRole.employee);
-              onEmployee();
-            },
-          ),
-          if (!session.isSellerPortalSession) ...[
-            const SizedBox(height: 16),
-            RoleEntryCard(
-              label: AppRole.admin.label,
-              subtitle: session.isTenantManager
-                  ? 'Panel completo (rol server: ${session.appRole})'
-                  : 'Editar productos, stock y tipo de cambio',
-              icon: Icons.tune_rounded,
-              onTap: () => _askAdminPin(context),
+          SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+              children: [
+                const SupabaseConfigBanner(),
+                const RoleGateHero(),
+                const SizedBox(height: 28),
+                Text(
+                  '¿Cómo entrás?',
+                  style: AppText.heading.copyWith(fontSize: 26),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _subtitle(session, isDesktop: false),
+                  style: AppText.bodySmall,
+                ),
+                const SizedBox(height: 24),
+                RoleEntryCard(
+                  label: AppRole.employee.label,
+                  subtitle: 'Consultar precios, stock y carrito',
+                  icon: Icons.search_rounded,
+                  highlighted: true,
+                  onTap: () {
+                    context.read<AuthService>().loginAs(AppRole.employee);
+                    onEmployee();
+                  },
+                ),
+                if (!session.isSellerPortalSession) ...[
+                  const SizedBox(height: 16),
+                  RoleEntryCard(
+                    label: AppRole.admin.label,
+                    subtitle: session.isTenantManager
+                        ? 'Panel completo (rol server: ${session.appRole})'
+                        : 'Editar productos, stock y tipo de cambio',
+                    icon: Icons.tune_rounded,
+                    onTap: () => _askAdminPin(context),
+                  ),
+                ],
+                if (exchangeRate.hasServerRate) ...[
+                  const SizedBox(height: 24),
+                  DollarReferenceChip(
+                    rate: exchangeRate.rate,
+                    updatedAt: exchangeRate.updatedAt,
+                  ),
+                ],
+              ],
             ),
-          ],
-          if (exchangeRate.hasServerRate) ...[
-            const SizedBox(height: 24),
-            DollarReferenceChip(
-              rate: exchangeRate.rate,
-              updatedAt: exchangeRate.updatedAt,
+          ),
+          if (session.isSignedIn)
+            Positioned(
+              top: MediaQuery.paddingOf(context).top + 8,
+              right: 8,
+              child: _MobileSessionActions(session: session),
             ),
-          ],
         ],
       ),
     );
@@ -214,8 +143,8 @@ class RoleGateScreen extends StatelessWidget {
   }
 }
 
-class _SessionActions extends StatelessWidget {
-  const _SessionActions({required this.session});
+class _MobileSessionActions extends StatelessWidget {
+  const _MobileSessionActions({required this.session});
 
   final TenantSessionService session;
 
@@ -225,17 +154,16 @@ class _SessionActions extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (session.destinationCount > 1)
-          TextButton.icon(
-            onPressed: () => context.read<TenantSessionService>().backToSelector(),
-            icon: const Icon(Icons.swap_horiz_rounded, size: 18),
-            label: const Text('Cambiar armería'),
-            style: TextButton.styleFrom(foregroundColor: AppColors.textMuted),
+          IconButton(
+            tooltip: 'Cambiar de armería',
+            onPressed: () =>
+                context.read<TenantSessionService>().backToSelector(),
+            icon: const Icon(Icons.swap_horiz_rounded),
           ),
-        TextButton.icon(
+        IconButton(
+          tooltip: 'Cerrar sesión',
           onPressed: () => context.read<TenantSessionService>().signOut(),
-          icon: const Icon(Icons.logout_rounded, size: 18),
-          label: const Text('Salir'),
-          style: TextButton.styleFrom(foregroundColor: AppColors.textMuted),
+          icon: const Icon(Icons.logout_rounded),
         ),
       ],
     );

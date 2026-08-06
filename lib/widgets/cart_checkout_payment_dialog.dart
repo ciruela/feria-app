@@ -51,6 +51,7 @@ Future<CartCheckoutPayment?> showCartCheckoutPaymentDialog(
 
   return showDialog<CartCheckoutPayment>(
     context: context,
+    barrierColor: AppColors.scrim,
     builder: (context) => _CartCheckoutPaymentDialog(current: current),
   );
 }
@@ -84,7 +85,7 @@ class _CartCheckoutPaymentDialog extends StatelessWidget {
     if (asSheet) return content;
 
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       backgroundColor: AppColors.surfaceRaised,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppDecorations.radius),
@@ -106,7 +107,7 @@ class _CartCheckoutPaymentDialog extends StatelessWidget {
   ) {
     return ConstrainedBox(
       constraints: BoxConstraints(
-        maxWidth: asSheet ? double.infinity : 480,
+        maxWidth: asSheet ? double.infinity : 560,
         maxHeight: asSheet
             ? double.infinity
             : MediaQuery.sizeOf(context).height * 0.82,

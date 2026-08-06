@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-/// Lockup / monograma Armenext del handoff Cobre táctico.
+/// Marca de plataforma **Armenext** (sistema Cobre táctico).
+///
+/// Usar en todo el flujo empleado/vendedor (handoffs 01–08): mismo diseño
+/// para todas las armerías. El nombre del tenant (World Guns, etc.) no va en
+/// el chrome de esas pantallas — solo en selector de workspace, panel admin
+/// ([TenantAppTitle]) y documentos ([PresupuestoBranding]).
 class ArmenextLockup extends StatelessWidget {
   const ArmenextLockup({
     super.key,

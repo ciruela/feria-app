@@ -360,22 +360,51 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
     return FeriaScaffold(
       constrainBody: false,
-      appBar: FeriaAppBar(
-        title: const Text('Presupuesto'),
-        actions: [
-          if (isDesktop && seller != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Center(
-                child: Text(
-                  'Atiende ${formatSellerFirstName(seller.nombre)}'
-                  '${exchangeRate.updatedAt != null ? ' · ${formatDateTime(exchangeRate.updatedAt!)}' : ''}',
-                  style: AppText.bodySmall,
-                ),
+      appBar: isDesktop
+          ? FeriaAppBar(
+              title: Row(
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: TextButton.styleFrom(foregroundColor: AppColors.textMuted),
+                    child: const Text('Carrito'),
+                  ),
+                  Text(
+                    'Presupuesto',
+                    style: AppText.heading.copyWith(fontSize: 17),
+                  ),
+                ],
               ),
+              showBackButton: false,
+              actions: [
+                if (seller != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 20),
+                    child: Center(
+                      child: Text(
+                        'Atiende ${formatSellerFirstName(seller.nombre)}'
+                        '${exchangeRate.updatedAt != null ? ' · ${formatDateTime(exchangeRate.updatedAt!)}' : ''}',
+                        style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+                      ),
+                    ),
+                  ),
+              ],
+            )
+          : FeriaAppBar(
+              title: const Text('Presupuesto'),
+              actions: [
+                if (seller != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 16),
+                    child: Center(
+                      child: Text(
+                        'Atiende ${formatSellerFirstName(seller.nombre)}',
+                        style: AppText.bodySmall,
+                      ),
+                    ),
+                  ),
+              ],
             ),
-        ],
-      ),
       body: cart.isEmpty
           ? const Center(child: Text('El carrito está vacío'))
           : isDesktop
@@ -522,25 +551,55 @@ class _BudgetSidebar extends StatelessWidget {
             label: Text(finalizing ? 'Generando…' : 'Generar comprobante'),
           ),
           const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: onExportPdf,
-            icon: const Icon(Icons.picture_as_pdf_outlined),
-            label: const Text('Exportar PDF'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(44),
-              side: const BorderSide(color: AppColors.border),
+          if (isDesktop)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onExportPdf,
+                    icon: const Icon(Icons.picture_as_pdf_outlined),
+                    label: const Text('Exportar PDF'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(44),
+                      side: const BorderSide(color: AppColors.border),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onPrint,
+                    icon: const Icon(Icons.print_outlined),
+                    label: const Text('Imprimir'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(44),
+                      side: const BorderSide(color: AppColors.border),
+                    ),
+                  ),
+                ),
+              ],
+            )
+          else ...[
+            OutlinedButton.icon(
+              onPressed: onExportPdf,
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              label: const Text('Exportar PDF'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+                side: const BorderSide(color: AppColors.border),
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: onPrint,
-            icon: const Icon(Icons.print_outlined),
-            label: const Text('Imprimir'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(44),
-              side: const BorderSide(color: AppColors.border),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: onPrint,
+              icon: const Icon(Icons.print_outlined),
+              label: const Text('Imprimir'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+                side: const BorderSide(color: AppColors.border),
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

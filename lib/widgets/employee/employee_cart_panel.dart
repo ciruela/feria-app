@@ -34,15 +34,34 @@ class EmployeeCartPanel extends StatelessWidget {
           const Divider(height: 1, color: AppColors.border),
           Expanded(
             child: cart.isEmpty
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text(
-                        'El carrito está vacío.\n'
-                        'Tocá un producto de la tabla para sumarlo.',
-                        textAlign: TextAlign.center,
-                        style: AppText.bodySmall,
-                      ),
+                ? Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Todavía no cargaste nada',
+                          style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(AppDecorations.radius),
+                            border: Border.all(
+                              color: AppColors.border,
+                              width: AppDecorations.hairline,
+                            ),
+                          ),
+                          child: const Text(
+                            'El carrito está vacío.\n'
+                            'Tocá un producto de la tabla para sumarlo.',
+                            textAlign: TextAlign.center,
+                            style: AppText.bodySmall,
+                          ),
+                        ),
+                        const Spacer(),
+                      ],
                     ),
                   )
                 : const EmployeeCartBody(compact: true, showHeader: false),

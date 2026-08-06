@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../services/in_tenant_flow_service.dart';
 import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/armenext_brand.dart';
 import '../../widgets/feria_shell.dart';
 
 /// Selector de "espacio de trabajo": tras el login, si el usuario tiene acceso
@@ -65,7 +66,7 @@ class _WorkspaceSelectorScreenState extends State<WorkspaceSelectorScreen> {
 
     return FeriaScaffold(
       appBar: FeriaAppBar(
-        title: const Text('Elegí a dónde entrar'),
+        title: const SizedBox.shrink(),
         showBackButton: false,
         actions: [
           IconButton(
@@ -99,6 +100,24 @@ class _WorkspaceSelectorScreenState extends State<WorkspaceSelectorScreen> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        const Center(
+                          child: ArmenextLockup(width: 140, height: 34),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Elegí a dónde entrar',
+                          textAlign: TextAlign.center,
+                          style: AppText.heading,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Cada armería tiene su catálogo y equipo.',
+                          textAlign: TextAlign.center,
+                          style: AppText.bodySmall.copyWith(
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
                         if (session.email.isNotEmpty) ...[
                           Text(
                             session.email,

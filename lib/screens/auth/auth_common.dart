@@ -6,8 +6,8 @@ import '../../services/catalog_service.dart';
 import '../../services/exchange_rate_service.dart';
 import '../../services/seller_service.dart';
 import '../../services/tenant_session_service.dart';
-import '../../theme/app_theme.dart';
-import '../../utils/tenant_slug.dart';
+
+export '../../widgets/auth/auth_header.dart';
 
 /// Recarga datos del tenant activo tras autenticación.
 Future<void> reloadTenantData(BuildContext context) async {
@@ -21,56 +21,6 @@ Future<void> reloadTenantData(BuildContext context) async {
     context.read<AdminService>().load(),
     context.read<ExchangeRateService>().load(),
   ]);
-}
-
-/// Subtítulo del header según el tipo de entrada (plataforma vs tenant).
-String authLandingSubtitle() {
-  if (isTenantSubdomainEntry()) {
-    return 'Acceso para el equipo de esta armería';
-  }
-  return 'Panel de administración y ventas';
-}
-
-class AuthHeader extends StatelessWidget {
-  const AuthHeader({super.key, this.subtitle});
-
-  final String? subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final session = context.watch<TenantSessionService>();
-    final slug = detectTenantSlug();
-    final title = session.isSignedIn && session.effectiveTenantId != null
-        ? session.activeTenantDisplayName
-        : slug != null && slug.isNotEmpty
-            ? humanizeTenantSlug(slug)
-            : 'Feria Armerías';
-
-    return Column(
-      children: [
-        const Icon(
-          Icons.storefront_rounded,
-          size: 56,
-          color: AppColors.goldDark,
-        ),
-        const SizedBox(height: 16),
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          subtitle ?? authLandingSubtitle(),
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: AppColors.textSecondary),
-        ),
-      ],
-    );
-  }
 }
 
 /// Layout compartido de formularios de autenticación.

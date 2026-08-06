@@ -9,10 +9,15 @@ import '../services/pricing_service.dart';
 import '../services/pricing_settings_service.dart';
 import '../services/product_photo_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/layout_breakpoints.dart';
 import '../widgets/add_to_cart_sheet.dart';
 import '../widgets/added_to_cart_sheet.dart';
+import '../widgets/employee/employee_desktop_shell.dart';
+import '../widgets/employee/employee_nav.dart';
+import '../widgets/employee/product_detail_desktop.dart';
 import '../widgets/feria_shell.dart';
 import '../widgets/product_prices_panel.dart';
+import 'auth/tenant_app_shell.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({
@@ -78,6 +83,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     await handleAddedToCartNavigation(context, action);
   }
 
+  void _handleDesktopNav(BuildContext context, EmployeeNavItem item) {
+    switch (item) {
+      case EmployeeNavItem.catalog:
+      case EmployeeNavItem.byCode:
+        Navigator.of(context).pop();
+      case EmployeeNavItem.adminProducts:
+      case EmployeeNavItem.adminExchange:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Disponible en modo Administración desde el selector de rol.'),
+          ),
+        );
+      case EmployeeNavItem.cart:
+      case EmployeeNavItem.exit:
+        Navigator.of(context).pop();
+        if (item == EmployeeNavItem.exit) {
+          exitInTenantFlow(context);
+        }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final exchangeRate = context.watch<ExchangeRateService>();
@@ -90,6 +116,34 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       pricingSettings,
     );
     final displayUrls = _displayUrls;
+    final isDesktop = LayoutBreakpoints.isDesktop(MediaQuery.sizeOf(context).width);
+
+    final gallery = _PhotoGallery(
+      foto: product.foto,
+      displayUrls: displayUrls,
+      marca: product.marca,
+      accent: _accent,
+      pageController: _pageController,
+      page: _page,
+      onPageChanged: (index) => setState(() => _page = index),
+      onTap: displayUrls.isNotEmpty ? () => _openFullscreen(_page) : null,
+    );
+
+    if (isDesktop) {
+      return EmployeeDesktopShell(
+        selected: EmployeeNavItem.catalog,
+        onNav: (item) => _handleDesktopNav(context, item),
+        body: ProductDetailDesktopBody(
+          product: product,
+          prices: prices,
+          showArs: exchangeRate.hasServerRate,
+          photoGallery: AspectRatio(aspectRatio: 4 / 3, child: gallery),
+          canAdd: canAdd,
+          onBack: () => Navigator.of(context).pop(),
+          onAddToCart: _addToCart,
+        ),
+      );
+    }
 
     return FeriaScaffold(
       appBar: FeriaAppBar(
@@ -114,16 +168,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
-          _PhotoGallery(
-            foto: product.foto,
-            displayUrls: displayUrls,
-            marca: product.marca,
-            accent: _accent,
-            pageController: _pageController,
-            page: _page,
-            onPageChanged: (index) => setState(() => _page = index),
-            onTap: displayUrls.isNotEmpty ? () => _openFullscreen(_page) : null,
-          ),
+          gallery,
           if (displayUrls.length > 1) ...[
             const SizedBox(height: 8),
             Text(

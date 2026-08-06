@@ -17,7 +17,7 @@ import '../../utils/formatters.dart';
 import '../../utils/layout_breakpoints.dart';
 import '../../widgets/employee/catalog_category_chips.dart';
 import '../../widgets/employee/catalog_product_list.dart';
-import '../../widgets/employee/employee_cart_panel.dart';
+import '../../widgets/employee/employee_desktop_shell.dart';
 import '../../widgets/employee/employee_nav.dart';
 import '../../widgets/employee/employee_role_widgets.dart';
 import '../../widgets/section_header.dart';
@@ -154,19 +154,10 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
     );
 
     if (isDesktop) {
-      return Scaffold(
-        backgroundColor: AppColors.surface,
-        body: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            EmployeeSidebar(
-              selected: _nav,
-              onSelected: _handleNav,
-            ),
-            Expanded(child: catalogBody),
-            const EmployeeCartPanel(),
-          ],
-        ),
+      return EmployeeDesktopShell(
+        selected: _nav,
+        onNav: _handleNav,
+        body: catalogBody,
       );
     }
 

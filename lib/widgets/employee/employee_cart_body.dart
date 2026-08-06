@@ -109,6 +109,15 @@ class EmployeeCartBody extends StatelessWidget {
               ],
             ),
           ),
+        ] else if (compact) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text(
+              '${cart.itemCount} ítem${cart.itemCount == 1 ? '' : 's'}'
+              '${seller != null ? ' · ${formatSellerFirstName(seller.nombre)}' : ''}',
+              style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+            ),
+          ),
         ],
         Padding(
           padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 16),

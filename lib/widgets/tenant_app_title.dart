@@ -6,6 +6,9 @@ import '../utils/tenant_slug.dart';
 import 'feria_shell.dart';
 
 /// Título de app bar con el nombre de la armería activa.
+///
+/// Solo panel **admin** y contextos operativos por tenant.
+/// No usar en flujo empleado (catálogo, role gate, vendedor): ahí va Armenext.
 class TenantAppTitle extends StatelessWidget {
   const TenantAppTitle({
     super.key,
