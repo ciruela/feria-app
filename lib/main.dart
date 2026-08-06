@@ -55,11 +55,12 @@ Future<void> _bootstrap() async {
   if (!AppConfig.useSupabase) {
     await catalogService.load();
     await sellerService.load();
+    // Sin Supabase el TC es local; con Supabase se carga tras bindTenant.
+    await exchangeRateService.load();
+    await pricingSettingsService.load();
   }
-  await exchangeRateService.load();
   await authService.load();
   await adminService.load();
-  await pricingSettingsService.load();
 
   final dataSyncService = DataSyncService(
     catalog: catalogService,

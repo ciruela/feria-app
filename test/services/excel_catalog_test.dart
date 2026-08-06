@@ -203,6 +203,7 @@ void main() {
     test('fromMap puebla calibre/modelo desde la descripción', () {
       final row = ExcelProductRow.fromMap({
         'codigo': '20732',
+        'marca': 'CCI',
         'descripcion': 'C.22 30G LR VARMIT V-MAX 30GR 2200 FPS CCI M.73 (50)',
         'balas_por_caja': '50',
         'total_balas': '800',
@@ -215,7 +216,7 @@ void main() {
   });
 
   group('ExcelProductRow.fromMap (CCI)', () {
-    test('munición sin marca usa CCI por defecto', () {
+    test('munición sin marca queda vacía (fail-closed)', () {
       final row = ExcelProductRow.fromMap({
         'codigo': '0034',
         'descripcion': '22LR 40gr',
@@ -224,7 +225,7 @@ void main() {
         'precio_usd': '8.5',
       });
       expect(row.type, ProductType.municion);
-      expect(row.marca, ExcelCatalogService.defaultMunicionBrand);
+      expect(row.marca, isEmpty);
       expect(row.roundsPerBox, 50);
       expect(row.stock, 10);
       expect(row.precioUsd, 8.5);
@@ -380,6 +381,48 @@ void main() {
         isNull,
       );
       expect(ExcelCatalogService.normalizeBrandCandidate('Hoja1'), isNull);
+    });
+  });
+
+  group('ExcelCatalogService.parseRows multi-hoja', () {
+    test('lee productos de todas las hojas con su marca', () {
+      final excel = Excel.createExcel();
+      final first = excel.sheets.keys.first;
+      excel.rename(first, 'ORBEA');
+      final orbea = excel['ORBEA'];
+      void put(Sheet s, int c, int r, String v) => s
+          .cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r))
+          .value = TextCellValue(v);
+
+      put(orbea, 0, 0, 'ORBEA');
+      put(orbea, 0, 1, 'Código');
+      put(orbea, 1, 1, 'Descripción');
+      put(orbea, 2, 1, 'PRECIO');
+      put(orbea, 0, 2, '1111');
+      put(orbea, 1, 2, 'C.12 ORBEA (25)');
+      put(orbea, 2, 2, '10');
+
+      excel.copy('ORBEA', 'Aguila');
+      // copy may duplicate; rewrite Aguila sheet cleanly
+      final aguila = excel['Aguila']!;
+      // Clear by overwriting header/data
+      put(aguila, 0, 0, 'Aguila');
+      put(aguila, 0, 1, 'Código');
+      put(aguila, 1, 1, 'Descripción');
+      put(aguila, 2, 1, 'PRECIO');
+      put(aguila, 0, 2, '9999');
+      put(aguila, 1, 2, 'C.22 AGUILA (50)');
+      put(aguila, 2, 2, '12');
+
+      final rows = ExcelCatalogService()
+          .parseRows(Uint8List.fromList(excel.encode()!));
+      expect(rows.length, greaterThanOrEqualTo(2));
+      final marcas = rows.map((r) => r['marca']).toSet();
+      expect(marcas.contains('ORBEA') || marcas.contains('Orbea'), isTrue);
+      expect(
+        marcas.any((m) => (m ?? '').toLowerCase() == 'aguila'),
+        isTrue,
+      );
     });
   });
 

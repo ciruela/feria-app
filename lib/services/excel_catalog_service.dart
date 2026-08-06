@@ -25,11 +25,17 @@ class ExcelImportPreviewRow {
     required this.row,
     required this.action,
     this.existingId,
+    this.warnings = const [],
+    this.existingStock,
+    this.existingMarca,
   });
 
   final ExcelProductRow row;
   final ExcelImportAction action;
   final String? existingId;
+  final List<String> warnings;
+  final int? existingStock;
+  final String? existingMarca;
 }
 
 /// Resultado de interpretar un Excel sin escribir nada (para revisar antes).
@@ -47,12 +53,12 @@ class ExcelImportPreview {
       rows.where((r) => r.action == ExcelImportAction.update).length;
   int get toSkip =>
       rows.where((r) => r.action == ExcelImportAction.skip).length;
+
+  int get withWarnings =>
+      rows.where((r) => r.warnings.isNotEmpty).length;
 }
 
 class ExcelCatalogService {
-  /// Último recurso si la planilla no trae marca en columna, título ni hoja.
-  static const defaultMunicionBrand = 'CCI';
-
   /// Columnas que exporta la app (encabezados del template).
   static const headers = [
     'tipo',
@@ -377,33 +383,54 @@ class ExcelCatalogService {
     return Uint8List.fromList(bytes);
   }
 
+  /// Lee **todas** las hojas del workbook. Marca por hoja (título / Marca: / nombre).
   List<Map<String, String>> parseRows(Uint8List bytes) {
     final excel = Excel.decodeBytes(bytes);
     if (excel.tables.isEmpty) {
       throw Exception('El Excel está vacío');
     }
 
-    final sheetName = excel.tables.keys.first;
-    final sheet = excel.tables[sheetName]!;
-    if (sheet.rows.isEmpty) {
-      throw Exception('El Excel no tiene filas');
+    final rows = <Map<String, String>>[];
+    final errors = <String>[];
+
+    for (final sheetName in excel.tables.keys) {
+      final sheet = excel.tables[sheetName];
+      if (sheet == null || sheet.rows.isEmpty) continue;
+
+      try {
+        rows.addAll(_parseSheet(sheet.rows, sheetName: sheetName));
+      } catch (error) {
+        errors.add('$sheetName: $error');
+      }
     }
 
-    // No exigimos "marca"/"calibre" (las planillas de proveedor tipo CCI no las
-    // traen). Detectamos la fila de encabezados (que puede estar más abajo o
-    // partida en dos filas) y la marca del preámbulo / hoja / título.
-    final header = _findHeader(sheet.rows);
+    if (rows.isEmpty) {
+      final detail = errors.isEmpty
+          ? 'No encontré filas de productos debajo de los encabezados.'
+          : errors.join(' · ');
+      throw Exception(detail);
+    }
+
+    return rows;
+  }
+
+  List<Map<String, String>> _parseSheet(
+    List<List<Data?>> sheetRows, {
+    required String sheetName,
+  }) {
+    // No exigimos "marca"/"calibre" (las planillas de proveedor no las traen).
+    final header = _findHeader(sheetRows);
     final columnIndex = header.columns;
     final brand = _detectBrand(
-      sheet.rows,
+      sheetRows,
       header.dataStart,
       sheetName: sheetName,
     );
 
     final rows = <Map<String, String>>[];
 
-    for (var r = header.dataStart; r < sheet.rows.length; r++) {
-      final row = sheet.rows[r];
+    for (var r = header.dataStart; r < sheetRows.length; r++) {
+      final row = sheetRows[r];
       if (row.isEmpty || row.every((cell) => _cellText(cell).trim().isEmpty)) {
         continue;
       }
@@ -414,23 +441,21 @@ class ExcelCatalogService {
         data[entry.key] = _cellText(cell).replaceAll('\u00a0', ' ').trim();
       }
 
-      // Saltear filas sin ningún identificador (ej. filas de subtotal/total).
       final hasData = (data['codigo']?.isNotEmpty ?? false) ||
           (data['descripcion']?.isNotEmpty ?? false) ||
           (data['modelo']?.isNotEmpty ?? false);
       if (!hasData) continue;
 
-      // Marca detectada en el preámbulo cuando la fila no la trae.
       if (brand != null && (data['marca']?.isEmpty ?? true)) {
         data['marca'] = brand;
       }
+      data['_sheet'] = sheetName;
       rows.add(data);
     }
 
     if (rows.isEmpty) {
-      throw Exception('No encontré filas de productos debajo de los encabezados.');
+      throw Exception('sin filas de producto');
     }
-
     return rows;
   }
 
@@ -531,15 +556,10 @@ class ExcelProductRow {
     var modelo = data['modelo']?.trim() ?? '';
     final descripcion = data['descripcion']?.trim() ?? '';
 
-    // Marca ya viene de columna o del preámbulo (parseRows). Sin pista → default.
-    var marca = data['marca']?.trim() ?? '';
-    if (marca.isEmpty && type == ProductType.municion) {
-      marca = ExcelCatalogService.defaultMunicionBrand;
-    }
+    // Fail-closed: sin marca detectada no inventamos CCI.
+    final marca = data['marca']?.trim() ?? '';
 
-    // Munición estilo proveedor: datos empaquetados en la descripción
-    // ("C.22 40G LR MINI MAG 1235FPS CCI M.960 (50)"). Extraemos calibre y
-    // modelo cuando la planilla no trae esas columnas por separado.
+    // Munición estilo proveedor: datos empaquetados en la descripción.
     if (type == ProductType.municion && descripcion.isNotEmpty) {
       final parsed = ExcelCatalogService.parseMunicionDescription(descripcion);
       if (calibre.isEmpty) calibre = parsed.calibre;
@@ -562,23 +582,32 @@ class ExcelProductRow {
   static int? _parseInt(String? raw) {
     final value = raw?.trim() ?? '';
     if (value.isEmpty) return null;
-    // Soporta "1.000" o "1,000" como miles.
-    final normalized = value.replaceAll('.', '').replaceAll(',', '');
-    return int.tryParse(normalized) ?? int.tryParse(value);
+    // Entero con separador de miles (1.000 / 1,000). Rechaza decimales tipo 12.5.
+    if (RegExp(r'^\d{1,3}([.,]\d{3})+$').hasMatch(value)) {
+      final normalized = value.replaceAll('.', '').replaceAll(',', '');
+      return int.tryParse(normalized);
+    }
+    if (RegExp(r'^\d+$').hasMatch(value)) {
+      return int.tryParse(value);
+    }
+    // "12.5" / "10,5" no son enteros de stock.
+    return null;
   }
 
   /// Precio USD: soporta "12.5", "12,50", "1.234,56", "U\$D 12", etc.
+  /// Vacío → 0. Texto no numérico → FormatException (no 0 silencioso).
   static double _parsePrice(String? raw) {
-    var value = (raw ?? '')
-        .replaceAll('\u00a0', ' ')
-        .trim()
-        .replaceAll(RegExp(r'[^\d,.\-]'), '');
-    if (value.isEmpty) return 0;
+    final original = (raw ?? '').replaceAll('\u00a0', ' ').trim();
+    if (original.isEmpty) return 0;
+
+    var value = original.replaceAll(RegExp(r'[^\d,.\-]'), '');
+    if (value.isEmpty || value == '-' || value == '.' || value == ',') {
+      throw FormatException('Precio inválido: $original');
+    }
 
     final hasComma = value.contains(',');
     final hasDot = value.contains('.');
     if (hasComma && hasDot) {
-      // El último separador es el decimal (AR: 1.234,56 / US: 1,234.56).
       if (value.lastIndexOf(',') > value.lastIndexOf('.')) {
         value = value.replaceAll('.', '').replaceAll(',', '.');
       } else {
@@ -586,9 +615,25 @@ class ExcelProductRow {
       }
     } else if (hasComma) {
       value = value.replaceAll(',', '.');
+    } else if (hasDot) {
+      // Solo puntos: si hay grupos de miles (1.234 o 1.234.567) → miles AR.
+      final parts = value.split('.');
+      if (parts.length > 2 && parts.skip(1).every((p) => p.length == 3)) {
+        value = parts.join();
+      } else if (parts.length == 2 &&
+          parts[0].isNotEmpty &&
+          parts[1].length == 3 &&
+          !parts[0].contains(RegExp(r'\D'))) {
+        // Ambiguo "1.234": tratamos como miles (1234), típico en planillas AR.
+        value = parts.join();
+      }
     }
 
-    return double.tryParse(value) ?? 0;
+    final parsed = double.tryParse(value);
+    if (parsed == null) {
+      throw FormatException('Precio inválido: $original');
+    }
+    return parsed;
   }
 
   Product toNewProduct(int index) {

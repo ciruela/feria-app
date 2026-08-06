@@ -62,7 +62,8 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
           const SizedBox(height: 8),
           const Text(
             'Lista = USD × tipo de cambio. Transferencia usa precio lista. '
-            'Efectivo aplica descuento sobre lista. Débito y cuotas recargan % sobre lista.',
+            'Efectivo aplica descuento sobre lista. Débito y cuotas recargan % sobre lista. '
+            'Los % se guardan en la armería (todos los dispositivos usan los mismos).',
           ),
           const SizedBox(height: 20),
           _field('Descuento efectivo (%)', _efectivo),

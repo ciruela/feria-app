@@ -81,16 +81,35 @@ class EmployeeCartBody extends StatelessWidget {
       );
     }
 
-    final listaTotal = totalsService.cartTotalAtMethod(
-      cart: cart,
-      method: PaymentMethod.lista,
-      exchangeRate: exchangeRate,
-      pricingSettings: pricingSettings,
-    );
+    final hasRate = exchangeRate.hasServerRate;
+    final listaTotal = hasRate
+        ? totalsService.cartTotalAtMethod(
+            cart: cart,
+            method: PaymentMethod.lista,
+            exchangeRate: exchangeRate,
+            pricingSettings: pricingSettings,
+          )
+        : const CartLineTotal(usd: 0, ars: 0);
+    final canContinue = checkout != null && hasRate;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (!hasRate)
+          Material(
+            color: AppColors.danger.withValues(alpha: 0.12),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Text(
+                'Falta el tipo de cambio de esta armería. '
+                'Administración debe cargarlo antes de vender.',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.danger,
+                ),
+              ),
+            ),
+          ),
         if (showHeader) ...[
           Padding(
             padding: EdgeInsets.fromLTRB(compact ? 16 : 20, compact ? 16 : 20, 16, 8),
@@ -129,12 +148,15 @@ class EmployeeCartBody extends StatelessWidget {
                 pricingSettings,
               );
               final lineUsd = prices.usd * item.quantity;
-              final lineArs = pricingMethod.totalArsFor(prices) * item.quantity;
+              final lineArs = hasRate
+                  ? pricingMethod.totalArsFor(prices) * item.quantity
+                  : 0.0;
 
               return EmployeeCartLine(
                 item: item,
                 lineUsd: lineUsd,
                 lineArs: lineArs,
+                showArs: hasRate,
                 canIncrease: () {
                   final max = cart.maxQuantityForLine(item);
                   return max == null || item.quantity < max;
@@ -154,13 +176,20 @@ class EmployeeCartBody extends StatelessWidget {
         ),
         EmployeeCartFooter(
           compact: compact,
-          totalUsd: checkoutTotal?.usd ?? listaTotal.usd,
-          listaArs: listaTotal.ars,
-          allocations: allocations,
+          totalUsd: checkoutTotal?.usd ??
+              (hasRate
+                  ? listaTotal.usd
+                  : cart.items.fold<double>(
+                      0,
+                      (s, i) => s + i.product.precioUsd * i.quantity,
+                    )),
+          listaArs: hasRate ? listaTotal.ars : 0,
+          allocations: hasRate ? allocations : const [],
           checkoutConfigured: checkout != null,
-          exchangeRate: exchangeRate.rate,
-          updatedAt: exchangeRate.updatedAt,
-          onContinue: checkout != null ? () => _openBudget(context) : null,
+          hasServerRate: hasRate,
+          exchangeRate: hasRate ? exchangeRate.rate : null,
+          updatedAt: hasRate ? exchangeRate.updatedAt : null,
+          onContinue: canContinue ? () => _openBudget(context) : null,
         ),
       ],
     );
@@ -176,6 +205,7 @@ class EmployeeCartLine extends StatelessWidget {
     required this.canIncrease,
     required this.onDecrease,
     required this.onIncrease,
+    this.showArs = true,
   });
 
   final CartItem item;
@@ -184,6 +214,7 @@ class EmployeeCartLine extends StatelessWidget {
   final bool canIncrease;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
+  final bool showArs;
 
   @override
   Widget build(BuildContext context) {
@@ -210,7 +241,7 @@ class EmployeeCartLine extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                formatArs(lineArs),
+                showArs ? formatArs(lineArs) : '—',
                 style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w700),
               ),
             ],
@@ -281,6 +312,7 @@ class EmployeeCartFooter extends StatelessWidget {
     required this.listaArs,
     required this.allocations,
     required this.checkoutConfigured,
+    this.hasServerRate = true,
     required this.exchangeRate,
     this.updatedAt,
     this.onContinue,
@@ -291,6 +323,7 @@ class EmployeeCartFooter extends StatelessWidget {
   final double listaArs;
   final List<PaymentAllocation> allocations;
   final bool checkoutConfigured;
+  final bool hasServerRate;
   final double? exchangeRate;
   final DateTime? updatedAt;
   final VoidCallback? onContinue;
@@ -312,6 +345,7 @@ class EmployeeCartFooter extends StatelessWidget {
             listaArs: listaArs,
             allocations: allocations,
             checkoutConfigured: checkoutConfigured,
+            hasServerRate: hasServerRate,
             exchangeRate: exchangeRate,
             updatedAt: updatedAt,
             showExchangeNote: !compact,
@@ -343,6 +377,7 @@ class EmployeeCartTotalsBlock extends StatelessWidget {
     required this.listaArs,
     required this.allocations,
     required this.checkoutConfigured,
+    this.hasServerRate = true,
     required this.exchangeRate,
     this.updatedAt,
     this.showExchangeNote = true,
@@ -353,6 +388,7 @@ class EmployeeCartTotalsBlock extends StatelessWidget {
   final double listaArs;
   final List<PaymentAllocation> allocations;
   final bool checkoutConfigured;
+  final bool hasServerRate;
   final double? exchangeRate;
   final DateTime? updatedAt;
   final bool showExchangeNote;
@@ -363,7 +399,16 @@ class EmployeeCartTotalsBlock extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (!checkoutConfigured)
+        if (!hasServerRate)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              'Sin tipo de cambio: no se muestran precios en pesos',
+              textAlign: TextAlign.center,
+              style: AppText.bodySmall.copyWith(color: AppColors.danger),
+            ),
+          )
+        else if (!checkoutConfigured)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Text(
@@ -379,8 +424,8 @@ class EmployeeCartTotalsBlock extends StatelessWidget {
         const SizedBox(height: 6),
         _FooterTotalRow(
           label: 'Lista',
-          value: formatArs(listaArs),
-          valueMuted: listaValueMuted,
+          value: hasServerRate ? formatArs(listaArs) : '—',
+          valueMuted: listaValueMuted || !hasServerRate,
         ),
         if (allocations.isNotEmpty) ...[
           const SizedBox(height: 10),

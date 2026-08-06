@@ -40,11 +40,15 @@ class PaymentAllocation {
     required this.method,
     required this.amountUsd,
     required this.amountArs,
+    this.share = 1.0,
   });
 
   final PaymentMethod method;
   final double amountUsd;
   final double amountArs;
+
+  /// Porción de la venta (0–1). Debe sumar 1 entre todas las allocations.
+  final double share;
 
   bool get paysInUsd => method.isUsdPayment;
 }

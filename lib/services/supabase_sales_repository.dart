@@ -356,25 +356,15 @@ class SupabaseSalesRepository {
   }
 
   List<Map<String, dynamic>> _allocationShares(Budget budget) {
-    final allocations = budget.paymentAllocations;
-    final totalUsd = allocations.fold<double>(
-      0,
-      (sum, a) => sum + a.amountUsd,
-    );
-    final totalArs = allocations.fold<double>(
-      0,
-      (sum, a) => sum + a.amountArs,
-    );
-
-    return allocations.map((allocation) {
-      final share = allocation.paysInUsd
-          ? (totalUsd > 0 ? allocation.amountUsd / totalUsd : 0.0)
-          : (totalArs > 0 ? allocation.amountArs / totalArs : 0.0);
-      return {
-        'method': allocation.method.key,
-        'share': share,
-      };
-    }).toList();
+    return budget.paymentAllocations
+        .map(
+          (allocation) => {
+            'method': allocation.method.key,
+            // share de la venta (suma 1), no proporción dentro de una moneda.
+            'share': allocation.share,
+          },
+        )
+        .toList();
   }
 
   Map<String, dynamic> _pricingPayload(PricingSettingsService? settings) {

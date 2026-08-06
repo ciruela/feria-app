@@ -40,6 +40,10 @@ Future<AddedToCartAction?> promptAddToCart(
   final result = cart.addProductQuantity(product, quantity);
   if (!context.mounted) return null;
 
+  if (result == CartAddResult.missingPrice) {
+    showMissingPriceMessage(context);
+    return null;
+  }
   if (result == CartAddResult.stockLimitReached) {
     showStockLimitMessage(context, product);
     return null;

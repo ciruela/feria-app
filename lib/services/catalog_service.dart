@@ -584,21 +584,54 @@ class CatalogService extends ChangeNotifier {
     final rawRows = parser.parseRows(bytes);
     final rows = <ExcelImportPreviewRow>[];
     var unreadable = 0;
+    final seenCodes = <String>{};
 
     for (final raw in rawRows) {
       try {
         final row = ExcelProductRow.fromMap(raw);
         final existing = _findMatchingRow(row);
+        final warnings = <String>[];
+
+        if (row.marca.isEmpty) {
+          warnings.add('Sin marca (poné título o Marca: en la hoja)');
+        }
+        if (row.precioUsd <= 0) {
+          warnings.add(
+            existing != null
+                ? 'Precio USD 0 (se conserva el actual)'
+                : 'Precio USD 0',
+          );
+        }
+        if (existing == null && row.stock == null) {
+          warnings.add('Sin stock');
+        }
+        if (existing != null &&
+            row.marca.isNotEmpty &&
+            existing.marca.toLowerCase() != row.marca.toLowerCase()) {
+          warnings.add('Marca distinta: hoy ${existing.marca}');
+        }
+        final codeKey = row.codigo.trim().toLowerCase();
+        if (codeKey.isNotEmpty && !seenCodes.add(codeKey)) {
+          warnings.add('Código repetido en el Excel');
+        }
+
         final action = existing != null
             ? ExcelImportAction.update
             : (_canCreateFromRow(row)
                 ? ExcelImportAction.create
                 : ExcelImportAction.skip);
+        if (action == ExcelImportAction.skip && row.marca.isEmpty) {
+          warnings.add('Se omite: falta marca');
+        }
+
         rows.add(
           ExcelImportPreviewRow(
             row: row,
             action: action,
             existingId: existing?.id,
+            warnings: warnings,
+            existingStock: existing?.stock,
+            existingMarca: existing?.marca,
           ),
         );
       } catch (_) {
@@ -610,6 +643,11 @@ class CatalogService extends ChangeNotifier {
   }
 
   Future<ExcelImportResult> importFromExcel(Uint8List bytes) async {
+    // Catálogo fresco del servidor para no duplicar por caché vieja.
+    if (SupabaseService.isConfigured) {
+      await syncFromCloud(silent: true);
+    }
+
     final parser = ExcelCatalogService();
     final rows = parser.parseRows(bytes);
 

@@ -61,6 +61,8 @@ class CartTotalsService {
     return CartLineTotal(usd: usd, ars: ars);
   }
 
+  /// Asigna montos y [PaymentAllocation.share] (suma 1) para register_sale.
+  /// Dual USD+ARS: cada medio lleva su moneda con la porción de venta.
   List<PaymentAllocation> allocationsFor({
     required CartCheckoutPayment checkout,
     required CartLineTotal total,
@@ -71,39 +73,28 @@ class CartTotalsService {
           method: checkout.pricingMethod,
           amountUsd: checkout.pricingMethod.isUsdPayment ? total.usd : 0,
           amountArs: checkout.pricingMethod.isUsdPayment ? 0 : total.ars,
+          share: 1.0,
         ),
       ];
     }
 
     final primary = checkout.pricingMethod;
     final secondary = checkout.secondMethod!;
-    final share = checkout.primaryShare;
-
-    if (primary.isUsdPayment) {
-      return [
-        PaymentAllocation(
-          method: primary,
-          amountUsd: total.usd * share,
-          amountArs: 0,
-        ),
-        PaymentAllocation(
-          method: secondary,
-          amountUsd: total.usd * (1 - share),
-          amountArs: 0,
-        ),
-      ];
-    }
+    final share = checkout.primaryShare.clamp(0.05, 0.95);
+    final rest = 1.0 - share;
 
     return [
       PaymentAllocation(
         method: primary,
-        amountUsd: 0,
-        amountArs: total.ars * share,
+        amountUsd: primary.isUsdPayment ? total.usd * share : 0,
+        amountArs: primary.isUsdPayment ? 0 : total.ars * share,
+        share: share,
       ),
       PaymentAllocation(
         method: secondary,
-        amountUsd: 0,
-        amountArs: total.ars * (1 - share),
+        amountUsd: secondary.isUsdPayment ? total.usd * rest : 0,
+        amountArs: secondary.isUsdPayment ? 0 : total.ars * rest,
+        share: rest,
       ),
     ];
   }

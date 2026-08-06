@@ -234,6 +234,22 @@ class _BudgetScreenState extends State<BudgetScreen> {
     if (_finalizing) return;
 
     final cart = context.read<CartService>();
+    final exchangeRate = context.read<ExchangeRateService>();
+
+    if (!exchangeRate.hasServerRate) {
+      _showMessage(
+        'Falta el tipo de cambio de esta armería. '
+        'Pedile a administración que lo configure.',
+      );
+      return;
+    }
+
+    if (budget.lines.any((line) => line.unitUsd <= 0)) {
+      _showMessage(
+        'Hay productos sin precio USD. Sacalos del carrito o pedí que los carguen.',
+      );
+      return;
+    }
 
     if (!cart.hasCheckoutPayment) {
       _showMessage('Configurá cómo abona el cliente antes de generar el comprobante.');

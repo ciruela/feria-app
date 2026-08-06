@@ -84,7 +84,9 @@ class CartMobileLayout extends StatelessWidget {
                   totalsService: totalsService,
                   checkout: checkout,
                   pricingMethod: pricingMethod,
-                  onContinue: checkout != null ? () => _openBudget(context) : null,
+                  onContinue: checkout != null && exchangeRate.hasServerRate
+                      ? () => _openBudget(context)
+                      : null,
                 ),
         ),
       ],
@@ -130,16 +132,37 @@ class _CartMobileContent extends StatelessWidget {
       );
     }
 
-    final listaTotal = totalsService.cartTotalAtMethod(
-      cart: cart,
-      method: PaymentMethod.lista,
-      exchangeRate: exchangeRate,
-      pricingSettings: pricingSettings,
-    );
+    final hasRate = exchangeRate.hasServerRate;
+    final listaTotal = hasRate
+        ? totalsService.cartTotalAtMethod(
+            cart: cart,
+            method: PaymentMethod.lista,
+            exchangeRate: exchangeRate,
+            pricingSettings: pricingSettings,
+          )
+        : const CartLineTotal(usd: 0, ars: 0);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       children: [
+        if (!hasRate) ...[
+          Material(
+            color: AppColors.danger.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
+            child: const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text(
+                'Falta el tipo de cambio de esta armería. '
+                'Administración debe cargarlo antes de vender.',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.danger,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         const CartCheckoutPaymentPanel(
           budgetHandoff: true,
           raisedSurface: true,
@@ -155,7 +178,8 @@ class _CartMobileContent extends StatelessWidget {
                   child: _CartMobileLine(
                     item: cart.items[i],
                     lineUsd: _lineUsd(cart.items[i]),
-                    lineArs: _lineArs(cart.items[i]),
+                    lineArs: hasRate ? _lineArs(cart.items[i]) : 0,
+                    showArs: hasRate,
                     canIncrease: _canIncrease(cart, cart.items[i]),
                     onDecrease: () =>
                         cart.changeQuantity(cart.items[i].lineKey, cart.items[i].quantity - 1),
@@ -171,12 +195,19 @@ class _CartMobileContent extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: EmployeeCartTotalsBlock(
-              totalUsd: checkoutTotal?.usd ?? listaTotal.usd,
-              listaArs: listaTotal.ars,
-              allocations: allocations,
+              totalUsd: checkoutTotal?.usd ??
+                  (hasRate
+                      ? listaTotal.usd
+                      : cart.items.fold<double>(
+                          0,
+                          (s, i) => s + i.product.precioUsd * i.quantity,
+                        )),
+              listaArs: hasRate ? listaTotal.ars : 0,
+              allocations: hasRate ? allocations : const [],
               checkoutConfigured: checkout != null,
-              exchangeRate: exchangeRate.rate,
-              updatedAt: exchangeRate.updatedAt,
+              hasServerRate: hasRate,
+              exchangeRate: hasRate ? exchangeRate.rate : null,
+              updatedAt: hasRate ? exchangeRate.updatedAt : null,
               listaValueMuted: true,
             ),
           ),
@@ -250,6 +281,7 @@ class _CartMobileLine extends StatelessWidget {
     required this.canIncrease,
     required this.onDecrease,
     required this.onIncrease,
+    this.showArs = true,
   });
 
   final CartItem item;
@@ -258,6 +290,7 @@ class _CartMobileLine extends StatelessWidget {
   final bool canIncrease;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
+  final bool showArs;
 
   @override
   Widget build(BuildContext context) {
@@ -265,6 +298,7 @@ class _CartMobileLine extends StatelessWidget {
       item: item,
       lineUsd: lineUsd,
       lineArs: lineArs,
+      showArs: showArs,
       canIncrease: canIncrease,
       onDecrease: onDecrease,
       onIncrease: onIncrease,

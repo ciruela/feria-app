@@ -23,6 +23,7 @@ class CartItem {
 enum CartAddResult {
   added,
   stockLimitReached,
+  missingPrice,
 }
 
 class CartService extends ChangeNotifier {
@@ -66,6 +67,7 @@ class CartService extends ChangeNotifier {
   }
 
   bool canAddMore(Product product) {
+    if (product.precioUsd <= 0) return false;
     if (AppConfig.useSupabase && product.stock == null) return false;
     if (!product.inStock) return false;
 
@@ -86,6 +88,9 @@ class CartService extends ChangeNotifier {
 
   CartAddResult addProductQuantity(Product product, int quantity) {
     if (quantity <= 0) return CartAddResult.stockLimitReached;
+    if (product.precioUsd <= 0) {
+      return CartAddResult.missingPrice;
+    }
     if (AppConfig.useSupabase && product.stock == null) {
       return CartAddResult.stockLimitReached;
     }

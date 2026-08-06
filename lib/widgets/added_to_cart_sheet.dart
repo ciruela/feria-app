@@ -112,3 +112,13 @@ void showStockLimitMessage(BuildContext context, Product product) {
     SnackBar(content: Text(message)),
   );
 }
+
+void showMissingPriceMessage(BuildContext context) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text(
+        'Este producto no tiene precio USD. Pedile a administración que lo cargue.',
+      ),
+    ),
+  );
+}

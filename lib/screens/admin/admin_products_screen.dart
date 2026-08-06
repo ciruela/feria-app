@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/product.dart';
 import '../../services/catalog_service.dart';
+import '../../services/exchange_rate_service.dart';
 import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
@@ -691,6 +692,41 @@ class _ProductAdminTile extends StatelessWidget {
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
                       ),
+                    ),
+                    const SizedBox(height: 4),
+                    Builder(
+                      builder: (context) {
+                        final fx = context.watch<ExchangeRateService>();
+                        if (!fx.hasServerRate) {
+                          return const Text(
+                            'Sin tipo de cambio',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textSecondary,
+                            ),
+                          );
+                        }
+                        if (product.precioUsd <= 0) {
+                          return const Text(
+                            'Sin precio USD',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.accent,
+                            ),
+                          );
+                        }
+                        final lista = product.precioUsd * fx.rate;
+                        return Text(
+                          'Lista ${formatArs(lista)}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textSecondary,
+                          ),
+                        );
+                      },
                     ),
                     if (product.isMunicion &&
                         product.stockInicial != null) ...[

@@ -65,6 +65,12 @@ class _ExcelImportPreviewDialog extends StatelessWidget {
                     value: preview.toSkip + preview.unreadable,
                     color: AppColors.textSecondary,
                   ),
+                  if (preview.withWarnings > 0)
+                    _SummaryPill(
+                      label: 'Con avisos',
+                      value: preview.withWarnings,
+                      color: AppColors.accent,
+                    ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -130,6 +136,7 @@ class _PreviewTable extends StatelessWidget {
               DataColumn(label: Text('Código')),
               DataColumn(label: Text('Precio USD')),
               DataColumn(label: Text('Stock')),
+              DataColumn(label: Text('Avisos')),
             ],
             rows: rows.map(_buildRow).toList(),
           ),
@@ -144,6 +151,9 @@ class _PreviewTable extends StatelessWidget {
     final style = dim
         ? const TextStyle(color: AppColors.textSecondary)
         : const TextStyle(color: AppColors.textPrimary);
+    final stockLabel = item.existingStock != null && row.stock != null
+        ? '${item.existingStock} → ${row.stock}'
+        : (row.stock?.toString() ?? '—');
 
     return DataRow(
       cells: [
@@ -154,7 +164,20 @@ class _PreviewTable extends StatelessWidget {
         DataCell(Text(_orDash(row.modelo), style: style)),
         DataCell(Text(_orDash(row.codigo), style: style)),
         DataCell(Text(formatUsd(row.precioUsd), style: style)),
-        DataCell(Text(row.stock?.toString() ?? '—', style: style)),
+        DataCell(Text(stockLabel, style: style)),
+        DataCell(
+          Text(
+            item.warnings.isEmpty ? '—' : item.warnings.join(' · '),
+            style: TextStyle(
+              color: item.warnings.isEmpty
+                  ? AppColors.textSecondary
+                  : AppColors.accent,
+              fontSize: 12,
+              fontWeight:
+                  item.warnings.isEmpty ? FontWeight.w400 : FontWeight.w700,
+            ),
+          ),
+        ),
       ],
     );
   }
