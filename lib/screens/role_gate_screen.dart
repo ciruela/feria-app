@@ -11,8 +11,8 @@ import '../services/tenant_session_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/layout_breakpoints.dart';
 import '../widgets/admin_pin_entry.dart';
-import '../widgets/employee/employee_role_widgets.dart';
 import '../widgets/employee/role_gate_desktop.dart';
+import '../widgets/employee/role_gate_mobile.dart';
 import '../widgets/supabase_config_banner.dart';
 
 typedef AdminEntryCallback = void Function(AdminUser admin);
@@ -61,53 +61,18 @@ class RoleGateScreen extends StatelessWidget {
       backgroundColor: AppColors.canvas,
       body: Stack(
         children: [
-          SafeArea(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
-              children: [
-                const SupabaseConfigBanner(),
-                const RoleGateHero(),
-                const SizedBox(height: 28),
-                Text(
-                  '¿Cómo entrás?',
-                  style: AppText.heading.copyWith(fontSize: 26),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _subtitle(session, isDesktop: false),
-                  style: AppText.bodySmall,
-                ),
-                const SizedBox(height: 24),
-                RoleEntryCard(
-                  label: AppRole.employee.label,
-                  subtitle: 'Consultar precios, stock y carrito',
-                  icon: Icons.search_rounded,
-                  highlighted: true,
-                  onTap: () {
-                    context.read<AuthService>().loginAs(AppRole.employee);
-                    onEmployee();
-                  },
-                ),
-                if (!session.isSellerPortalSession) ...[
-                  const SizedBox(height: 16),
-                  RoleEntryCard(
-                    label: AppRole.admin.label,
-                    subtitle: session.isTenantManager
-                        ? 'Panel completo (rol server: ${session.appRole})'
-                        : 'Editar productos, stock y tipo de cambio',
-                    icon: Icons.tune_rounded,
-                    onTap: () => _askAdminPin(context),
-                  ),
-                ],
-                if (exchangeRate.hasServerRate) ...[
-                  const SizedBox(height: 24),
-                  DollarReferenceChip(
-                    rate: exchangeRate.rate,
-                    updatedAt: exchangeRate.updatedAt,
-                  ),
-                ],
-              ],
-            ),
+          RoleGateMobileLayout(
+            subtitle: _subtitle(session, isDesktop: false),
+            showAdminCard: !session.isSellerPortalSession,
+            exchangeRate:
+                exchangeRate.hasServerRate ? exchangeRate.rate : null,
+            exchangeUpdatedAt: exchangeRate.updatedAt,
+            header: const SupabaseConfigBanner(),
+            onEmployee: () {
+              context.read<AuthService>().loginAs(AppRole.employee);
+              onEmployee();
+            },
+            onAdmin: () => _askAdminPin(context),
           ),
           if (session.isSignedIn)
             Positioned(

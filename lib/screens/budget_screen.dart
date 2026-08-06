@@ -24,8 +24,8 @@ import '../utils/formatters.dart';
 import '../utils/presupuesto_pdf.dart';
 import '../widgets/cart_checkout_payment_panel.dart';
 import '../widgets/employee/budget_desktop_layout.dart';
+import '../widgets/employee/budget_mobile_layout.dart';
 import '../widgets/employee/dni_scan_sheet.dart';
-import '../widgets/feria_shell.dart';
 import '../widgets/presupuesto_paper.dart';
 import 'comprobante_screen.dart';
 
@@ -336,26 +336,32 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
     final displayTotalArs = checkoutTotal?.ars ?? listaTotal.ars;
 
-    final sidebar = _BudgetSidebar(
-      scanning: _scanning,
-      checkoutConfigured: checkoutConfigured,
+    final actions = _BudgetActions(
       finalizing: _finalizing,
-      hasCustomerData: hasCustomerData,
-      displayTotalArs: displayTotalArs,
-      listaArs: listaTotal.ars,
-      exchangeRate: exchangeRate.rate,
-      onScanDni: _pickScanSource,
-      onRescanDni: _pickScanSource,
       onGenerate: checkoutConfigured && !_finalizing
           ? () => _finalizeComprobante(budget)
           : null,
       onExportPdf: () => _exportPdf(budget),
       onPrint: () => _printBudget(budget),
-      desktopHandoff: isDesktop,
     );
 
-    final preview = Center(
-      child: PresupuestoA4Preview(
+    if (cart.isEmpty) {
+      return Scaffold(
+        backgroundColor: AppColors.canvas,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            BudgetMobileHeader(onBack: () => Navigator.of(context).pop()),
+            const Expanded(
+              child: Center(child: Text('El carrito está vacío')),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (isDesktop) {
+      final previewWidget = PresupuestoA4Preview(
         child: PresupuestoPaper(
           budget: budget,
           controllers: _controllers,
@@ -367,17 +373,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
             context.read<CartService>().updateTarjetaConsumo(lineKey, value);
           },
         ),
-      ),
-    );
-
-    if (cart.isEmpty) {
-      return const FeriaScaffold(
-        appBar: FeriaAppBar(title: Text('Presupuesto')),
-        body: Center(child: Text('El carrito está vacío')),
       );
-    }
 
-    if (isDesktop) {
       return Scaffold(
         backgroundColor: AppColors.canvas,
         body: BudgetDesktopLayout(
@@ -386,14 +383,24 @@ class _BudgetScreenState extends State<BudgetScreen> {
             updatedAt: exchangeRate.updatedAt,
             onBack: () => Navigator.of(context).pop(),
           ),
-          sidebar: sidebar,
+          sidebar: _BudgetSidebar(
+            scanning: _scanning,
+            checkoutConfigured: checkoutConfigured,
+            hasCustomerData: hasCustomerData,
+            displayTotalArs: displayTotalArs,
+            listaArs: listaTotal.ars,
+            exchangeRate: exchangeRate.rate,
+            onScanDni: _pickScanSource,
+            onRescanDni: _pickScanSource,
+            actions: actions,
+          ),
           preview: ColoredBox(
             color: AppColors.canvas,
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
               child: Align(
                 alignment: Alignment.topCenter,
-                child: preview,
+                child: Center(child: previewWidget),
               ),
             ),
           ),
@@ -401,31 +408,30 @@ class _BudgetScreenState extends State<BudgetScreen> {
       );
     }
 
-    return FeriaScaffold(
-      constrainBody: false,
-      appBar: FeriaAppBar(
-        title: const Text('Presupuesto'),
-        actions: [
-          if (seller != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Center(
-                child: Text(
-                  'Atiende ${formatSellerFirstName(seller.nombre)}',
-                  style: AppText.bodySmall,
-                ),
-              ),
-            ),
-        ],
+    final previewWidget = PresupuestoA4Preview(
+      maxWidth: MediaQuery.sizeOf(context).width - 32,
+      child: PresupuestoPaper(
+        budget: budget,
+        controllers: _controllers,
+        onChanged: () => setState(() {}),
+        onSerialChanged: (lineKey, value) {
+          context.read<CartService>().updateSerialNumber(lineKey, value);
+        },
+        onTcChanged: (lineKey, value) {
+          context.read<CartService>().updateTarjetaConsumo(lineKey, value);
+        },
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          sidebar,
-          const SizedBox(height: 16),
-          preview,
-        ],
-      ),
+    );
+
+    return BudgetMobileLayout(
+      scanning: _scanning,
+      hasCustomerData: hasCustomerData,
+      checkoutConfigured: checkoutConfigured,
+      onBack: () => Navigator.of(context).pop(),
+      onScanDni: _pickScanSource,
+      onRescanDni: _pickScanSource,
+      preview: previewWidget,
+      actions: actions,
     );
   }
 }
@@ -434,32 +440,24 @@ class _BudgetSidebar extends StatelessWidget {
   const _BudgetSidebar({
     required this.scanning,
     required this.checkoutConfigured,
-    required this.finalizing,
     required this.hasCustomerData,
     required this.displayTotalArs,
     required this.listaArs,
     required this.exchangeRate,
     required this.onScanDni,
     required this.onRescanDni,
-    required this.onGenerate,
-    required this.onExportPdf,
-    required this.onPrint,
-    this.desktopHandoff = false,
+    required this.actions,
   });
 
   final bool scanning;
   final bool checkoutConfigured;
-  final bool finalizing;
   final bool hasCustomerData;
   final double displayTotalArs;
   final double listaArs;
   final double? exchangeRate;
   final VoidCallback onScanDni;
   final VoidCallback onRescanDni;
-  final VoidCallback? onGenerate;
-  final VoidCallback onExportPdf;
-  final VoidCallback onPrint;
-  final bool desktopHandoff;
+  final Widget actions;
 
   @override
   Widget build(BuildContext context) {
@@ -504,7 +502,7 @@ class _BudgetSidebar extends StatelessWidget {
         const SizedBox(height: 24),
         Text('FORMA DE PAGO', style: sectionLabel),
         const SizedBox(height: 10),
-        CartCheckoutPaymentPanel(budgetHandoff: desktopHandoff),
+        const CartCheckoutPaymentPanel(budgetHandoff: true),
         if (!checkoutConfigured) ...[
           const SizedBox(height: 8),
           Text(
@@ -529,7 +527,41 @@ class _BudgetSidebar extends StatelessWidget {
       ],
     );
 
-    final actions = Column(
+    return ColoredBox(
+      color: AppColors.canvas,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: SingleChildScrollView(child: content),
+            ),
+            const SizedBox(height: 16),
+            actions,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BudgetActions extends StatelessWidget {
+  const _BudgetActions({
+    required this.finalizing,
+    required this.onGenerate,
+    required this.onExportPdf,
+    required this.onPrint,
+  });
+
+  final bool finalizing;
+  final VoidCallback? onGenerate;
+  final VoidCallback onExportPdf;
+  final VoidCallback onPrint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         FilledButton.icon(
@@ -584,37 +616,6 @@ class _BudgetSidebar extends StatelessWidget {
           ],
         ),
       ],
-    );
-
-    if (desktopHandoff) {
-      return ColoredBox(
-        color: AppColors.canvas,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: SingleChildScrollView(child: content),
-              ),
-              const SizedBox(height: 16),
-              actions,
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          content,
-          const SizedBox(height: 20),
-          actions,
-        ],
-      ),
     );
   }
 }

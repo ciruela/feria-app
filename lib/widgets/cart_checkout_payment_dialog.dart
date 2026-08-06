@@ -12,6 +12,7 @@ import '../services/pricing_settings_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/formatters.dart';
 import '../utils/layout_breakpoints.dart';
+import 'employee/cart_checkout_payment_mobile.dart';
 
 Future<CartCheckoutPayment?> showCartCheckoutPaymentDialog(
   BuildContext context, {
@@ -28,7 +29,7 @@ Future<CartCheckoutPayment?> showCartCheckoutPaymentDialog(
     result = await showModalBottomSheet<CartCheckoutPayment>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surfaceRaised,
+      backgroundColor: AppColors.canvas,
       barrierColor: AppColors.scrim,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
@@ -41,9 +42,9 @@ Future<CartCheckoutPayment?> showCartCheckoutPaymentDialog(
         ),
         child: DraggableScrollableSheet(
           expand: false,
-          initialChildSize: 0.88,
-          minChildSize: 0.5,
-          maxChildSize: 0.92,
+          initialChildSize: 0.92,
+          minChildSize: 0.55,
+          maxChildSize: 0.96,
           builder: (_, scrollController) => _CartCheckoutPaymentDialog(
             current: current,
             scrollController: scrollController,
@@ -113,6 +114,60 @@ class _CartCheckoutPaymentDialogState extends State<_CartCheckoutPaymentDialog> 
     Navigator.of(context).pop(_selected);
   }
 
+  Future<void> _openDualPayment(
+    BuildContext context, {
+    required CartService cart,
+    required ExchangeRateService exchangeRate,
+    required PricingSettingsService pricingSettings,
+    required CartTotalsService totalsService,
+  }) async {
+    final dual = widget.asSheet
+        ? await showModalBottomSheet<CartCheckoutPayment>(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: AppColors.canvas,
+            barrierColor: AppColors.scrim,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(AppDecorations.radiusSheet),
+              ),
+            ),
+            builder: (context) => Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(context).bottom,
+              ),
+              child: DraggableScrollableSheet(
+                expand: false,
+                initialChildSize: 0.88,
+                minChildSize: 0.5,
+                maxChildSize: 0.96,
+                builder: (_, scrollController) =>
+                    _CartDualPaymentWizardDialog(
+                  cart: cart,
+                  exchangeRate: exchangeRate,
+                  pricingSettings: pricingSettings,
+                  totalsService: totalsService,
+                  asSheet: true,
+                  scrollController: scrollController,
+                ),
+              ),
+            ),
+          )
+        : await showDialog<CartCheckoutPayment>(
+            context: context,
+            barrierColor: AppColors.scrim,
+            builder: (context) => _CartDualPaymentWizardDialog(
+              cart: cart,
+              exchangeRate: exchangeRate,
+              pricingSettings: pricingSettings,
+              totalsService: totalsService,
+            ),
+          );
+    if (dual != null && mounted) {
+      _selectDual(dual);
+    }
+  }
+
   bool get _isSingleSelected {
     final selected = _selected;
     return selected != null && !selected.isDual;
@@ -162,8 +217,28 @@ class _CartCheckoutPaymentDialogState extends State<_CartCheckoutPaymentDialog> 
     CartTotalsService totalsService, {
     required bool isDesktop,
   }) {
-    final methods =
-        isDesktop ? checkoutDialogPaymentMethods : selectablePaymentMethods;
+    if (widget.asSheet) {
+      return CartCheckoutPaymentMobileContent(
+        selected: _selected,
+        selectedMethod: _selectedMethod,
+        cart: cart,
+        exchangeRate: exchangeRate,
+        pricingSettings: pricingSettings,
+        totalsService: totalsService,
+        scrollController: widget.scrollController,
+        onSelectSingle: _selectSingle,
+        onOpenDualPayment: () => _openDualPayment(
+          context,
+          cart: cart,
+          exchangeRate: exchangeRate,
+          pricingSettings: pricingSettings,
+          totalsService: totalsService,
+        ),
+        onConfirm: _confirm,
+      );
+    }
+
+    final methods = checkoutDialogPaymentMethods;
 
     return ConstrainedBox(
       constraints: BoxConstraints(
@@ -175,27 +250,15 @@ class _CartCheckoutPaymentDialogState extends State<_CartCheckoutPaymentDialog> 
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (widget.asSheet)
-            Padding(
-              padding: const EdgeInsets.only(top: 10, bottom: 4),
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
           Padding(
-            padding: EdgeInsets.fromLTRB(24, widget.asSheet ? 16 : 28, 24, 0),
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
             child: Column(
               children: [
                 Text(
                   '¿Cómo abona el cliente?',
                   textAlign: TextAlign.center,
                   style: AppText.heading.copyWith(
-                    fontSize: isDesktop ? 26 : 22,
+                    fontSize: 26,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -216,21 +279,13 @@ class _CartCheckoutPaymentDialogState extends State<_CartCheckoutPaymentDialog> 
             child: SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: () async {
-                  final dual = await showDialog<CartCheckoutPayment>(
-                    context: context,
-                    barrierColor: AppColors.scrim,
-                    builder: (context) => _CartDualPaymentWizardDialog(
-                      cart: cart,
-                      exchangeRate: exchangeRate,
-                      pricingSettings: pricingSettings,
-                      totalsService: totalsService,
-                    ),
-                  );
-                  if (dual != null && mounted) {
-                    _selectDual(dual);
-                  }
-                },
+                onPressed: () => _openDualPayment(
+                  context,
+                  cart: cart,
+                  exchangeRate: exchangeRate,
+                  pricingSettings: pricingSettings,
+                  totalsService: totalsService,
+                ),
                 icon: const Icon(Icons.swap_horiz_rounded, size: 18),
                 label: const Text('Pagar en dos formas'),
                 style: FilledButton.styleFrom(
@@ -371,12 +426,16 @@ class _CartDualPaymentWizardDialog extends StatefulWidget {
     required this.exchangeRate,
     required this.pricingSettings,
     required this.totalsService,
+    this.asSheet = false,
+    this.scrollController,
   });
 
   final CartService cart;
   final ExchangeRateService exchangeRate;
   final PricingSettingsService pricingSettings;
   final CartTotalsService totalsService;
+  final bool asSheet;
+  final ScrollController? scrollController;
 
   @override
   State<_CartDualPaymentWizardDialog> createState() =>
@@ -487,6 +546,117 @@ class _CartDualPaymentWizardDialogState
 
   @override
   Widget build(BuildContext context) {
+    final content = ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: widget.asSheet ? double.infinity : 680,
+        maxHeight: widget.asSheet
+            ? double.infinity
+            : MediaQuery.sizeOf(context).height * 0.84,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(24, widget.asSheet ? 24 : 28, 24, 0),
+            child: Column(
+              children: [
+                Text(
+                  _stepTitle,
+                  textAlign: TextAlign.center,
+                  style: AppText.heading.copyWith(fontSize: 22),
+                ),
+                if (_stepSubtitle != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _stepSubtitle!,
+                    textAlign: TextAlign.center,
+                    style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Flexible(
+            child: SingleChildScrollView(
+              controller: widget.scrollController,
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: switch (_step) {
+                _DualPaymentStep.first || _DualPaymentStep.second =>
+                  _MethodPicker(
+                    mobileHandoff: widget.asSheet,
+                    exclude: _step == _DualPaymentStep.second && _first != null
+                        ? {_first!}
+                        : const {},
+                    selected: _step == _DualPaymentStep.first ? _first : _second,
+                    cart: widget.cart,
+                    exchangeRate: widget.exchangeRate,
+                    pricingSettings: widget.pricingSettings,
+                    totalsService: widget.totalsService,
+                    onSelected: (method) {
+                      setState(() {
+                        if (_step == _DualPaymentStep.first) {
+                          _first = method;
+                        } else {
+                          _second = method;
+                        }
+                      });
+                    },
+                  ),
+                _DualPaymentStep.split => _SplitStep(
+                    first: _first!,
+                    second: _second!,
+                    share: _share,
+                    total: _total,
+                    amountController: _amountController,
+                    formatAmount: _formatAmount,
+                    amountFor: _amountFor,
+                    onShareChanged: (value) {
+                      setState(() {
+                        _share = value;
+                        _amountController.text = _formatAmount(_amountFor(value))
+                            .replaceAll(RegExp(r'[^0-9.,]'), '');
+                      });
+                    },
+                    onAmountChanged: _syncShareFromAmount,
+                  ),
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+            child: Row(
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                if (_step != _DualPaymentStep.first) ...[
+                  TextButton(
+                    onPressed: _goBack,
+                    child: const Text('Volver'),
+                  ),
+                ],
+                const Spacer(),
+                FilledButton(
+                  onPressed: _canProceed ? _goNext : null,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.surfaceTouch,
+                    foregroundColor: AppColors.textPrimary,
+                  ),
+                  child: Text(
+                    _step == _DualPaymentStep.split ? 'Confirmar' : 'Siguiente',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (widget.asSheet) return content;
+
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 48, vertical: 40),
       backgroundColor: AppColors.surfaceRaised,
@@ -494,110 +664,7 @@ class _CartDualPaymentWizardDialogState
         borderRadius: BorderRadius.circular(AppDecorations.radiusSheet),
         side: const BorderSide(color: AppColors.border, width: AppDecorations.hairline),
       ),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: 680,
-          maxHeight: MediaQuery.sizeOf(context).height * 0.84,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
-              child: Column(
-                children: [
-                  Text(
-                    _stepTitle,
-                    textAlign: TextAlign.center,
-                    style: AppText.heading.copyWith(fontSize: 22),
-                  ),
-                  if (_stepSubtitle != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      _stepSubtitle!,
-                      textAlign: TextAlign.center,
-                      style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: switch (_step) {
-                  _DualPaymentStep.first || _DualPaymentStep.second =>
-                    _MethodPicker(
-                      exclude: _step == _DualPaymentStep.second && _first != null
-                          ? {_first!}
-                          : const {},
-                      selected: _step == _DualPaymentStep.first ? _first : _second,
-                      cart: widget.cart,
-                      exchangeRate: widget.exchangeRate,
-                      pricingSettings: widget.pricingSettings,
-                      totalsService: widget.totalsService,
-                      onSelected: (method) {
-                        setState(() {
-                          if (_step == _DualPaymentStep.first) {
-                            _first = method;
-                          } else {
-                            _second = method;
-                          }
-                        });
-                      },
-                    ),
-                  _DualPaymentStep.split => _SplitStep(
-                      first: _first!,
-                      second: _second!,
-                      share: _share,
-                      total: _total,
-                      amountController: _amountController,
-                      formatAmount: _formatAmount,
-                      amountFor: _amountFor,
-                      onShareChanged: (value) {
-                        setState(() {
-                          _share = value;
-                          _amountController.text = _formatAmount(_amountFor(value))
-                              .replaceAll(RegExp(r'[^0-9.,]'), '');
-                        });
-                      },
-                      onAmountChanged: _syncShareFromAmount,
-                    ),
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-              child: Row(
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancelar'),
-                  ),
-                  if (_step != _DualPaymentStep.first) ...[
-                    TextButton(
-                      onPressed: _goBack,
-                      child: const Text('Volver'),
-                    ),
-                  ],
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: _canProceed ? _goNext : null,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.surfaceTouch,
-                      foregroundColor: AppColors.textPrimary,
-                    ),
-                    child: Text(
-                      _step == _DualPaymentStep.split ? 'Confirmar' : 'Siguiente',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+      child: content,
     );
   }
 }
@@ -611,6 +678,7 @@ class _MethodPicker extends StatelessWidget {
     required this.pricingSettings,
     required this.totalsService,
     required this.onSelected,
+    this.mobileHandoff = false,
   });
 
   final Set<PaymentMethod> exclude;
@@ -620,12 +688,41 @@ class _MethodPicker extends StatelessWidget {
   final PricingSettingsService pricingSettings;
   final CartTotalsService totalsService;
   final ValueChanged<PaymentMethod> onSelected;
+  final bool mobileHandoff;
 
   @override
   Widget build(BuildContext context) {
-    final methods = checkoutDialogPaymentMethods
+    final methods = (mobileHandoff ? selectablePaymentMethods : checkoutDialogPaymentMethods)
         .where((method) => !exclude.contains(method))
         .toList();
+
+    if (mobileHandoff) {
+      return Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(AppDecorations.radius),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            for (var i = 0; i < methods.length; i++) ...[
+              if (i > 0) const Divider(color: AppColors.border, height: 1),
+              CartCheckoutPaymentMobileRow(
+                method: methods[i],
+                total: totalsService.cartTotalAtMethod(
+                  cart: cart,
+                  method: methods[i],
+                  exchangeRate: exchangeRate,
+                  pricingSettings: pricingSettings,
+                ),
+                selected: selected == methods[i],
+                onTap: () => onSelected(methods[i]),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
 
     return Column(
       children: [

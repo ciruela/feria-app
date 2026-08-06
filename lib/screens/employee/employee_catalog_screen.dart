@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../config/app_config.dart';
 import '../../config/stock_config.dart';
 import '../../models/product.dart';
 import '../../services/auth_service.dart';
@@ -16,10 +15,10 @@ import '../../utils/formatters.dart';
 import '../../utils/layout_breakpoints.dart';
 import '../../widgets/employee/catalog_category_chips.dart';
 import '../../widgets/employee/catalog_desktop_header.dart';
+import '../../widgets/employee/catalog_mobile_layout.dart';
 import '../../widgets/employee/catalog_product_list.dart';
 import '../../widgets/employee/employee_desktop_shell.dart';
 import '../../widgets/employee/employee_nav.dart';
-import '../../widgets/employee/employee_role_widgets.dart';
 import '../../widgets/section_header.dart';
 import '../auth/tenant_app_shell.dart';
 import '../cart_screen.dart';
@@ -132,25 +131,19 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
     final sellerName = seller != null ? formatSellerFirstName(seller.nombre) : '—';
     final sellerInitial = sellerName.isNotEmpty ? sellerName[0].toUpperCase() : '?';
 
-    final catalogBody = _CatalogBody(
+    final catalogBody = _CatalogDesktopBody(
       products: products,
       totalLoaded: catalog.products.length,
       lowStockCount: lowStockCount,
       searchController: _searchController,
       searchFocus: _searchFocus,
-      searchQuery: _searchQuery,
       typeFilter: _typeFilter,
       sellerName: sellerName,
       sellerInitial: sellerInitial,
       exchangeRate: exchangeRate,
-      isDesktop: isDesktop,
       onSearchChanged: (value) => setState(() => _searchQuery = value),
       onTypeChanged: (type) => setState(() => _typeFilter = type),
       onChangeSeller: _changeSeller,
-      onSync: AppConfig.usesRemoteCatalog && !catalog.isSyncing
-          ? () => catalog.syncFromCloud()
-          : null,
-      isSyncing: catalog.isSyncing,
     );
 
     if (isDesktop) {
@@ -162,8 +155,28 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
-      body: catalogBody,
+      backgroundColor: AppColors.canvas,
+      body: SafeArea(
+        bottom: false,
+        child: CatalogMobileLayout(
+          products: products,
+          totalLoaded: catalog.products.length,
+          lowStockCount: lowStockCount,
+          searchController: _searchController,
+          searchFocus: _searchFocus,
+          typeFilter: _typeFilter,
+          sellerName: sellerName,
+          sellerInitial: sellerInitial,
+          exchangeRate: exchangeRate,
+          onSearchChanged: (value) => setState(() => _searchQuery = value),
+          onTypeChanged: (type) => setState(() => _typeFilter = type),
+          onChangeSeller: _changeSeller,
+          onSync: catalogMobileShowSync() && !catalog.isSyncing
+              ? () => catalog.syncFromCloud()
+              : null,
+          isSyncing: catalog.isSyncing,
+        ),
+      ),
       bottomNavigationBar: EmployeeBottomNav(
         selected: _nav,
         cartCount: cartCount,
@@ -175,24 +188,20 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
   }
 }
 
-class _CatalogBody extends StatelessWidget {
-  const _CatalogBody({
+class _CatalogDesktopBody extends StatelessWidget {
+  const _CatalogDesktopBody({
     required this.products,
     required this.totalLoaded,
     required this.lowStockCount,
     required this.searchController,
     required this.searchFocus,
-    required this.searchQuery,
     required this.typeFilter,
     required this.sellerName,
     required this.sellerInitial,
     required this.exchangeRate,
-    required this.isDesktop,
     required this.onSearchChanged,
     required this.onTypeChanged,
     required this.onChangeSeller,
-    required this.onSync,
-    required this.isSyncing,
   });
 
   final List<Product> products;
@@ -200,175 +209,37 @@ class _CatalogBody extends StatelessWidget {
   final int lowStockCount;
   final TextEditingController searchController;
   final FocusNode searchFocus;
-  final String searchQuery;
   final ProductType? typeFilter;
   final String sellerName;
   final String sellerInitial;
   final ExchangeRateService exchangeRate;
-  final bool isDesktop;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<ProductType?> onTypeChanged;
   final VoidCallback onChangeSeller;
-  final VoidCallback? onSync;
-  final bool isSyncing;
 
   @override
   Widget build(BuildContext context) {
-    if (isDesktop) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          CatalogDesktopHeader(
-            sellerName: sellerName,
-            sellerInitial: sellerInitial,
-            exchangeRate: exchangeRate,
-            lowStockCount: lowStockCount,
-            showing: products.length,
-            totalLoaded: totalLoaded,
-            onChangeSeller: onChangeSeller,
-            searchController: searchController,
-            searchFocus: searchFocus,
-            onSearchChanged: onSearchChanged,
-          ),
-          CatalogCategoryChips(
-            selected: typeFilter,
-            onSelected: onTypeChanged,
-            desktopHandoff: true,
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: products.isEmpty
-                ? const EmptyState(
-                    icon: Icons.search_off_rounded,
-                    title: 'Sin resultados',
-                    subtitle: 'Probá otro código, modelo o categoría',
-                  )
-                : CatalogProductTable(products: products),
-          ),
-        ],
-      );
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(isDesktop ? 28 : 20, isDesktop ? 24 : 16, 20, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Hola, $sellerName',
-                          style: AppText.heading.copyWith(
-                            fontSize: isDesktop ? 28 : 24,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Armas cortas · largas · munición',
-                          style: AppText.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (onSync != null)
-                    IconButton(
-                      tooltip: 'Actualizar catálogo',
-                      onPressed: isSyncing ? null : onSync,
-                      icon: isSyncing
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.cloud_download_outlined),
-                    ),
-                  DollarReferenceChip(
-                    compact: !isDesktop,
-                    rate: exchangeRate.hasServerRate ? exchangeRate.rate : null,
-                    updatedAt: exchangeRate.updatedAt,
-                  ),
-                  const SizedBox(width: 8),
-                  Material(
-                    color: AppColors.surfaceTouch,
-                    borderRadius: BorderRadius.circular(AppDecorations.radius),
-                    child: InkWell(
-                      onTap: onChangeSeller,
-                      borderRadius: BorderRadius.circular(AppDecorations.radius),
-                      child: SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: Center(
-                          child: Text(
-                            sellerInitial,
-                            style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: searchController,
-                focusNode: searchFocus,
-                onChanged: onSearchChanged,
-                decoration: InputDecoration(
-                  hintText: 'Código, modelo o calibre',
-                  prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted),
-                  filled: true,
-                  fillColor: AppColors.surfaceRaised,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppDecorations.radius),
-                    borderSide: const BorderSide(color: AppColors.border),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppDecorations.radius),
-                    borderSide: const BorderSide(color: AppColors.border),
-                  ),
-                ),
-              ),
-              if (isDesktop) ...[
-                const SizedBox(height: 16),
-                CatalogDesktopStatsRow(
-                  rate: exchangeRate.hasServerRate ? exchangeRate.rate : null,
-                  updatedAt: exchangeRate.updatedAt,
-                  lowStockCount: lowStockCount,
-                  showing: products.length,
-                  totalLoaded: totalLoaded,
-                ),
-              ],
-            ],
-          ),
+        CatalogDesktopHeader(
+          sellerName: sellerName,
+          sellerInitial: sellerInitial,
+          exchangeRate: exchangeRate,
+          lowStockCount: lowStockCount,
+          showing: products.length,
+          totalLoaded: totalLoaded,
+          onChangeSeller: onChangeSeller,
+          searchController: searchController,
+          searchFocus: searchFocus,
+          onSearchChanged: onSearchChanged,
         ),
         CatalogCategoryChips(
           selected: typeFilter,
           onSelected: onTypeChanged,
+          desktopHandoff: true,
         ),
         const SizedBox(height: 12),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(
-            children: [
-              Text('Catálogo', style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w700)),
-              const Spacer(),
-              Text(
-                '${products.length} producto${products.length == 1 ? '' : 's'}'
-                '${lowStockCount > 0 ? ' · $lowStockCount con últimas unidades' : ''}',
-                style: AppText.bodySmall,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
         Expanded(
           child: products.isEmpty
               ? const EmptyState(
@@ -376,14 +247,7 @@ class _CatalogBody extends StatelessWidget {
                   title: 'Sin resultados',
                   subtitle: 'Probá otro código, modelo o categoría',
                 )
-              : isDesktop
-                  ? CatalogProductTable(products: products)
-                  : ListView.builder(
-                      itemCount: products.length,
-                      itemBuilder: (context, index) {
-                        return CatalogProductRow(product: products[index]);
-                      },
-                    ),
+              : CatalogProductTable(products: products),
         ),
       ],
     );

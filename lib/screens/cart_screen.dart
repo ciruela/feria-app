@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/cart_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/layout_breakpoints.dart';
+import '../widgets/employee/cart_mobile_layout.dart';
 import '../widgets/employee/employee_cart_body.dart';
 import '../widgets/employee/employee_nav.dart';
 import 'auth/tenant_app_shell.dart';
@@ -22,8 +23,9 @@ class CartScreen extends StatelessWidget {
     final cartCount = context.watch<CartService>().itemCount;
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: isDesktop ? AppColors.surface : AppColors.canvas,
       body: SafeArea(
+        bottom: false,
         child: isDesktop
             ? Center(
                 child: ConstrainedBox(
@@ -31,7 +33,7 @@ class CartScreen extends StatelessWidget {
                   child: const EmployeeCartBody(),
                 ),
               )
-            : const EmployeeCartBody(),
+            : const CartMobileLayout(),
       ),
       bottomNavigationBar: isDesktop
           ? null

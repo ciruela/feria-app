@@ -307,48 +307,15 @@ class EmployeeCartFooter extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (!checkoutConfigured)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Text(
-                'Configurá cómo abona el cliente para continuar',
-                textAlign: TextAlign.center,
-                style: AppText.bodySmall.copyWith(color: AppColors.accent),
-              ),
-            ),
-          _FooterTotalRow(
-            label: 'Total en dólares',
-            value: formatUsd(totalUsd),
+          EmployeeCartTotalsBlock(
+            totalUsd: totalUsd,
+            listaArs: listaArs,
+            allocations: allocations,
+            checkoutConfigured: checkoutConfigured,
+            exchangeRate: exchangeRate,
+            updatedAt: updatedAt,
+            showExchangeNote: !compact,
           ),
-          const SizedBox(height: 6),
-          _FooterTotalRow(
-            label: 'Lista',
-            value: formatArs(listaArs),
-          ),
-          if (allocations.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            ...allocations.map((allocation) {
-              final amount = allocation.paysInUsd
-                  ? formatUsd(allocation.amountUsd)
-                  : formatArs(allocation.amountArs);
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: _FooterTotalRow(
-                  label: allocation.method.shortLabel,
-                  value: amount,
-                  prominent: true,
-                ),
-              );
-            }),
-          ],
-          if (!compact && exchangeRate != null && updatedAt != null) ...[
-            const SizedBox(height: 6),
-            Text(
-              'Calculado con el dólar ${formatArs(exchangeRate!).replaceFirst(r'$ ', '')} · '
-              '${formatDateTime(updatedAt!)}',
-              style: AppText.bodySmall.copyWith(fontSize: 11),
-            ),
-          ],
           const SizedBox(height: 12),
           FilledButton.icon(
             onPressed: onContinue,
@@ -368,16 +335,94 @@ class EmployeeCartFooter extends StatelessWidget {
   }
 }
 
+/// Totales del carrito (mock 05 desktop footer / 05 mobile card).
+class EmployeeCartTotalsBlock extends StatelessWidget {
+  const EmployeeCartTotalsBlock({
+    super.key,
+    required this.totalUsd,
+    required this.listaArs,
+    required this.allocations,
+    required this.checkoutConfigured,
+    required this.exchangeRate,
+    this.updatedAt,
+    this.showExchangeNote = true,
+    this.listaValueMuted = false,
+  });
+
+  final double totalUsd;
+  final double listaArs;
+  final List<PaymentAllocation> allocations;
+  final bool checkoutConfigured;
+  final double? exchangeRate;
+  final DateTime? updatedAt;
+  final bool showExchangeNote;
+  final bool listaValueMuted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!checkoutConfigured)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              'Configurá cómo abona el cliente para continuar',
+              textAlign: TextAlign.center,
+              style: AppText.bodySmall.copyWith(color: AppColors.accent),
+            ),
+          ),
+        _FooterTotalRow(
+          label: 'Total en dólares',
+          value: formatUsd(totalUsd),
+        ),
+        const SizedBox(height: 6),
+        _FooterTotalRow(
+          label: 'Lista',
+          value: formatArs(listaArs),
+          valueMuted: listaValueMuted,
+        ),
+        if (allocations.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          ...allocations.map((allocation) {
+            final amount = allocation.paysInUsd
+                ? formatUsd(allocation.amountUsd)
+                : formatArs(allocation.amountArs);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: _FooterTotalRow(
+                label: allocation.method.shortLabel,
+                value: amount,
+                prominent: true,
+              ),
+            );
+          }),
+        ],
+        if (showExchangeNote && exchangeRate != null && updatedAt != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            'Calculado con el dólar ${formatArs(exchangeRate!).replaceFirst(r'$ ', '')} · '
+            '${formatDateTime(updatedAt!)}',
+            style: AppText.bodySmall.copyWith(fontSize: 11),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _FooterTotalRow extends StatelessWidget {
   const _FooterTotalRow({
     required this.label,
     required this.value,
     this.prominent = false,
+    this.valueMuted = false,
   });
 
   final String label;
   final String value;
   final bool prominent;
+  final bool valueMuted;
 
   @override
   Widget build(BuildContext context) {
@@ -397,7 +442,10 @@ class _FooterTotalRow extends StatelessWidget {
           value,
           style: prominent
               ? AppText.number.copyWith(fontSize: 22, fontWeight: FontWeight.w700)
-              : AppText.bodyLarge.copyWith(fontWeight: FontWeight.w600),
+              : AppText.bodyLarge.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: valueMuted ? AppColors.textMuted : AppColors.textPrimary,
+                ),
         ),
       ],
     );

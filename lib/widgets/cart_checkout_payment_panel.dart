@@ -11,10 +11,17 @@ import '../utils/formatters.dart';
 import 'cart_checkout_payment_dialog.dart';
 
 class CartCheckoutPaymentPanel extends StatelessWidget {
-  const CartCheckoutPaymentPanel({super.key, this.budgetHandoff = false});
+  const CartCheckoutPaymentPanel({
+    super.key,
+    this.budgetHandoff = false,
+    this.raisedSurface = false,
+  });
 
-  /// Mock 07_Desk: método y monto en una fila horizontal.
+  /// Mock 07_Desk / 05_Mob: método y monto en una fila horizontal.
   final bool budgetHandoff;
+
+  /// Mock 05_Mob: fondo elevado en lugar de touch.
+  final bool raisedSurface;
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +34,7 @@ class CartCheckoutPaymentPanel extends StatelessWidget {
     final checkout = cart.checkoutPayment;
 
     return Material(
-      color: AppColors.surfaceTouch,
+      color: raisedSurface ? AppColors.surfaceRaised : AppColors.surfaceTouch,
       borderRadius: BorderRadius.circular(AppDecorations.radius),
       child: InkWell(
         onTap: () async {

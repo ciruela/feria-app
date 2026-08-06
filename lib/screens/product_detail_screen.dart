@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/product.dart';
 import '../config/stock_config.dart';
+import '../services/auth_service.dart';
 import '../services/cart_service.dart';
 import '../services/catalog_service.dart';
 import '../services/exchange_rate_service.dart';
@@ -21,9 +22,9 @@ import '../widgets/added_to_cart_sheet.dart';
 import '../widgets/employee/employee_desktop_shell.dart';
 import '../widgets/employee/employee_nav.dart';
 import '../widgets/employee/product_detail_desktop.dart';
-import '../widgets/feria_shell.dart';
-import '../widgets/product_prices_panel.dart';
+import '../widgets/employee/product_detail_mobile.dart';
 import 'auth/tenant_app_shell.dart';
+import 'cart_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({
@@ -119,6 +120,38 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
+  void _exit() {
+    final session = context.read<TenantSessionService>();
+    if (session.isSellerPortalSession) {
+      context.read<AuthService>().logout();
+      session.signOut();
+    } else {
+      exitInTenantFlow(context);
+    }
+  }
+
+  void _handleMobileNav(EmployeeNavItem item) {
+    switch (item) {
+      case EmployeeNavItem.catalog:
+      case EmployeeNavItem.byCode:
+        Navigator.of(context).pop();
+      case EmployeeNavItem.adminProducts:
+      case EmployeeNavItem.adminExchange:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Disponible en modo Administración desde el selector de rol.'),
+          ),
+        );
+      case EmployeeNavItem.cart:
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const CartScreen()),
+        );
+      case EmployeeNavItem.exit:
+        Navigator.of(context).pop();
+        _exit();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final exchangeRate = context.watch<ExchangeRateService>();
@@ -149,6 +182,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       page: _page,
       onPageChanged: (index) => setState(() => _page = index),
       onTap: displayUrls.isNotEmpty ? () => _openFullscreen(_page) : null,
+      edgeToEdge: !isDesktop,
     );
 
     if (isDesktop) {
@@ -173,104 +207,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       );
     }
 
-    return FeriaScaffold(
-      appBar: FeriaAppBar(
-        title: const Text('Catálogo'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.border),
-                borderRadius: BorderRadius.circular(AppDecorations.radius),
-              ),
-              child: Text(
-                product.type.label.toUpperCase(),
-                style: AppText.label.copyWith(fontSize: 10),
-              ),
-            ),
-          ),
-        ],
+    final cartCount = cart.itemCount;
+
+    return Scaffold(
+      backgroundColor: AppColors.canvas,
+      body: ProductDetailMobileLayout(
+        product: product,
+        prices: prices,
+        showArs: exchangeRate.hasServerRate,
+        photoGallery: gallery,
+        canAdd: canAdd,
+        onBack: () => Navigator.of(context).pop(),
+        onAddToCart: _addToCart,
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        children: [
-          gallery,
-          if (displayUrls.length > 1) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Deslizá para ver ${displayUrls.length} fotos · tocá para ampliar',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                  ),
-            ),
-          ] else if (displayUrls.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Tocá la foto para ampliar',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                  ),
-            ),
-          ],
-          const SizedBox(height: 16),
-          Text(
-            product.isArma ? product.modeloDisplay : product.codigo,
-            style: AppText.heading.copyWith(fontSize: 24),
-          ),
-          if (product.codigo.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(product.codigo, style: AppText.bodySmall),
-          ],
-          const SizedBox(height: 16),
-          _InfoBlock(product: product),
-          const SizedBox(height: 16),
-          ProductPricesPanel(
-            prices: prices,
-            showArs: exchangeRate.hasServerRate,
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: canAdd ? AppDecorations.accentGradient : null,
-                color: canAdd ? null : AppColors.border,
-                borderRadius: AppDecorations.radiusMd,
-                boxShadow: canAdd
-                    ? [
-                        BoxShadow(
-                          color: AppColors.accent.withValues(alpha: 0.28),
-                          blurRadius: 12,
-                          offset: const Offset(0, 6),
-                        ),
-                      ]
-                    : null,
-              ),
-              child: ElevatedButton.icon(
-                onPressed: canAdd ? _addToCart : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  minimumSize: const Size.fromHeight(56),
-                ),
-                icon: const Icon(Icons.shopping_bag_outlined),
-                label: Text(
-                  !product.inStock
-                      ? 'Sin stock'
-                      : canAdd
-                          ? 'Agregar al carrito'
-                          : 'Stock máximo en carrito',
-                ),
-              ),
-            ),
-          ),
-        ],
+      bottomNavigationBar: EmployeeBottomNav(
+        selected: EmployeeNavItem.catalog,
+        cartCount: cartCount,
+        onCatalog: () => _handleMobileNav(EmployeeNavItem.catalog),
+        onCart: () => _handleMobileNav(EmployeeNavItem.cart),
+        onExit: () => _handleMobileNav(EmployeeNavItem.exit),
       ),
     );
   }
@@ -286,6 +241,7 @@ class _PhotoGallery extends StatelessWidget {
     required this.page,
     required this.onPageChanged,
     this.onTap,
+    this.edgeToEdge = false,
   });
 
   final String foto;
@@ -296,81 +252,86 @@ class _PhotoGallery extends StatelessWidget {
   final int page;
   final ValueChanged<int> onPageChanged;
   final VoidCallback? onTap;
+  final bool edgeToEdge;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final image = GestureDetector(
       onTap: onTap,
-      child: ClipRRect(
-        borderRadius: AppDecorations.radiusMd,
-        child: AspectRatio(
-          aspectRatio: 4 / 3,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              _buildImage(),
-              if (displayUrls.length > 1)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 12,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(displayUrls.length, (index) {
-                      final active = index == page;
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: active ? 18 : 8,
-                        height: 8,
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        decoration: BoxDecoration(
-                          color: active
-                              ? Colors.white
-                              : Colors.white.withValues(alpha: 0.45),
-                          borderRadius: BorderRadius.circular(99),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x44000000),
-                              blurRadius: 4,
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                  ),
-                ),
-              if (onTap != null)
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.zoom_out_map, color: Colors.white, size: 16),
-                        SizedBox(width: 6),
-                        Text(
-                          'AMPLIAR',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
+      child: AspectRatio(
+        aspectRatio: edgeToEdge ? 1.1 : 4 / 3,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _buildImage(),
+            if (displayUrls.length > 1)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 12,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(displayUrls.length, (index) {
+                    final active = index == page;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: active ? 18 : 8,
+                      height: 8,
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      decoration: BoxDecoration(
+                        color: active
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(99),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x44000000),
+                            blurRadius: 4,
                           ),
+                        ],
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            if (onTap != null && !edgeToEdge)
+              Positioned(
+                top: 10,
+                right: 10,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.zoom_out_map, color: Colors.white, size: 16),
+                      SizedBox(width: 6),
+                      Text(
+                        'AMPLIAR',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
+    );
+
+    if (edgeToEdge) return image;
+
+    return ClipRRect(
+      borderRadius: AppDecorations.radiusMd,
+      child: image,
     );
   }
 
@@ -451,125 +412,6 @@ class _Placeholder extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _InfoBlock extends StatelessWidget {
-  const _InfoBlock({required this.product});
-
-  final Product product;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: AppDecorations.radiusMd,
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (product.isArma) ...[
-            _InfoLine(label: 'Modelo', value: product.modeloDisplay),
-            const SizedBox(height: 10),
-            _InfoLine(label: 'Calibre', value: product.calibre),
-            const SizedBox(height: 10),
-            _InfoLine(label: 'Ref. interna', value: product.codigo),
-          ] else ...[
-            _InfoLine(label: 'Código', value: product.codigo),
-            const SizedBox(height: 10),
-            _InfoLine(label: 'Calibre', value: product.calibre),
-          ],
-          if (product.stock != null) ...[
-            const SizedBox(height: 14),
-            _StockBadge(stock: product.stock!),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoLine extends StatelessWidget {
-  const _InfoLine({
-    required this.label,
-    required this.value,
-  });
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 110,
-          child: Text(
-            label.toUpperCase(),
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textSecondary,
-              letterSpacing: 0.8,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StockBadge extends StatelessWidget {
-  const _StockBadge({required this.stock});
-
-  final int stock;
-
-  @override
-  Widget build(BuildContext context) {
-    final sinStock = stock <= 0;
-    final color = sinStock ? AppColors.danger : AppColors.success;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: AppDecorations.radiusSm,
-        border: Border.all(color: color.withValues(alpha: 0.45)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            sinStock ? Icons.block : Icons.inventory_2_outlined,
-            color: color,
-            size: 20,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            sinStock ? 'SIN STOCK' : 'STOCK: $stock',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: color,
-            ),
-          ),
-        ],
       ),
     );
   }

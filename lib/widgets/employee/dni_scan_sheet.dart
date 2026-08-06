@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../services/dni_ocr_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/layout_breakpoints.dart';
+import 'dni_scan_mobile.dart';
 
 typedef DniScanAction = void Function(DniScanSide side, ImageSource source);
 typedef DniScanBothAction = void Function(ImageSource source);
@@ -29,8 +30,7 @@ Future<void> showDniScanSheet(
         ),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),
-          child: _DniScanContent(
-            desktopHandoff: true,
+          child: _DniScanDesktopContent(
             onScanSide: onScanSide,
             onScanBoth: onScanBoth,
             onClose: () => Navigator.pop(context),
@@ -42,7 +42,8 @@ Future<void> showDniScanSheet(
 
   return showModalBottomSheet<void>(
     context: context,
-    backgroundColor: AppColors.surfaceRaised,
+    isScrollControlled: true,
+    backgroundColor: AppColors.canvas,
     barrierColor: AppColors.scrim,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(
@@ -50,7 +51,7 @@ Future<void> showDniScanSheet(
       ),
     ),
     builder: (context) => SafeArea(
-      child: _DniScanContent(
+      child: DniScanMobileContent(
         onScanSide: onScanSide,
         onScanBoth: onScanBoth,
         onClose: () => Navigator.pop(context),
@@ -59,47 +60,41 @@ Future<void> showDniScanSheet(
   );
 }
 
-class _DniScanContent extends StatelessWidget {
-  const _DniScanContent({
+class _DniScanDesktopContent extends StatelessWidget {
+  const _DniScanDesktopContent({
     required this.onScanSide,
     required this.onScanBoth,
     required this.onClose,
-    this.desktopHandoff = false,
   });
 
   final DniScanAction onScanSide;
   final DniScanBothAction onScanBoth;
   final VoidCallback onClose;
-  final bool desktopHandoff;
 
   @override
   Widget build(BuildContext context) {
-    final horizontal = desktopHandoff ? 28.0 : 20.0;
-    final top = desktopHandoff ? 28.0 : 20.0;
-    final bottom = desktopHandoff ? 24.0 : 16.0;
-
     return Padding(
-      padding: EdgeInsets.fromLTRB(horizontal, top, horizontal, bottom),
+      padding: const EdgeInsets.fromLTRB(28, 28, 28, 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             'Escanear DNI',
-            textAlign: desktopHandoff ? TextAlign.center : TextAlign.start,
+            textAlign: TextAlign.center,
             style: AppText.heading.copyWith(
-              fontSize: desktopHandoff ? 24 : 22,
+              fontSize: 24,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'El frente trae nombre y número; el dorso, domicilio y localidad.',
-            textAlign: desktopHandoff ? TextAlign.center : TextAlign.start,
+            textAlign: TextAlign.center,
             style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
           ),
-          SizedBox(height: desktopHandoff ? 24 : 16),
-          _DniScanOption(
+          const SizedBox(height: 24),
+          _DniScanDesktopOption(
             code: 'FR',
             title: 'Frente del DNI',
             subtitle: 'Nombre, apellido y número de documento',
@@ -109,7 +104,7 @@ class _DniScanContent extends StatelessWidget {
             },
           ),
           const SizedBox(height: 6),
-          _DniScanOption(
+          _DniScanDesktopOption(
             code: 'DO',
             title: 'Dorso del DNI',
             subtitle: 'Domicilio y localidad',
@@ -119,7 +114,7 @@ class _DniScanContent extends StatelessWidget {
             },
           ),
           const SizedBox(height: 6),
-          _DniScanOption(
+          _DniScanDesktopOption(
             code: 'FD',
             title: 'Frente y dorso (cámara)',
             subtitle: 'Escaneo completo en dos pasos',
@@ -129,7 +124,7 @@ class _DniScanContent extends StatelessWidget {
             },
           ),
           const SizedBox(height: 6),
-          _DniScanOption(
+          _DniScanDesktopOption(
             code: 'GA',
             title: 'Elegir foto de galería',
             subtitle: 'Una cara del DNI (frente o dorso)',
@@ -138,7 +133,7 @@ class _DniScanContent extends StatelessWidget {
               onScanSide(DniScanSide.unknown, ImageSource.gallery);
             },
           ),
-          SizedBox(height: desktopHandoff ? 24 : 16),
+          const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
@@ -157,8 +152,8 @@ class _DniScanContent extends StatelessWidget {
   }
 }
 
-class _DniScanOption extends StatelessWidget {
-  const _DniScanOption({
+class _DniScanDesktopOption extends StatelessWidget {
+  const _DniScanDesktopOption({
     required this.code,
     required this.title,
     required this.subtitle,

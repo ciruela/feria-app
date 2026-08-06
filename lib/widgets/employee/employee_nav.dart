@@ -198,7 +198,7 @@ class EmployeeBottomNav extends StatelessWidget {
               ),
               Expanded(
                 child: _BottomItem(
-                  icon: Icons.tune_rounded,
+                  icon: Icons.logout_rounded,
                   label: 'Salir',
                   selected: false,
                   onTap: onExit,
