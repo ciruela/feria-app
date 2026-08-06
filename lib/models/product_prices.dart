@@ -108,6 +108,19 @@ const weaponPaymentMethods = [
   PaymentMethod.tarjeta18,
 ];
 
+/// Formas de pago del diálogo de checkout (mock 06_Desk — sin dólar billete).
+const checkoutDialogPaymentMethods = [
+  PaymentMethod.transferencia,
+  PaymentMethod.efectivo,
+  PaymentMethod.debito,
+  PaymentMethod.tarjeta1,
+  PaymentMethod.tarjeta3,
+  PaymentMethod.tarjeta6,
+  PaymentMethod.tarjeta9,
+  PaymentMethod.tarjeta12,
+  PaymentMethod.tarjeta18,
+];
+
 /// Formas de pago seleccionables en diálogos (sin "lista", que es solo referencia de precio).
 const selectablePaymentMethods = weaponPaymentMethods;
 

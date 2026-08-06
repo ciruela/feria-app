@@ -3,11 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/product.dart';
+import '../config/stock_config.dart';
 import '../services/cart_service.dart';
+import '../services/catalog_service.dart';
 import '../services/exchange_rate_service.dart';
+import '../services/in_tenant_flow_service.dart';
 import '../services/pricing_service.dart';
 import '../services/pricing_settings_service.dart';
 import '../services/product_photo_service.dart';
+import '../services/seller_service.dart';
+import '../services/tenant_session_service.dart';
+import '../utils/formatters.dart';
 import '../theme/app_theme.dart';
 import '../utils/layout_breakpoints.dart';
 import '../widgets/add_to_cart_sheet.dart';
@@ -83,6 +89,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     await handleAddedToCartNavigation(context, action);
   }
 
+  void _changeSeller() {
+    final session = context.read<TenantSessionService>();
+    if (session.isSellerPortalSession) {
+      session.signOut();
+    } else {
+      context.read<InTenantFlowService>().openSellerSelect();
+    }
+  }
+
   void _handleDesktopNav(BuildContext context, EmployeeNavItem item) {
     switch (item) {
       case EmployeeNavItem.catalog:
@@ -109,7 +124,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final exchangeRate = context.watch<ExchangeRateService>();
     final pricingSettings = context.watch<PricingSettingsService>();
     final cart = context.watch<CartService>();
+    final catalog = context.watch<CatalogService>();
+    final seller = context.watch<SellerService>().selected;
     final canAdd = cart.canAddMore(product);
+    final sellerName = seller != null ? formatSellerFirstName(seller.nombre) : '—';
+    final sellerInitial = sellerName.isNotEmpty ? sellerName[0].toUpperCase() : '?';
+    final lowStockCount =
+        catalog.products.where((p) => isLowStock(p.stock)).length;
+    final totalLoaded = catalog.products.length;
     final prices = context.read<PricingService>().pricesFor(
       product,
       exchangeRate,
@@ -133,14 +155,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       return EmployeeDesktopShell(
         selected: EmployeeNavItem.catalog,
         onNav: (item) => _handleDesktopNav(context, item),
-        body: ProductDetailDesktopBody(
+        body: ProductDetailDesktopLayout(
           product: product,
           prices: prices,
+          exchangeRate: exchangeRate,
           showArs: exchangeRate.hasServerRate,
           photoGallery: AspectRatio(aspectRatio: 4 / 3, child: gallery),
           canAdd: canAdd,
+          sellerName: sellerName,
+          sellerInitial: sellerInitial,
+          lowStockCount: lowStockCount,
+          totalLoaded: totalLoaded,
           onBack: () => Navigator.of(context).pop(),
           onAddToCart: _addToCart,
+          onChangeSeller: _changeSeller,
         ),
       );
     }

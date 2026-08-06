@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../config/stock_config.dart';
 import '../../models/product.dart';
+import '../../services/cart_service.dart';
 import '../../services/exchange_rate_service.dart';
 import '../../services/pricing_service.dart';
 import '../../services/pricing_settings_service.dart';
@@ -246,6 +247,7 @@ class CatalogProductTableRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final exchangeRate = context.watch<ExchangeRateService>();
     final pricingSettings = context.watch<PricingSettingsService>();
+    final cartQty = context.watch<CartService>().quantityInCart(product.id);
     final prices = context.read<PricingService>().pricesFor(
           product,
           exchangeRate,
@@ -289,6 +291,16 @@ class CatalogProductTableRow extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      if (cartQty > 0) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '$cartQty en carrito',
+                          style: AppText.bodySmall.copyWith(
+                            color: AppColors.success,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

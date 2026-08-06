@@ -11,7 +11,10 @@ import '../utils/formatters.dart';
 import 'cart_checkout_payment_dialog.dart';
 
 class CartCheckoutPaymentPanel extends StatelessWidget {
-  const CartCheckoutPaymentPanel({super.key});
+  const CartCheckoutPaymentPanel({super.key, this.budgetHandoff = false});
+
+  /// Mock 07_Desk: método y monto en una fila horizontal.
+  final bool budgetHandoff;
 
   @override
   Widget build(BuildContext context) {
@@ -28,12 +31,10 @@ class CartCheckoutPaymentPanel extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppDecorations.radius),
       child: InkWell(
         onTap: () async {
-          final selected = await showCartCheckoutPaymentDialog(
+          await showCartCheckoutPaymentDialog(
             context,
             current: checkout,
           );
-          if (selected == null || !context.mounted) return;
-          context.read<CartService>().setCheckoutPayment(selected);
         },
         borderRadius: BorderRadius.circular(AppDecorations.radius),
         child: Container(
@@ -45,15 +46,15 @@ class CartCheckoutPaymentPanel extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 children: [
                   Expanded(
                     child: Text(
                       'CÓMO ABONA EL CLIENTE',
-                      style: AppText.label,
+                      style: AppText.label.copyWith(fontSize: 10),
                     ),
                   ),
-                  Icon(Icons.edit_outlined, size: 16, color: AppColors.textMuted),
+                  const Icon(Icons.edit_outlined, size: 16, color: AppColors.textMuted),
                 ],
               ),
               const SizedBox(height: 8),
@@ -69,6 +70,7 @@ class CartCheckoutPaymentPanel extends StatelessWidget {
                   exchangeRate: exchangeRate,
                   pricingSettings: pricingSettings,
                   totalsService: totalsService,
+                  budgetHandoff: budgetHandoff,
                 ),
             ],
           ),
@@ -85,6 +87,7 @@ class _CheckoutSummary extends StatelessWidget {
     required this.exchangeRate,
     required this.pricingSettings,
     required this.totalsService,
+    this.budgetHandoff = false,
   });
 
   final CartCheckoutPayment checkout;
@@ -92,6 +95,7 @@ class _CheckoutSummary extends StatelessWidget {
   final ExchangeRateService exchangeRate;
   final PricingSettingsService pricingSettings;
   final CartTotalsService totalsService;
+  final bool budgetHandoff;
 
   @override
   Widget build(BuildContext context) {
@@ -112,6 +116,23 @@ class _CheckoutSummary extends StatelessWidget {
           ? formatUsd(allocation.amountUsd)
           : formatArs(allocation.amountArs);
 
+      if (budgetHandoff) {
+        return Row(
+          children: [
+            Expanded(
+              child: Text(
+                allocation.method.shortLabel,
+                style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+            Text(
+              amount,
+              style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ],
+        );
+      }
+
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -119,8 +140,14 @@ class _CheckoutSummary extends StatelessWidget {
             allocation.method.shortLabel,
             style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w600),
           ),
-          const SizedBox(height: 2),
-          Text(amount, style: AppText.number.copyWith(fontSize: 20)),
+          const SizedBox(height: 4),
+          Text(
+            amount,
+            style: AppText.number.copyWith(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       );
     }

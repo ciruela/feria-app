@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/cart_service.dart';
+import '../../services/seller_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/formatters.dart';
 import '../../widgets/employee/employee_cart_body.dart';
 import 'handoff_dashed_border.dart';
 
@@ -13,6 +15,9 @@ class EmployeeCartPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartService>();
+    final seller = context.watch<SellerService>().selected;
+    final sellerName =
+        seller != null ? formatSellerFirstName(seller.nombre) : null;
 
     return Container(
       width: 320,
@@ -33,6 +38,13 @@ class EmployeeCartPanel extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     'Todavía no cargaste nada',
+                    style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+                  ),
+                ] else ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    '${cart.itemCount} item${cart.itemCount == 1 ? '' : 's'}'
+                    '${sellerName != null ? ' · $sellerName' : ''}',
                     style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
                   ),
                 ],

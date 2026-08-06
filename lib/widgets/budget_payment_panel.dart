@@ -95,12 +95,10 @@ class _DualPaymentReminder extends StatelessWidget {
           const SizedBox(height: 8),
           TextButton(
             onPressed: () async {
-              final selected = await showCartCheckoutPaymentDialog(
+              await showCartCheckoutPaymentDialog(
                 context,
                 current: checkout,
               );
-              if (selected == null || !context.mounted) return;
-              context.read<CartService>().setCheckoutPayment(selected);
             },
             child: const Text('MODIFICAR FORMA DE PAGO'),
           ),

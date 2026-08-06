@@ -11,16 +11,21 @@ import '../services/exchange_rate_service.dart';
 import '../services/pricing_settings_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/formatters.dart';
-import 'filter_buttons.dart';
+import '../utils/layout_breakpoints.dart';
 
 Future<CartCheckoutPayment?> showCartCheckoutPaymentDialog(
   BuildContext context, {
   CartCheckoutPayment? current,
-}) {
-  final useSheet = MediaQuery.sizeOf(context).width < 960;
+}) async {
+  final cart = context.read<CartService>();
+  final original = current ?? cart.checkoutPayment;
+  final width = MediaQuery.sizeOf(context).width;
+  final useSheet = !LayoutBreakpoints.isDesktop(width);
+
+  final CartCheckoutPayment? result;
 
   if (useSheet) {
-    return showModalBottomSheet<CartCheckoutPayment>(
+    result = await showModalBottomSheet<CartCheckoutPayment>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.surfaceRaised,
@@ -47,16 +52,28 @@ Future<CartCheckoutPayment?> showCartCheckoutPaymentDialog(
         ),
       ),
     );
+  } else {
+    result = await showDialog<CartCheckoutPayment>(
+      context: context,
+      barrierColor: AppColors.scrim,
+      builder: (context) => _CartCheckoutPaymentDialog(current: current),
+    );
   }
 
-  return showDialog<CartCheckoutPayment>(
-    context: context,
-    barrierColor: AppColors.scrim,
-    builder: (context) => _CartCheckoutPaymentDialog(current: current),
-  );
+  if (!context.mounted) return result;
+
+  if (result != null) {
+    cart.setCheckoutPayment(result);
+  } else if (original != null) {
+    cart.setCheckoutPayment(original);
+  } else {
+    cart.clearCheckoutPayment();
+  }
+
+  return result;
 }
 
-class _CartCheckoutPaymentDialog extends StatelessWidget {
+class _CartCheckoutPaymentDialog extends StatefulWidget {
   const _CartCheckoutPaymentDialog({
     this.current,
     this.scrollController,
@@ -68,11 +85,49 @@ class _CartCheckoutPaymentDialog extends StatelessWidget {
   final bool asSheet;
 
   @override
+  State<_CartCheckoutPaymentDialog> createState() =>
+      _CartCheckoutPaymentDialogState();
+}
+
+class _CartCheckoutPaymentDialogState extends State<_CartCheckoutPaymentDialog> {
+  CartCheckoutPayment? _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.current;
+  }
+
+  void _selectSingle(PaymentMethod method) {
+    final payment = CartCheckoutPayment.single(method);
+    setState(() => _selected = payment);
+    context.read<CartService>().setCheckoutPayment(payment);
+  }
+
+  void _selectDual(CartCheckoutPayment dual) {
+    setState(() => _selected = dual);
+    context.read<CartService>().setCheckoutPayment(dual);
+  }
+
+  void _confirm() {
+    Navigator.of(context).pop(_selected);
+  }
+
+  bool get _isSingleSelected {
+    final selected = _selected;
+    return selected != null && !selected.isDual;
+  }
+
+  PaymentMethod? get _selectedMethod =>
+      _isSingleSelected ? _selected!.pricingMethod : null;
+
+  @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartService>();
     final exchangeRate = context.watch<ExchangeRateService>();
     final pricingSettings = context.watch<PricingSettingsService>();
     final totalsService = context.read<CartTotalsService>();
+    final isDesktop = !widget.asSheet;
 
     final content = _buildContent(
       context,
@@ -80,15 +135,16 @@ class _CartCheckoutPaymentDialog extends StatelessWidget {
       exchangeRate,
       pricingSettings,
       totalsService,
+      isDesktop: isDesktop,
     );
 
-    if (asSheet) return content;
+    if (widget.asSheet) return content;
 
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 48, vertical: 40),
       backgroundColor: AppColors.surfaceRaised,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppDecorations.radius),
+        borderRadius: BorderRadius.circular(AppDecorations.radiusSheet),
         side: const BorderSide(
           color: AppColors.border,
           width: AppDecorations.hairline,
@@ -103,19 +159,23 @@ class _CartCheckoutPaymentDialog extends StatelessWidget {
     CartService cart,
     ExchangeRateService exchangeRate,
     PricingSettingsService pricingSettings,
-    CartTotalsService totalsService,
-  ) {
+    CartTotalsService totalsService, {
+    required bool isDesktop,
+  }) {
+    final methods =
+        isDesktop ? checkoutDialogPaymentMethods : selectablePaymentMethods;
+
     return ConstrainedBox(
       constraints: BoxConstraints(
-        maxWidth: asSheet ? double.infinity : 560,
-        maxHeight: asSheet
+        maxWidth: widget.asSheet ? double.infinity : 680,
+        maxHeight: widget.asSheet
             ? double.infinity
-            : MediaQuery.sizeOf(context).height * 0.82,
+            : MediaQuery.sizeOf(context).height * 0.84,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (asSheet)
+          if (widget.asSheet)
             Padding(
               padding: const EdgeInsets.only(top: 10, bottom: 4),
               child: Container(
@@ -127,100 +187,104 @@ class _CartCheckoutPaymentDialog extends StatelessWidget {
                 ),
               ),
             ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
+          Padding(
+            padding: EdgeInsets.fromLTRB(24, widget.asSheet ? 16 : 28, 24, 0),
             child: Column(
               children: [
                 Text(
                   '¿Cómo abona el cliente?',
                   textAlign: TextAlign.center,
-                  style: AppText.heading,
+                  style: AppText.heading.copyWith(
+                    fontSize: isDesktop ? 26 : 22,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Text(
                   'Define el precio de referencia del comprobante. '
                   'Si hace falta, dividí el cobro en dos formas y repartí '
                   'el monto de lista entre ambas.',
                   textAlign: TextAlign.center,
-                  style: AppText.bodySmall,
+                  style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          Flexible(
-            child: ListView(
-              controller: scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              shrinkWrap: true,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    final dual = await showDialog<CartCheckoutPayment>(
-                      context: context,
-                      builder: (context) => _CartDualPaymentWizardDialog(
-                        cart: cart,
-                        exchangeRate: exchangeRate,
-                        pricingSettings: pricingSettings,
-                        totalsService: totalsService,
-                      ),
-                    );
-                    if (dual != null && context.mounted) {
-                      Navigator.of(context).pop(dual);
-                    }
-                  },
-                  icon: const Icon(Icons.swap_horiz_rounded, size: 18),
-                  label: const Text('Pagar en dos formas'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(44),
-                    side: const BorderSide(color: AppColors.border),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ...selectablePaymentMethods.map((method) {
-                  final total = totalsService.cartTotalAtMethod(
-                    cart: cart,
-                    method: method,
-                    exchangeRate: exchangeRate,
-                    pricingSettings: pricingSettings,
-                  );
-                  final selected = current != null &&
-                      !current!.isDual &&
-                      current!.pricingMethod == method;
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _PaymentMethodRow(
-                      method: method,
-                      total: total,
-                      selected: selected,
-                      onTap: () => Navigator.of(context).pop(
-                        CartCheckoutPayment.single(method),
-                      ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () async {
+                  final dual = await showDialog<CartCheckoutPayment>(
+                    context: context,
+                    barrierColor: AppColors.scrim,
+                    builder: (context) => _CartDualPaymentWizardDialog(
+                      cart: cart,
+                      exchangeRate: exchangeRate,
+                      pricingSettings: pricingSettings,
+                      totalsService: totalsService,
                     ),
                   );
-                }),
-              ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.surfaceTouch,
-                    foregroundColor: AppColors.textPrimary,
-                    minimumSize: const Size.fromHeight(AppDecorations.buttonPrimary),
-                  ),
-                  child: const Text('Listo'),
+                  if (dual != null && mounted) {
+                    _selectDual(dual);
+                  }
+                },
+                icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                label: const Text('Pagar en dos formas'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.surfaceTouch,
+                  foregroundColor: AppColors.textPrimary,
+                  minimumSize: const Size.fromHeight(44),
                 ),
               ),
             ),
-          ],
-        ),
-      );
+          ),
+          const SizedBox(height: 16),
+          Flexible(
+            child: ListView(
+              controller: widget.scrollController,
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              shrinkWrap: true,
+              children: [
+                for (final method in methods) ...[
+                  _PaymentMethodRow(
+                    method: method,
+                    total: totalsService.cartTotalAtMethod(
+                      cart: cart,
+                      method: method,
+                      exchangeRate: exchangeRate,
+                      pricingSettings: pricingSettings,
+                    ),
+                    selected: _selectedMethod == method,
+                    onTap: () => _selectSingle(method),
+                  ),
+                  const SizedBox(height: 6),
+                ],
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _selected != null ? _confirm : null,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.surfaceTouch,
+                  foregroundColor: AppColors.textPrimary,
+                  disabledBackgroundColor: AppColors.surfaceTouch,
+                  disabledForegroundColor: AppColors.textMuted,
+                  minimumSize: const Size.fromHeight(AppDecorations.buttonPrimary),
+                ),
+                child: const Text('Listo'),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -253,10 +317,24 @@ class _PaymentMethodRow extends StatelessWidget {
     final amount =
         method.isUsdPayment ? formatUsd(total.usd) : formatArs(total.ars);
     final installments = _installmentCount(method);
-    String? installmentDetail;
+    final labelStyle = AppText.bodyLarge.copyWith(
+      fontWeight: FontWeight.w600,
+      color: selected ? AppColors.canvas : AppColors.textPrimary,
+    );
+    final amountStyle = AppText.bodyLarge.copyWith(
+      fontWeight: FontWeight.w700,
+      color: selected ? AppColors.canvas : AppColors.textPrimary,
+    );
+
+    Widget label;
     if (installments != null && installments > 1 && !method.isUsdPayment) {
       final cuota = total.ars / installments;
-      installmentDetail = '$installments x ${formatArs(cuota)}';
+      label = Text(
+        '${method.shortLabel}: $installments x ${formatArs(cuota)}',
+        style: labelStyle,
+      );
+    } else {
+      label = Text(method.shortLabel, style: labelStyle);
     }
 
     return Material(
@@ -266,7 +344,7 @@ class _PaymentMethodRow extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppDecorations.radius),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppDecorations.radius),
             border: Border.all(
@@ -275,34 +353,8 @@ class _PaymentMethodRow extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      method.shortLabel,
-                      style: AppText.bodyLarge.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: selected ? AppColors.surface : AppColors.textPrimary,
-                      ),
-                    ),
-                    if (installmentDetail != null)
-                      Text(
-                        installmentDetail,
-                        style: AppText.bodySmall.copyWith(
-                          color: selected ? AppColors.surface : AppColors.textMuted,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              Text(
-                amount,
-                style: AppText.bodyLarge.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: selected ? AppColors.surface : AppColors.textPrimary,
-                ),
-              ),
+              Expanded(child: label),
+              Text(amount, style: amountStyle),
             ],
           ),
         ),
@@ -436,40 +488,44 @@ class _CartDualPaymentWizardDialogState
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 48, vertical: 40),
+      backgroundColor: AppColors.surfaceRaised,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppDecorations.radiusSheet),
+        side: const BorderSide(color: AppColors.border, width: AppDecorations.hairline),
+      ),
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: 420,
-          maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+          maxWidth: 680,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.84,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
               child: Column(
                 children: [
                   Text(
                     _stepTitle,
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleLarge,
+                    style: AppText.heading.copyWith(fontSize: 22),
                   ),
                   if (_stepSubtitle != null) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Text(
                       _stepSubtitle!,
                       textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium,
+                      style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
                     ),
                   ],
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: switch (_step) {
                   _DualPaymentStep.first || _DualPaymentStep.second =>
                     _MethodPicker(
@@ -512,24 +568,28 @@ class _CartDualPaymentWizardDialogState
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
               child: Row(
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('CANCELAR'),
+                    child: const Text('Cancelar'),
                   ),
                   if (_step != _DualPaymentStep.first) ...[
                     TextButton(
                       onPressed: _goBack,
-                      child: const Text('VOLVER'),
+                      child: const Text('Volver'),
                     ),
                   ],
                   const Spacer(),
                   FilledButton(
                     onPressed: _canProceed ? _goNext : null,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.surfaceTouch,
+                      foregroundColor: AppColors.textPrimary,
+                    ),
                     child: Text(
-                      _step == _DualPaymentStep.split ? 'CONFIRMAR' : 'SIGUIENTE',
+                      _step == _DualPaymentStep.split ? 'Confirmar' : 'Siguiente',
                     ),
                   ),
                 ],
@@ -563,35 +623,28 @@ class _MethodPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final methods = selectablePaymentMethods
+    final methods = checkoutDialogPaymentMethods
         .where((method) => !exclude.contains(method))
         .toList();
 
     return Column(
       children: [
         for (final method in methods) ...[
-          FilterChipButton(
-            label: _methodLabel(method),
+          _PaymentMethodRow(
+            method: method,
+            total: totalsService.cartTotalAtMethod(
+              cart: cart,
+              method: method,
+              exchangeRate: exchangeRate,
+              pricingSettings: pricingSettings,
+            ),
             selected: selected == method,
-            compact: true,
             onTap: () => onSelected(method),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
         ],
       ],
     );
-  }
-
-  String _methodLabel(PaymentMethod method) {
-    final total = totalsService.cartTotalAtMethod(
-      cart: cart,
-      method: method,
-      exchangeRate: exchangeRate,
-      pricingSettings: pricingSettings,
-    );
-    final amount =
-        method.isUsdPayment ? formatUsd(total.usd) : formatArs(total.ars);
-    return '${method.shortLabel.toUpperCase()} · $amount';
   }
 }
 
@@ -629,13 +682,7 @@ class _SplitStep extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          amountLabel,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
+        Text(amountLabel, style: AppText.label),
         const SizedBox(height: 6),
         TextField(
           controller: amountController,
@@ -652,11 +699,7 @@ class _SplitStep extends StatelessWidget {
         const SizedBox(height: 12),
         Text(
           '${(100 * share).round()}% · ${first.shortLabel}',
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textSecondary,
-          ),
+          style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
         ),
         Slider(
           value: share,
@@ -698,8 +741,8 @@ class _SharePreviewRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.surfaceTouch,
+        borderRadius: BorderRadius.circular(AppDecorations.radius),
         border: Border.all(color: AppColors.border),
       ),
       child: Row(
@@ -707,7 +750,7 @@ class _SharePreviewRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(fontWeight: FontWeight.w800),
+              style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
           Column(
@@ -715,17 +758,11 @@ class _SharePreviewRow extends StatelessWidget {
             children: [
               Text(
                 value,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w700),
               ),
               Text(
                 'de $total',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textSecondary,
-                ),
+                style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
               ),
             ],
           ),

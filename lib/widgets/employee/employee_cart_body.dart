@@ -15,6 +15,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../added_to_cart_sheet.dart';
 import '../cart_checkout_payment_panel.dart';
+import 'catalog_product_list.dart';
 
 /// Cuerpo compartido del carrito (panel desktop, pantalla mobile y web).
 class EmployeeCartBody extends StatelessWidget {
@@ -102,20 +103,11 @@ class EmployeeCartBody extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${cart.itemCount} ítem${cart.itemCount == 1 ? '' : 's'}'
+                  '${cart.itemCount} item${cart.itemCount == 1 ? '' : 's'}'
                   '${seller != null ? ' · ${formatSellerFirstName(seller.nombre)}' : ''}',
                   style: AppText.bodySmall,
                 ),
               ],
-            ),
-          ),
-        ] else if (compact) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Text(
-              '${cart.itemCount} ítem${cart.itemCount == 1 ? '' : 's'}'
-              '${seller != null ? ' · ${formatSellerFirstName(seller.nombre)}' : ''}',
-              style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
             ),
           ),
         ],
@@ -143,7 +135,6 @@ class EmployeeCartBody extends StatelessWidget {
                 item: item,
                 lineUsd: lineUsd,
                 lineArs: lineArs,
-                paysInUsd: pricingMethod.isUsdPayment,
                 canIncrease: () {
                   final max = cart.maxQuantityForLine(item);
                   return max == null || item.quantity < max;
@@ -182,7 +173,6 @@ class EmployeeCartLine extends StatelessWidget {
     required this.item,
     required this.lineUsd,
     required this.lineArs,
-    required this.paysInUsd,
     required this.canIncrease,
     required this.onDecrease,
     required this.onIncrease,
@@ -191,7 +181,6 @@ class EmployeeCartLine extends StatelessWidget {
   final CartItem item;
   final double lineUsd;
   final double lineArs;
-  final bool paysInUsd;
   final bool canIncrease;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
@@ -199,51 +188,46 @@ class EmployeeCartLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final product = item.product;
-    final title = product.isArma
-        ? product.modeloDisplay.toUpperCase()
-        : product.sellerShortTitle.toUpperCase();
+    final title = catalogProductTitle(product);
     final code = product.codigo.isNotEmpty ? product.codigo : product.modeloDisplay;
     final unitUsd = lineUsd / item.quantity;
-    final lineAmount = paysInUsd ? formatUsd(lineUsd) : formatArs(lineArs);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w700),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${formatUsd(unitUsd)} · $code',
-                      style: AppText.bodySmall,
-                    ),
-                  ],
+                child: Text(
+                  title,
+                  style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w700),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               Text(
-                lineAmount,
+                formatArs(lineArs),
                 style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w700),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              Expanded(
+                child: Text(
+                  '${formatUsd(unitUsd)} · $code',
+                  style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+                ),
+              ),
               _QtyButton(icon: Icons.remove, onTap: onDecrease),
               SizedBox(
-                width: 36,
+                width: 28,
                 child: Text(
                   '${item.quantity}',
                   textAlign: TextAlign.center,
@@ -332,12 +316,15 @@ class EmployeeCartFooter extends StatelessWidget {
                 style: AppText.bodySmall.copyWith(color: AppColors.accent),
               ),
             ),
-          Text(
-            'Total en dólares: ${formatUsd(totalUsd)}',
-            style: AppText.bodySmall,
+          _FooterTotalRow(
+            label: 'Total en dólares',
+            value: formatUsd(totalUsd),
           ),
-          const SizedBox(height: 4),
-          Text('Lista: ${formatArs(listaArs)}', style: AppText.bodySmall),
+          const SizedBox(height: 6),
+          _FooterTotalRow(
+            label: 'Lista',
+            value: formatArs(listaArs),
+          ),
           if (allocations.isNotEmpty) ...[
             const SizedBox(height: 10),
             ...allocations.map((allocation) {
@@ -345,27 +332,16 @@ class EmployeeCartFooter extends StatelessWidget {
                   ? formatUsd(allocation.amountUsd)
                   : formatArs(allocation.amountArs);
               return Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        allocation.method.shortLabel,
-                        style: AppText.bodySmall.copyWith(
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      amount,
-                      style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                  ],
+                padding: const EdgeInsets.only(bottom: 6),
+                child: _FooterTotalRow(
+                  label: allocation.method.shortLabel,
+                  value: amount,
+                  prominent: true,
                 ),
               );
             }),
           ],
-          if (exchangeRate != null && updatedAt != null) ...[
+          if (!compact && exchangeRate != null && updatedAt != null) ...[
             const SizedBox(height: 6),
             Text(
               'Calculado con el dólar ${formatArs(exchangeRate!).replaceFirst(r'$ ', '')} · '
@@ -378,7 +354,9 @@ class EmployeeCartFooter extends StatelessWidget {
             onPressed: onContinue,
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.accent,
+              foregroundColor: AppColors.onAccent,
               disabledBackgroundColor: AppColors.surfaceTouch,
+              disabledForegroundColor: AppColors.textMuted,
               minimumSize: Size.fromHeight(compact ? 44 : AppDecorations.buttonPrimary),
             ),
             icon: const Icon(Icons.description_outlined),
@@ -386,6 +364,42 @@ class EmployeeCartFooter extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _FooterTotalRow extends StatelessWidget {
+  const _FooterTotalRow({
+    required this.label,
+    required this.value,
+    this.prominent = false,
+  });
+
+  final String label;
+  final String value;
+  final bool prominent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: prominent
+                ? AppText.bodyLarge.copyWith(fontWeight: FontWeight.w600)
+                : AppText.bodySmall.copyWith(color: AppColors.textMuted),
+          ),
+        ),
+        Text(
+          value,
+          style: prominent
+              ? AppText.number.copyWith(fontSize: 22, fontWeight: FontWeight.w700)
+              : AppText.bodyLarge.copyWith(fontWeight: FontWeight.w600),
+        ),
+      ],
     );
   }
 }

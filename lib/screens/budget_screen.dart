@@ -23,6 +23,7 @@ import '../utils/layout_breakpoints.dart';
 import '../utils/formatters.dart';
 import '../utils/presupuesto_pdf.dart';
 import '../widgets/cart_checkout_payment_panel.dart';
+import '../widgets/employee/budget_desktop_layout.dart';
 import '../widgets/employee/dni_scan_sheet.dart';
 import '../widgets/feria_shell.dart';
 import '../widgets/presupuesto_paper.dart';
@@ -324,15 +325,25 @@ class _BudgetScreenState extends State<BudgetScreen> {
           pricingSettings: context.read<PricingSettingsService>(),
         );
 
+    final checkoutTotal = cart.hasCheckoutPayment && cart.checkoutPayment != null
+        ? context.read<CartTotalsService>().cartTotalAtMethod(
+              cart: cart,
+              method: cart.checkoutPayment!.pricingMethod,
+              exchangeRate: exchangeRate,
+              pricingSettings: context.read<PricingSettingsService>(),
+            )
+        : null;
+
+    final displayTotalArs = checkoutTotal?.ars ?? listaTotal.ars;
+
     final sidebar = _BudgetSidebar(
       scanning: _scanning,
       checkoutConfigured: checkoutConfigured,
       finalizing: _finalizing,
       hasCustomerData: hasCustomerData,
+      displayTotalArs: displayTotalArs,
       listaArs: listaTotal.ars,
       exchangeRate: exchangeRate.rate,
-      sellerName: seller != null ? formatSellerFirstName(seller.nombre) : null,
-      updatedAt: exchangeRate.updatedAt,
       onScanDni: _pickScanSource,
       onRescanDni: _pickScanSource,
       onGenerate: checkoutConfigured && !_finalizing
@@ -340,6 +351,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
           : null,
       onExportPdf: () => _exportPdf(budget),
       onPrint: () => _printBudget(budget),
+      desktopHandoff: isDesktop,
     );
 
     final preview = Center(
@@ -358,77 +370,62 @@ class _BudgetScreenState extends State<BudgetScreen> {
       ),
     );
 
+    if (cart.isEmpty) {
+      return FeriaScaffold(
+        appBar: FeriaAppBar(title: const Text('Presupuesto')),
+        body: const Center(child: Text('El carrito está vacío')),
+      );
+    }
+
+    if (isDesktop) {
+      return Scaffold(
+        backgroundColor: AppColors.canvas,
+        body: BudgetDesktopLayout(
+          header: BudgetDesktopHeader(
+            sellerName: seller != null ? formatSellerFirstName(seller.nombre) : null,
+            updatedAt: exchangeRate.updatedAt,
+            onBack: () => Navigator.of(context).pop(),
+          ),
+          sidebar: sidebar,
+          preview: ColoredBox(
+            color: AppColors.canvas,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: preview,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return FeriaScaffold(
       constrainBody: false,
-      appBar: isDesktop
-          ? FeriaAppBar(
-              title: Row(
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: TextButton.styleFrom(foregroundColor: AppColors.textMuted),
-                    child: const Text('Carrito'),
-                  ),
-                  Text(
-                    'Presupuesto',
-                    style: AppText.heading.copyWith(fontSize: 17),
-                  ),
-                ],
-              ),
-              showBackButton: false,
-              actions: [
-                if (seller != null)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 20),
-                    child: Center(
-                      child: Text(
-                        'Atiende ${formatSellerFirstName(seller.nombre)}'
-                        '${exchangeRate.updatedAt != null ? ' · ${formatDateTime(exchangeRate.updatedAt!)}' : ''}',
-                        style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
-                      ),
-                    ),
-                  ),
-              ],
-            )
-          : FeriaAppBar(
-              title: const Text('Presupuesto'),
-              actions: [
-                if (seller != null)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 16),
-                    child: Center(
-                      child: Text(
-                        'Atiende ${formatSellerFirstName(seller.nombre)}',
-                        style: AppText.bodySmall,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-      body: cart.isEmpty
-          ? const Center(child: Text('El carrito está vacío'))
-          : isDesktop
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(width: 320, child: sidebar),
-                    const VerticalDivider(width: 1, color: AppColors.border),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(24),
-                        child: preview,
-                      ),
-                    ),
-                  ],
-                )
-              : ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    sidebar,
-                    const SizedBox(height: 16),
-                    preview,
-                  ],
+      appBar: FeriaAppBar(
+        title: const Text('Presupuesto'),
+        actions: [
+          if (seller != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Center(
+                child: Text(
+                  'Atiende ${formatSellerFirstName(seller.nombre)}',
+                  style: AppText.bodySmall,
                 ),
+              ),
+            ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          sidebar,
+          const SizedBox(height: 16),
+          preview,
+        ],
+      ),
     );
   }
 }
@@ -439,167 +436,183 @@ class _BudgetSidebar extends StatelessWidget {
     required this.checkoutConfigured,
     required this.finalizing,
     required this.hasCustomerData,
+    required this.displayTotalArs,
     required this.listaArs,
     required this.exchangeRate,
-    required this.sellerName,
-    required this.updatedAt,
     required this.onScanDni,
     required this.onRescanDni,
     required this.onGenerate,
     required this.onExportPdf,
     required this.onPrint,
+    this.desktopHandoff = false,
   });
 
   final bool scanning;
   final bool checkoutConfigured;
   final bool finalizing;
   final bool hasCustomerData;
+  final double displayTotalArs;
   final double listaArs;
   final double? exchangeRate;
-  final String? sellerName;
-  final DateTime? updatedAt;
   final VoidCallback onScanDni;
   final VoidCallback onRescanDni;
   final VoidCallback? onGenerate;
   final VoidCallback onExportPdf;
   final VoidCallback onPrint;
+  final bool desktopHandoff;
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = LayoutBreakpoints.isDesktop(MediaQuery.sizeOf(context).width);
+    final sectionLabel = AppText.label.copyWith(
+      color: AppColors.textMuted,
+      fontSize: 10,
+    );
 
-    return Container(
-      color: isDesktop ? AppColors.surfaceRaised : Colors.transparent,
-      padding: EdgeInsets.all(isDesktop ? 20 : 0),
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('DATOS DEL CLIENTE', style: sectionLabel),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: scanning ? null : (hasCustomerData ? onRescanDni : onScanDni),
+          icon: scanning
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(
+                  hasCustomerData
+                      ? Icons.document_scanner_outlined
+                      : Icons.document_scanner_outlined,
+                ),
+          label: Text(hasCustomerData ? 'Volver a escanear el DNI' : 'Escanear DNI'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.textPrimary,
+            minimumSize: const Size.fromHeight(44),
+            side: const BorderSide(color: AppColors.border),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          hasCustomerData
+              ? 'Datos del cliente cargados desde el DNI. Revísalos antes de generar.'
+              : 'El DNI argentino tiene dos caras: escaneá el frente (nombre y DNI) '
+                  'y el dorso (domicilio y localidad). Revisá siempre los datos antes de generar.',
+          style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+        ),
+        const SizedBox(height: 24),
+        Text('FORMA DE PAGO', style: sectionLabel),
+        const SizedBox(height: 10),
+        CartCheckoutPaymentPanel(budgetHandoff: desktopHandoff),
+        if (!checkoutConfigured) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Configurá cómo abona el cliente para habilitar el comprobante.',
+            style: AppText.bodySmall.copyWith(color: AppColors.accent),
+          ),
+        ],
+        const SizedBox(height: 24),
+        Text('TOTAL DEL PRESUPUESTO', style: sectionLabel),
+        const SizedBox(height: 8),
+        Text(
+          formatArs(displayTotalArs),
+          style: AppText.number.copyWith(fontSize: 32, fontWeight: FontWeight.w700),
+        ),
+        if (exchangeRate != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            'Lista ${formatArs(listaArs)} · dólar ${formatReferenceRate(exchangeRate!)}',
+            style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+          ),
+        ],
+      ],
+    );
+
+    final actions = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FilledButton.icon(
+          onPressed: onGenerate,
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.accent,
+            foregroundColor: AppColors.onAccent,
+            disabledBackgroundColor: AppColors.surfaceTouch,
+            disabledForegroundColor: AppColors.textMuted,
+            minimumSize: const Size.fromHeight(AppDecorations.buttonPrimary),
+          ),
+          icon: finalizing
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.onAccent,
+                  ),
+                )
+              : const Icon(Icons.receipt_long_outlined),
+          label: Text(finalizing ? 'Generando…' : 'Generar comprobante'),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: onExportPdf,
+                icon: const Icon(Icons.download_outlined, size: 18),
+                label: const Text('Exportar PDF'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textPrimary,
+                  minimumSize: const Size.fromHeight(44),
+                  side: const BorderSide(color: AppColors.border),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: onPrint,
+                icon: const Icon(Icons.print_outlined, size: 18),
+                label: const Text('Imprimir'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textPrimary,
+                  minimumSize: const Size.fromHeight(44),
+                  side: const BorderSide(color: AppColors.border),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    if (desktopHandoff) {
+      return ColoredBox(
+        color: AppColors.canvas,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: SingleChildScrollView(child: content),
+              ),
+              const SizedBox(height: 16),
+              actions,
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'DATOS DEL CLIENTE',
-            style: AppText.label.copyWith(color: AppColors.textMuted),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: scanning ? null : (hasCustomerData ? onRescanDni : onScanDni),
-            icon: scanning
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Icon(hasCustomerData ? Icons.refresh_rounded : Icons.document_scanner_outlined),
-            label: Text(hasCustomerData ? 'Volver a escanear el DNI' : 'Escanear DNI'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(44),
-              side: const BorderSide(color: AppColors.border),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            hasCustomerData
-                ? 'Datos del cliente cargados desde el DNI. Revisalos antes de generar.'
-                : 'El DNI argentino tiene dos caras: escaneá el frente (nombre y DNI) '
-                    'y el dorso (domicilio y localidad). Revisá siempre los datos antes de generar.',
-            style: AppText.bodySmall,
-          ),
+          content,
           const SizedBox(height: 20),
-          Text(
-            'FORMA DE PAGO',
-            style: AppText.label.copyWith(color: AppColors.textMuted),
-          ),
-          const SizedBox(height: 10),
-          const CartCheckoutPaymentPanel(),
-          if (!checkoutConfigured) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Configurá cómo abona el cliente para habilitar el comprobante.',
-              style: AppText.bodySmall.copyWith(color: AppColors.accent),
-            ),
-          ],
-          const SizedBox(height: 20),
-          Text(
-            'TOTAL DEL PRESUPUESTO',
-            style: AppText.label.copyWith(color: AppColors.textMuted),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            formatArs(listaArs),
-            style: AppText.number.copyWith(fontSize: 28, fontWeight: FontWeight.w700),
-          ),
-          if (exchangeRate != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              'Lista ${formatArs(listaArs)} · dólar '
-              '${formatArs(exchangeRate!).replaceFirst(r'$ ', '')}',
-              style: AppText.bodySmall,
-            ),
-          ],
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: onGenerate,
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.accent,
-              minimumSize: const Size.fromHeight(AppDecorations.buttonPrimary),
-            ),
-            icon: finalizing
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onAccent),
-                  )
-                : const Icon(Icons.receipt_long_outlined),
-            label: Text(finalizing ? 'Generando…' : 'Generar comprobante'),
-          ),
-          const SizedBox(height: 10),
-          if (isDesktop)
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onExportPdf,
-                    icon: const Icon(Icons.picture_as_pdf_outlined),
-                    label: const Text('Exportar PDF'),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(44),
-                      side: const BorderSide(color: AppColors.border),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onPrint,
-                    icon: const Icon(Icons.print_outlined),
-                    label: const Text('Imprimir'),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(44),
-                      side: const BorderSide(color: AppColors.border),
-                    ),
-                  ),
-                ),
-              ],
-            )
-          else ...[
-            OutlinedButton.icon(
-              onPressed: onExportPdf,
-              icon: const Icon(Icons.picture_as_pdf_outlined),
-              label: const Text('Exportar PDF'),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(44),
-                side: const BorderSide(color: AppColors.border),
-              ),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: onPrint,
-              icon: const Icon(Icons.print_outlined),
-              label: const Text('Imprimir'),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(44),
-                side: const BorderSide(color: AppColors.border),
-              ),
-            ),
-          ],
+          actions,
         ],
       ),
     );
