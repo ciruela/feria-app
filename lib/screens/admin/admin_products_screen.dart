@@ -1,4 +1,5 @@
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -363,8 +364,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
             label: 'MARCA',
             child: brands.isEmpty
                 ? const Text('Sin marcas')
-                : SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
+                : _HorizontalChipScroller(
                     child: Row(
                       children: brands.map((marca) {
                         return Padding(
@@ -434,10 +434,7 @@ class _FilterBar extends StatelessWidget {
         ),
       ),
       child: label == null
-          ? SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: child,
-            )
+          ? _HorizontalChipScroller(child: child)
           : Row(
               children: [
                 SizedBox(
@@ -454,6 +451,71 @@ class _FilterBar extends StatelessWidget {
                 Expanded(child: child),
               ],
             ),
+    );
+  }
+}
+
+/// Scroll horizontal usable en web: rueda del mouse (vertical → lateral)
+/// y arrastre con click.
+class _HorizontalChipScroller extends StatefulWidget {
+  const _HorizontalChipScroller({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_HorizontalChipScroller> createState() =>
+      _HorizontalChipScrollerState();
+}
+
+class _HorizontalChipScrollerState extends State<_HorizontalChipScroller> {
+  final _controller = ScrollController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent || !_controller.hasClients) return;
+    final position = _controller.position;
+    if (!position.hasContentDimensions) return;
+
+    // En web la rueda manda delta.dy; trackpad también puede mandar dx.
+    final delta = event.scrollDelta.dx != 0
+        ? event.scrollDelta.dx
+        : event.scrollDelta.dy;
+    if (delta == 0) return;
+
+    final next = (position.pixels + delta).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if (next != position.pixels) {
+      _controller.jumpTo(next);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      onPointerSignal: _onPointerSignal,
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(
+          dragDevices: {
+            PointerDeviceKind.touch,
+            PointerDeviceKind.mouse,
+            PointerDeviceKind.trackpad,
+            PointerDeviceKind.stylus,
+          },
+          scrollbars: true,
+        ),
+        child: SingleChildScrollView(
+          controller: _controller,
+          scrollDirection: Axis.horizontal,
+          child: widget.child,
+        ),
+      ),
     );
   }
 }
