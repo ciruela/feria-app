@@ -21,19 +21,34 @@ class EmployeeCartPanel extends StatelessWidget {
           left: BorderSide(color: AppColors.border, width: AppDecorations.hairline),
         ),
       ),
-      child: cart.isEmpty
-          ? const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text(
-                  'El carrito está vacío.\n'
-                  'Tocá un producto de la tabla para sumarlo.',
-                  textAlign: TextAlign.center,
-                  style: AppText.bodySmall,
-                ),
-              ),
-            )
-          : const EmployeeCartBody(compact: true, showHeader: true),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+            child: Text(
+              'Carrito',
+              style: AppText.heading.copyWith(fontSize: 20),
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.border),
+          Expanded(
+            child: cart.isEmpty
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'El carrito está vacío.\n'
+                        'Tocá un producto de la tabla para sumarlo.',
+                        textAlign: TextAlign.center,
+                        style: AppText.bodySmall,
+                      ),
+                    ),
+                  )
+                : const EmployeeCartBody(compact: true, showHeader: false),
+          ),
+        ],
+      ),
     );
   }
 }

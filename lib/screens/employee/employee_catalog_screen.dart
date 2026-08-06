@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_config.dart';
@@ -83,6 +84,13 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _searchFocus.requestFocus();
         });
+      case EmployeeNavItem.adminProducts:
+      case EmployeeNavItem.adminExchange:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Disponible en modo Administración desde el selector de rol.'),
+          ),
+        );
       case EmployeeNavItem.cart:
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const CartScreen()),
@@ -215,6 +223,123 @@ class _CatalogBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (isDesktop) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(28, 24, 28, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Hola, $sellerName',
+                          style: AppText.heading.copyWith(fontSize: 28),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Armas cortas · largas · munición',
+                          style: AppText.bodySmall,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 24),
+                    Expanded(
+                      child: TextField(
+                        controller: searchController,
+                        focusNode: searchFocus,
+                        onChanged: onSearchChanged,
+                        decoration: InputDecoration(
+                          hintText: 'Código, modelo o calibre',
+                          prefixIcon: const Icon(
+                            Icons.search_rounded,
+                            color: AppColors.textMuted,
+                          ),
+                          filled: true,
+                          fillColor: AppColors.surfaceRaised,
+                          border: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppDecorations.radius),
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppDecorations.radius),
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    if (onSync != null)
+                      IconButton(
+                        tooltip: 'Actualizar catálogo',
+                        onPressed: isSyncing ? null : onSync,
+                        icon: isSyncing
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.cloud_download_outlined),
+                      ),
+                    Material(
+                      color: AppColors.surfaceTouch,
+                      borderRadius: BorderRadius.circular(AppDecorations.radius),
+                      child: InkWell(
+                        onTap: onChangeSeller,
+                        borderRadius: BorderRadius.circular(AppDecorations.radius),
+                        child: SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: Center(
+                            child: Text(
+                              sellerInitial,
+                              style: AppText.bodyLarge.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _DesktopStatsRow(
+                  rate: exchangeRate.hasServerRate ? exchangeRate.rate : null,
+                  updatedAt: exchangeRate.updatedAt,
+                  lowStockCount: lowStockCount,
+                  showing: products.length,
+                  totalLoaded: totalLoaded,
+                ),
+              ],
+            ),
+          ),
+          CatalogCategoryChips(
+            selected: typeFilter,
+            onSelected: onTypeChanged,
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: products.isEmpty
+                ? const EmptyState(
+                    icon: Icons.search_off_rounded,
+                    title: 'Sin resultados',
+                    subtitle: 'Probá otro código, modelo o categoría',
+                  )
+                : CatalogProductTable(products: products),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -378,7 +503,7 @@ class _DesktopStatsRow extends StatelessWidget {
         Expanded(
           child: _StatBox(
             label: 'DÓLAR DE REFERENCIA',
-            value: rate != null ? formatArs(rate!) : '—',
+            value: rate != null ? _formatReferenceRate(rate!) : '—',
             subtitle: updatedAt != null ? formatDateTime(updatedAt!) : null,
             accent: true,
           ),
@@ -400,6 +525,10 @@ class _DesktopStatsRow extends StatelessWidget {
       ],
     );
   }
+}
+
+String _formatReferenceRate(double rate) {
+  return NumberFormat('#,##0', 'es_AR').format(rate);
 }
 
 class _StatBox extends StatelessWidget {

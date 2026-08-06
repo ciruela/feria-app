@@ -188,11 +188,20 @@ class CatalogProductTable extends StatelessWidget {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text(
-            'El ojo abre el detalle · el carrito suma una unidad · '
-            'Lista y efectivo · el resto de las formas de pago, en el detalle',
-            style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'El ojo abre el detalle · el carrito suma una unidad',
+                  style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+                ),
+              ),
+              Text(
+                'Lista y efectivo · el resto de las formas de pago, en el detalle',
+                style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+              ),
+            ],
           ),
         ),
       ],

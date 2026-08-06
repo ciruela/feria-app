@@ -4,17 +4,19 @@ import '../../screens/auth/tenant_app_shell.dart';
 import '../../theme/app_theme.dart';
 import '../armenext_brand.dart';
 
-enum EmployeeNavItem { catalog, byCode, cart, exit }
+enum EmployeeNavItem { catalog, byCode, adminProducts, adminExchange, cart, exit }
 
 class EmployeeSidebar extends StatelessWidget {
   const EmployeeSidebar({
     super.key,
     required this.selected,
     required this.onSelected,
+    this.showAdminSection = true,
   });
 
   final EmployeeNavItem selected;
   final ValueChanged<EmployeeNavItem> onSelected;
+  final bool showAdminSection;
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +48,22 @@ class EmployeeSidebar extends StatelessWidget {
             selected: selected == EmployeeNavItem.byCode,
             onTap: () => onSelected(EmployeeNavItem.byCode),
           ),
+          if (showAdminSection) ...[
+            const SizedBox(height: 16),
+            const _SectionLabel('ADMINISTRACIÓN'),
+            _NavTile(
+              label: 'Productos',
+              icon: Icons.inventory_2_outlined,
+              selected: selected == EmployeeNavItem.adminProducts,
+              onTap: () => onSelected(EmployeeNavItem.adminProducts),
+            ),
+            _NavTile(
+              label: 'Tipo de cambio',
+              icon: Icons.currency_exchange_rounded,
+              selected: selected == EmployeeNavItem.adminExchange,
+              onTap: () => onSelected(EmployeeNavItem.adminExchange),
+            ),
+          ],
           const Spacer(),
           _NavTile(
             label: 'Salir',
