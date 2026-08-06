@@ -53,6 +53,7 @@ class _SellerPortalScopeLoaderState extends State<SellerPortalScopeLoader> {
 
     context.read<CatalogService>().bindTenant(tenantId);
     context.read<SellerService>().bindTenant(tenantId);
+    context.read<ExchangeRateService>().bindTenant(tenantId);
     context.read<AuthService>().loginAs(AppRole.employee);
 
     final catalogService = context.read<CatalogService>();

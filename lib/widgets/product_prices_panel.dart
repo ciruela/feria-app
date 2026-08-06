@@ -38,10 +38,21 @@ class ProductPricesPanel extends StatelessWidget {
             highlight: true,
             compact: compact,
           ),
-          if (!showArs) ...[
+          if (prices.usd <= 0) ...[
             const Divider(height: 18),
             Text(
-              'Precios en pesos no disponibles: falta el tipo de cambio de esta armería.',
+              'Este producto no tiene precio USD cargado. Editá el producto o reimportá el Excel con la columna de precio.',
+              style: TextStyle(
+                color: AppColors.accent,
+                fontSize: compact ? 12 : 13,
+                height: 1.35,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ] else if (!showArs) ...[
+            const Divider(height: 18),
+            Text(
+              'Precios en pesos no disponibles: falta el tipo de cambio de esta armería. Guardalo en Administración → Tipo de cambio.',
               style: TextStyle(
                 color: AppColors.textMuted,
                 fontSize: compact ? 12 : 13,

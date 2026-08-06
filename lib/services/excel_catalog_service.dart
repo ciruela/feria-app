@@ -370,6 +370,10 @@ class ExcelCatalogService {
     if (cell == null) return '';
     final value = cell.value;
     if (value == null) return '';
+    // Preferir el valor tipado: toString() de CellValue a veces envuelve el número.
+    if (value is DoubleCellValue) return value.value.toString();
+    if (value is IntCellValue) return value.value.toString();
+    if (value is TextCellValue) return value.value.toString();
     return value.toString();
   }
 }
@@ -429,8 +433,7 @@ class ExcelProductRow {
         throw FormatException('Tipo inválido: $typeKey');
     }
 
-    final precioRaw = data['precio_usd']?.replaceAll(',', '.') ?? '0';
-    final precio = double.tryParse(precioRaw) ?? 0;
+    final precio = _parsePrice(data['precio_usd']);
 
     int? roundsPerBox = _parseInt(data['balas_por_caja']);
     if (roundsPerBox != null && roundsPerBox <= 0) roundsPerBox = null;
@@ -484,6 +487,30 @@ class ExcelProductRow {
     // Soporta "1.000" o "1,000" como miles.
     final normalized = value.replaceAll('.', '').replaceAll(',', '');
     return int.tryParse(normalized) ?? int.tryParse(value);
+  }
+
+  /// Precio USD: soporta "12.5", "12,50", "1.234,56", "U\$D 12", etc.
+  static double _parsePrice(String? raw) {
+    var value = (raw ?? '')
+        .replaceAll('\u00a0', ' ')
+        .trim()
+        .replaceAll(RegExp(r'[^\d,.\-]'), '');
+    if (value.isEmpty) return 0;
+
+    final hasComma = value.contains(',');
+    final hasDot = value.contains('.');
+    if (hasComma && hasDot) {
+      // El último separador es el decimal (AR: 1.234,56 / US: 1,234.56).
+      if (value.lastIndexOf(',') > value.lastIndexOf('.')) {
+        value = value.replaceAll('.', '').replaceAll(',', '.');
+      } else {
+        value = value.replaceAll(',', '');
+      }
+    } else if (hasComma) {
+      value = value.replaceAll(',', '.');
+    }
+
+    return double.tryParse(value) ?? 0;
   }
 
   Product toNewProduct(int index) {

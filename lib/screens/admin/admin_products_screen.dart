@@ -30,8 +30,16 @@ class AdminProductsScreen extends StatefulWidget {
 class _AdminProductsScreenState extends State<AdminProductsScreen> {
   ProductType? _typeFilter;
   String? _marcaFilter;
+  String _searchQuery = '';
   late bool _lowStockOnly = widget.lowStockOnly;
   bool _ioBusy = false;
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   Future<void> _exportExcel() async {
     setState(() => _ioBusy = true);
@@ -133,14 +141,24 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
     final source = _typeFilter == null
         ? catalog.products
         : catalog.byType(_typeFilter!);
+    final query = _searchQuery.trim().toUpperCase();
 
     var products = source.where((product) {
       if (_lowStockOnly &&
           !(product.stock != null && product.stock! <= kLowStockThreshold)) {
         return false;
       }
-      if (_marcaFilter == null) return true;
-      return product.marca.toLowerCase() == _marcaFilter!.toLowerCase();
+      if (_marcaFilter != null &&
+          product.marca.toLowerCase() != _marcaFilter!.toLowerCase()) {
+        return false;
+      }
+      if (query.isEmpty) return true;
+      if (product.codigo.toUpperCase().contains(query)) return true;
+      if (product.modeloDisplay.toUpperCase().contains(query)) return true;
+      if (product.marca.toUpperCase().contains(query)) return true;
+      if (product.calibre.toUpperCase().contains(query)) return true;
+      if (product.descripcion.toUpperCase().contains(query)) return true;
+      return false;
     }).toList();
 
     products.sort((a, b) {
@@ -243,12 +261,17 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                 ),
               ],
             ),
-          if (_marcaFilter != null || _typeFilter != null || _lowStockOnly)
+          if (_marcaFilter != null ||
+              _typeFilter != null ||
+              _lowStockOnly ||
+              _searchQuery.trim().isNotEmpty)
             TextButton(
               onPressed: () => setState(() {
                 _typeFilter = null;
                 _marcaFilter = null;
                 _lowStockOnly = false;
+                _searchQuery = '';
+                _searchController.clear();
               }),
               child: const Text(
                 'VER TODOS',
@@ -268,6 +291,43 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) => setState(() => _searchQuery = value),
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: 'Buscar por código, modelo, marca o calibre',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: _searchQuery.trim().isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Limpiar búsqueda',
+                        onPressed: () => setState(() {
+                          _searchQuery = '';
+                          _searchController.clear();
+                        }),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                filled: true,
+                fillColor: AppColors.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           _FilterBar(
             child: Row(
               children: [

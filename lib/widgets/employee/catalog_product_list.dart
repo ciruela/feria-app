@@ -86,7 +86,11 @@ class CatalogProductRow extends StatelessWidget {
     final photoUrls = ProductPhotoService.displayUrls(product.fotoUrls);
     final lowStock = isLowStock(product.stock);
 
-    return Container(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _openDetail(context),
+        child: Container(
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
@@ -145,49 +149,48 @@ class CatalogProductRow extends StatelessWidget {
                         size: 18,
                       ),
                     ),
-                  if (exchangeRate.hasServerRate)
-                    Text(
-                      formatArs(prices.lista),
-                      style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w700),
-                    ),
+                  // El vendedor carga en USD: ese es el precio ancla de la tarjeta.
                   Text(
                     formatUsd(prices.usd),
-                    style: AppText.bodySmall,
+                    style: AppText.bodyLarge.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.accent,
+                    ),
                   ),
+                  if (exchangeRate.hasServerRate && prices.usd > 0) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      formatArs(prices.lista),
+                      style: AppText.bodySmall.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'Efect. ${formatArs(prices.efectivo)}',
+                      style: AppText.bodySmall.copyWith(
+                        color: AppColors.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ],
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _openDetail(context),
-                  icon: const Icon(Icons.visibility_outlined, size: 18),
-                  label: const Text('Ver'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.textPrimary,
-                    side: const BorderSide(color: AppColors.border),
-                    minimumSize: const Size.fromHeight(40),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: product.inStock ? () => _addToCart(context) : null,
-                  icon: const Icon(Icons.shopping_bag_outlined, size: 18),
-                  label: const Text('Agregar'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    minimumSize: const Size.fromHeight(40),
-                  ),
-                ),
-              ),
-            ],
+          FilledButton.icon(
+            onPressed: product.inStock ? () => _addToCart(context) : null,
+            icon: const Icon(Icons.shopping_bag_outlined, size: 18),
+            label: const Text('Agregar'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: AppColors.onAccent,
+              minimumSize: const Size.fromHeight(44),
+            ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

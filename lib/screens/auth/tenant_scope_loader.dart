@@ -52,6 +52,7 @@ class _TenantScopeLoaderState extends State<TenantScopeLoader> {
 
     context.read<CatalogService>().bindTenant(tenantId);
     context.read<SellerService>().bindTenant(tenantId);
+    context.read<ExchangeRateService>().bindTenant(tenantId);
 
     try {
       await Future.wait([

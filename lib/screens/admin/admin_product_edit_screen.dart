@@ -92,14 +92,16 @@ class _AdminProductEditScreenState extends State<AdminProductEditScreen> {
     final product = _product;
     if (product == null) return;
 
-    final bytes = await _photos.pickPhotoBytes(source: source);
-    if (bytes == null || !mounted) return;
-
     setState(() => _uploadingPhoto = true);
     try {
-      final updated = await context
-          .read<CatalogService>()
-          .uploadProductPhoto(product.id, bytes);
+      final picked = await _photos.pickPhoto(source: source);
+      if (picked == null || !mounted) return;
+
+      final updated = await context.read<CatalogService>().uploadProductPhoto(
+            product.id,
+            picked.bytes,
+            fileName: picked.fileName,
+          );
       if (!mounted) return;
 
       setState(() => _product = updated);
@@ -457,19 +459,31 @@ class _AdminProductEditScreenState extends State<AdminProductEditScreen> {
       }
     }
 
-    final updated = product.copyWith(
+    // Usar la ficha viva del catálogo para no pisar fotos recién subidas
+    // si el estado local quedó desfasado.
+    final live =
+        context.read<CatalogService>().productById(product.id) ?? product;
+
+    final updated = live.copyWith(
       precioUsd: precio,
       stock: stock,
       foto: '',
-      modelo: product.isArma ? _modeloController.text.trim() : product.modelo,
+      fotoUrls: live.fotoUrls,
+      modelo: product.isArma ? _modeloController.text.trim() : live.modelo,
       descripcion:
-          product.isMunicion ? _descripcionController.text.trim() : product.descripcion,
+          product.isMunicion ? _descripcionController.text.trim() : live.descripcion,
       calibre: calibre,
       codigo: codigo,
       roundsPerBox: roundsPerBox,
     );
 
-    await context.read<CatalogService>().updateProduct(updated);
+    try {
+      await context.read<CatalogService>().updateProduct(updated);
+    } catch (error) {
+      if (!context.mounted) return;
+      _showError('No se pudo guardar: $error');
+      return;
+    }
 
     if (!context.mounted) return;
 

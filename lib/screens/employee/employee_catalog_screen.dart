@@ -47,9 +47,16 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
     super.dispose();
   }
 
-  /// Productos del tipo elegido (sin aplicar marca/calibre/búsqueda).
-  List<Product> _typeSource(CatalogService catalog) =>
-      _typeFilter == null ? catalog.products : catalog.byType(_typeFilter!);
+  /// Catálogo vendible: el vendedor solo ve lo que tiene stock disponible.
+  List<Product> _availableProducts(CatalogService catalog) =>
+      catalog.products.where((p) => p.inStock).toList();
+
+  /// Productos disponibles del tipo elegido (sin aplicar marca/calibre/búsqueda).
+  List<Product> _typeSource(CatalogService catalog) {
+    final available = _availableProducts(catalog);
+    if (_typeFilter == null) return available;
+    return available.where((p) => p.type == _typeFilter).toList();
+  }
 
   /// Marcas disponibles para el tipo elegido.
   List<String> _marcaOptions(CatalogService catalog) =>
@@ -189,8 +196,9 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
     final exchangeRate = context.watch<ExchangeRateService>();
     final seller = context.watch<SellerService>().selected;
     final cartCount = context.watch<CartService>().itemCount;
+    final available = _availableProducts(catalog);
     final products = _products(catalog);
-    final lowStockCount = _lowStockCount(catalog.products);
+    final lowStockCount = _lowStockCount(available);
     final sellerName = seller != null ? formatSellerFirstName(seller.nombre) : '—';
     final sellerInitial = sellerName.isNotEmpty ? sellerName[0].toUpperCase() : '?';
     final marcaOptions = _marcaOptions(catalog);
@@ -198,7 +206,7 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
 
     final catalogBody = _CatalogDesktopBody(
       products: products,
-      totalLoaded: catalog.products.length,
+      totalLoaded: available.length,
       lowStockCount: lowStockCount,
       searchController: _searchController,
       searchFocus: _searchFocus,
@@ -232,7 +240,7 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
         bottom: false,
         child: CatalogMobileLayout(
           products: products,
-          totalLoaded: catalog.products.length,
+          totalLoaded: available.length,
           lowStockCount: lowStockCount,
           searchController: _searchController,
           searchFocus: _searchFocus,

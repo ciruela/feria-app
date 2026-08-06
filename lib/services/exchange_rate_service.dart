@@ -6,20 +6,22 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/audit_entry.dart';
 import '../utils/jwt.dart';
+import '../utils/tenant_cache.dart';
 import 'audit_service.dart';
 import 'supabase_config_repository.dart';
 import 'supabase_service.dart';
 
 class ExchangeRateService extends ChangeNotifier {
-  static const _rateKey = 'exchange_rate_ars';
-  static const _updatedAtKey = 'exchange_rate_updated_at';
-  static const _fromServerKey = 'exchange_rate_from_server';
+  static const _rateKeyBase = 'exchange_rate_ars';
+  static const _updatedAtKeyBase = 'exchange_rate_updated_at';
+  static const _fromServerKeyBase = 'exchange_rate_from_server';
   static const defaultRate = 1500.0;
 
   double _rate = defaultRate;
   DateTime? _updatedAt;
   bool _hasServerRate = false;
   RealtimeChannel? _realtimeChannel;
+  String? _tenantScope;
 
   final SupabaseConfigRepository _configRepo = SupabaseConfigRepository();
 
@@ -30,6 +32,23 @@ class ExchangeRateService extends ChangeNotifier {
   /// Si es false con Supabase, no inventar precios ARS con el default 1500 (AR-11).
   bool get hasServerRate =>
       !SupabaseService.isConfigured || _hasServerRate;
+
+  String get _rateKey => tenantCacheKey(_rateKeyBase, _tenantScope);
+  String get _updatedAtKey => tenantCacheKey(_updatedAtKeyBase, _tenantScope);
+  String get _fromServerKey =>
+      tenantCacheKey(_fromServerKeyBase, _tenantScope);
+
+  /// Aísla cache y Realtime por armería. Llamar antes de [load] al elegir tenant.
+  void bindTenant(String? tenantId) {
+    final next = tenantId?.trim();
+    if (_tenantScope == next) return;
+    _tenantScope = next;
+    _rate = defaultRate;
+    _updatedAt = null;
+    _hasServerRate = !SupabaseService.isConfigured;
+    _realtimeChannel?.unsubscribe();
+    _realtimeChannel = null;
+  }
 
   Future<void> load() async {
     await _loadFromCache();
@@ -87,8 +106,9 @@ class ExchangeRateService extends ChangeNotifier {
     try {
       final remote = await _configRepo.fetchExchangeRate();
       if (remote == null) {
-        // AR-11: lista vacía / sin fila del tenant ≠ "crear".
-        // No hacer upsert desde el sync (evita el bucle cada 5s).
+        // AR-11: sin fila del tenant no inventamos precios ARS.
+        // Conservamos el valor en memoria solo como placeholder del campo
+        // de edición; hasServerRate pasa a false para ocultar ARS.
         if (_hasServerRate) {
           _hasServerRate = false;
           await _persistCache();
@@ -104,6 +124,8 @@ class ExchangeRateService extends ChangeNotifier {
         fromServer: true,
       );
     } catch (error) {
+      // Error de red/RLS: NO bajar hasServerRate (evita “desaparecer” precios
+      // si el sync falla pero la armería sí tiene dólar cargado).
       debugPrint('ExchangeRateService sync: $error');
     }
   }
@@ -111,7 +133,9 @@ class ExchangeRateService extends ChangeNotifier {
   void _subscribeRealtime() {
     if (!SupabaseService.isConfigured) return;
 
-    final tenantId = _tenantIdFromJwt();
+    final tenantId = _tenantScope?.trim().isNotEmpty == true
+        ? _tenantScope
+        : _tenantIdFromJwt();
     _realtimeChannel?.unsubscribe();
     var channel = SupabaseService.client.channel(
       'app_config:${tenantId ?? 'all'}',

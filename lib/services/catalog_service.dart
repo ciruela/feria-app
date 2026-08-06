@@ -188,7 +188,16 @@ class CatalogService extends ChangeNotifier {
     final previous = _products[index];
     _products[index] = updated;
     await _persistCache();
-    await _pushToSupabase(updated);
+    try {
+      await _pushToSupabase(updated);
+    } catch (error) {
+      // Si el upsert falla (RLS, grants, red), no dejamos la foto/ficha
+      // "guardada" solo en caché local: el usuario vería el ok y al sync se pierde.
+      _products[index] = previous;
+      await _persistCache();
+      notifyListeners();
+      rethrow;
+    }
 
     if (SupabaseService.isConfigured &&
         updated.stock != null &&
@@ -260,8 +269,9 @@ class CatalogService extends ChangeNotifier {
 
   Future<Product> uploadProductPhoto(
     String productId,
-    Uint8List photoBytes,
-  ) async {
+    Uint8List photoBytes, {
+    String? fileName,
+  }) async {
     if (!SupabaseService.isConfigured) {
       throw StateError('Supabase no configurado — no se pueden subir fotos');
     }
@@ -271,7 +281,13 @@ class CatalogService extends ChangeNotifier {
       throw ArgumentError('Producto no encontrado');
     }
 
-    final storagePath = await _productPhotos.uploadBytes(product, photoBytes);
+    await _ensureSupabaseWriteContext();
+
+    final storagePath = await _productPhotos.uploadBytes(
+      product,
+      photoBytes,
+      fileName: fileName,
+    );
     final updated = product.copyWith(
       fotoUrls: [...product.fotoUrls, storagePath],
       foto: '',
@@ -818,9 +834,12 @@ class CatalogService extends ChangeNotifier {
     if (!SupabaseService.isConfigured) return;
 
     try {
+      await _ensureSupabaseWriteContext();
       await _supabaseCatalog.upsert(product);
     } catch (error) {
       _lastError = error.toString();
+      AppLogger.error('No se pudo guardar producto en Supabase', error: error);
+      rethrow;
     }
   }
 

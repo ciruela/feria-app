@@ -6,33 +6,49 @@ class SupabaseConfigRepository {
   static const _globalId = 'global';
 
   Future<({double rate, DateTime updatedAt})?> fetchExchangeRate() async {
-    final row = await SupabaseService.client
+    var query = SupabaseService.client
         .from(_table)
         .select('exchange_rate_ars, updated_at')
-        .eq('id', _globalId)
-        .maybeSingle();
+        .eq('id', _globalId);
 
+    // Filtro explícito por tenant (además de RLS) para no cruzar armerías.
+    final tenantId = _tenantIdFromJwt();
+    if (tenantId != null) {
+      query = query.eq('tenant_id', tenantId);
+    }
+
+    final row = await query.maybeSingle();
     if (row == null) return null;
 
+    final rate = (row['exchange_rate_ars'] as num?)?.toDouble();
+    if (rate == null || rate <= 0) return null;
+
     return (
-      rate: (row['exchange_rate_ars'] as num).toDouble(),
+      rate: rate,
       updatedAt: DateTime.parse(row['updated_at'] as String),
     );
   }
 
   Future<void> upsertExchangeRate(double rate) async {
     final tenantId = _tenantIdFromJwt();
+    if (tenantId == null || tenantId.isEmpty) {
+      throw StateError(
+        'No hay armería activa en la sesión. '
+        'Elegí una organización antes de guardar el tipo de cambio.',
+      );
+    }
+
     final payload = <String, dynamic>{
       'id': _globalId,
       'exchange_rate_ars': rate,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
-      if (tenantId != null) 'tenant_id': tenantId,
+      'tenant_id': tenantId,
     };
 
     // PK compuesta (tenant_id, id) — AR-11.
     await SupabaseService.client.from(_table).upsert(
           payload,
-          onConflict: tenantId != null ? 'tenant_id,id' : 'id',
+          onConflict: 'tenant_id,id',
         );
   }
 

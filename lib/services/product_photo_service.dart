@@ -8,16 +8,29 @@ import '../models/product.dart';
 import '../utils/jwt.dart';
 import 'supabase_service.dart';
 
-/// Fotos en Storage: `feria-fotos/{tenant_id}/{tipo}/{producto_id}/{timestamp}.jpg`
+/// Resultado de elegir una foto (bytes + nombre para detectar mime).
+class PickedProductPhoto {
+  const PickedProductPhoto({required this.bytes, this.fileName});
+
+  final Uint8List bytes;
+  final String? fileName;
+}
+
+/// Fotos en Storage: `feria-fotos/{tenant_id}/{tipo}/{producto_id}/{timestamp}.ext`
 /// Ej: `0853ba51-.../arma_corta/ac-001/1734567890123.jpg` (AR-12).
 class ProductPhotoService {
   final _picker = ImagePicker();
 
   static String folderFor(Product product) => product.type.key;
 
-  static String newStoragePath(Product product, {String? tenantId}) {
+  static String newStoragePath(
+    Product product, {
+    String? tenantId,
+    String? fileName,
+  }) {
     final ts = DateTime.now().millisecondsSinceEpoch;
-    final leaf = '${product.type.key}/${product.id}/$ts.jpg';
+    final ext = _extensionFor(fileName, fallback: 'jpg');
+    final leaf = '${product.type.key}/${product.id}/$ts.$ext';
     final tenant = (tenantId ?? _tenantIdFromJwt())?.trim();
     if (tenant == null || tenant.isEmpty) {
       throw StateError('Sesión sin tenant: no se puede subir la foto.');
@@ -115,14 +128,25 @@ class ProductPhotoService {
         .toList();
   }
 
-  Future<Uint8List?> pickPhotoBytes({ImageSource? source}) async {
+  Future<PickedProductPhoto?> pickPhoto({ImageSource? source}) async {
     if (kIsWeb) {
       final picked = await FilePicker.pickFiles(
-        type: FileType.image,
+        type: FileType.custom,
+        allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
         withData: true,
+        allowMultiple: false,
       );
       if (picked == null || picked.files.isEmpty) return null;
-      return picked.files.single.bytes;
+
+      final file = picked.files.single;
+      final bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        throw StateError(
+          'No se pudieron leer los bytes de la imagen en el navegador. '
+          'Probá con JPG/PNG más chico (máx. 5 MB).',
+        );
+      }
+      return PickedProductPhoto(bytes: bytes, fileName: file.name);
     }
 
     final photo = await _picker.pickImage(
@@ -132,27 +156,43 @@ class ProductPhotoService {
       maxWidth: 1600,
     );
     if (photo == null) return null;
-    return photo.readAsBytes();
+    final bytes = await photo.readAsBytes();
+    if (bytes.isEmpty) {
+      throw StateError('La imagen quedó vacía.');
+    }
+    return PickedProductPhoto(bytes: bytes, fileName: photo.name);
   }
 
-  Future<String> uploadBytes(Product product, Uint8List bytes) async {
+  /// Compat: solo bytes (mobile antiguo). Preferí [pickPhoto].
+  Future<Uint8List?> pickPhotoBytes({ImageSource? source}) async {
+    final picked = await pickPhoto(source: source);
+    return picked?.bytes;
+  }
+
+  Future<String> uploadBytes(
+    Product product,
+    Uint8List bytes, {
+    String? fileName,
+  }) async {
     if (!SupabaseService.isConfigured) {
       throw StateError('Supabase no configurado');
     }
 
-    final path = newStoragePath(product);
+    final path = newStoragePath(product, fileName: fileName);
     const maxBytes = 5 * 1024 * 1024;
     if (bytes.length > maxBytes) {
       throw StateError('La foto supera el máximo de 5 MB.');
     }
+
+    final contentType = _contentTypeFor(fileName, bytes);
 
     await SupabaseService.client.storage
         .from(AppConfig.productPhotosBucket)
         .uploadBinary(
           path,
           bytes,
-          fileOptions: const FileOptions(
-            contentType: 'image/jpeg',
+          fileOptions: FileOptions(
+            contentType: contentType,
             upsert: true,
           ),
         );
@@ -169,5 +209,48 @@ class ProductPhotoService {
     await SupabaseService.client.storage
         .from(AppConfig.productPhotosBucket)
         .remove([path]);
+  }
+
+  static String _extensionFor(String? fileName, {required String fallback}) {
+    final name = (fileName ?? '').trim().toLowerCase();
+    if (name.endsWith('.png')) return 'png';
+    if (name.endsWith('.webp')) return 'webp';
+    if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'jpg';
+    return fallback;
+  }
+
+  static String _contentTypeFor(String? fileName, Uint8List bytes) {
+    final ext = _extensionFor(fileName, fallback: '');
+    switch (ext) {
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'jpg':
+        return 'image/jpeg';
+    }
+
+    // Magic bytes si el nombre no ayuda.
+    if (bytes.length >= 3 &&
+        bytes[0] == 0xFF &&
+        bytes[1] == 0xD8 &&
+        bytes[2] == 0xFF) {
+      return 'image/jpeg';
+    }
+    if (bytes.length >= 4 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47) {
+      return 'image/png';
+    }
+    if (bytes.length >= 4 &&
+        bytes[0] == 0x52 &&
+        bytes[1] == 0x49 &&
+        bytes[2] == 0x46 &&
+        bytes[3] == 0x46) {
+      return 'image/webp';
+    }
+    return 'image/jpeg';
   }
 }

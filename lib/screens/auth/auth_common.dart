@@ -14,6 +14,7 @@ Future<void> reloadTenantData(BuildContext context) async {
   final tenantId = context.read<TenantSessionService>().effectiveTenantId;
   context.read<CatalogService>().bindTenant(tenantId);
   context.read<SellerService>().bindTenant(tenantId);
+  context.read<ExchangeRateService>().bindTenant(tenantId);
 
   await Future.wait([
     context.read<CatalogService>().load(),
