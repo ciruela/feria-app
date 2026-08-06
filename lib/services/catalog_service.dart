@@ -1012,6 +1012,8 @@ class CatalogService extends ChangeNotifier {
   }) {
     final query = codigoQuery?.trim() ?? '';
     final results = byType(type).where((product) {
+      // Catálogo de venta: sin stock (null o 0) no se lista.
+      if ((product.stock ?? 0) <= 0) return false;
       final marcaOk = marca == null ||
           product.marca.toLowerCase() == marca.toLowerCase();
       final calibreOk = calibre == null ||

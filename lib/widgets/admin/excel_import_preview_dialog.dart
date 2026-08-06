@@ -40,7 +40,6 @@ class _ExcelImportPreviewDialog extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 'Revisá antes de importar',
@@ -77,15 +76,20 @@ class _ExcelImportPreviewDialog extends StatelessWidget {
                     : _PreviewTable(rows: preview.rows),
               ),
               const SizedBox(height: 16),
+              // El tema usa minimumSize: Size.fromHeight (ancho infinito). En un
+              // Row eso desborda y oculta IMPORTAR; acá forzamos ancho intrínseco.
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(false),
                     child: const Text('CANCELAR'),
                   ),
-                  const SizedBox(width: 8),
+                  const Spacer(),
                   ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(0, AppDecorations.buttonPrimary),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                    ),
                     onPressed: applicable == 0
                         ? null
                         : () => Navigator.of(context).pop(true),

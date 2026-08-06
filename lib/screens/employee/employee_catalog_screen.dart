@@ -47,9 +47,9 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
     super.dispose();
   }
 
-  /// Catálogo vendible: el vendedor solo ve lo que tiene stock disponible.
+  /// Catálogo vendible: solo productos con stock > 0 (null/"—" no se muestran).
   List<Product> _availableProducts(CatalogService catalog) =>
-      catalog.products.where((p) => p.inStock).toList();
+      catalog.products.where((p) => (p.stock ?? 0) > 0).toList();
 
   /// Productos disponibles del tipo elegido (sin aplicar marca/calibre/búsqueda).
   List<Product> _typeSource(CatalogService catalog) {
