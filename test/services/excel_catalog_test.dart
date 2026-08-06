@@ -113,6 +113,31 @@ Uint8List _rdReportBytes() {
   return Uint8List.fromList(excel.encode()!);
 }
 
+Uint8List _orbeaReportBytes() {
+  // Planilla Orbea típica: título con la marca (sin "Marca:") y descripción
+  // estilo proveedor. Antes caía en CCI por el default.
+  final excel = Excel.createExcel();
+  final name = excel.sheets.keys.first;
+  excel.rename(name, 'Orbea');
+  final s = excel['Orbea'];
+  void put(int c, int r, String v) => s
+      .cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r))
+      .value = TextCellValue(v);
+
+  put(0, 0, 'LISTADO ORBEA');
+  put(0, 1, 'Código');
+  put(1, 1, 'Descripción');
+  put(2, 1, 'CAJA X');
+  put(3, 1, 'CAJAS');
+  put(4, 1, 'PRECIO');
+  put(0, 2, '1122803');
+  put(1, 2, 'C.12 28G ORBEA (25)');
+  put(2, 2, '25');
+  put(3, 2, '19');
+  put(4, 2, '17');
+  return Uint8List.fromList(excel.encode()!);
+}
+
 void main() {
   group('ExcelCatalogService.parseRows (reporte CCI real)', () {
     test('salta preámbulo, une encabezado partido y detecta marca', () {
@@ -326,6 +351,30 @@ void main() {
       expect(rows.first['codigo'], '13040');
       expect(rows.first['precio_usd'], '65000');
       expect(rows.first['marca'], 'RD');
+    });
+
+    test('planilla Orbea: detecta marca del título/hoja (no fuerza CCI)', () {
+      final rows = service.parseRows(_orbeaReportBytes());
+      expect(rows.length, 1);
+      expect(rows.first['codigo'], '1122803');
+      expect(rows.first['marca'], 'Orbea');
+      final row = ExcelProductRow.fromMap(rows.first);
+      expect(row.marca, 'Orbea');
+      expect(row.stock, 19);
+      expect(row.precioUsd, 17);
+    });
+  });
+
+  group('inferBrandFromText', () {
+    test('encuentra Orbea en título o descripción', () {
+      expect(
+        ExcelCatalogService.inferBrandFromText('LISTADO ORBEA'),
+        'Orbea',
+      );
+      expect(
+        ExcelCatalogService.inferBrandFromText('C.12 28G ORBEA (25)'),
+        'Orbea',
+      );
     });
   });
 

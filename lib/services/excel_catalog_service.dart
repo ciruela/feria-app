@@ -50,9 +50,35 @@ class ExcelImportPreview {
 }
 
 class ExcelCatalogService {
-  /// Marca por defecto para munición cuando la planilla no trae columna "marca"
-  /// (caso típico: planilla de proveedor CCI). Se puede editar luego por producto.
+  /// Marca por defecto para munición solo si no hay ninguna pista en la planilla
+  /// (columna, preámbulo, hoja o descripción). Caso típico: planilla CCI vieja.
   static const defaultMunicionBrand = 'CCI';
+
+  /// Marcas de munición frecuentes en planillas AR. Orden: más largas primero
+  /// para no matchear "BELL" dentro de "SELLIER & BELLOT".
+  static const knownMunicionBrands = [
+    'SELLIER & BELLOT',
+    'SELLIER Y BELLOT',
+    'BARNES BULLETS',
+    'WINCHESTER',
+    'REMINGTON',
+    'FEDERAL',
+    'HORNADY',
+    'MAGTECH',
+    'NORMA',
+    'ORBEA',
+    'AGUILA',
+    'NOSLER',
+    'SPEER',
+    'LAPUA',
+    'GECO',
+    'ELEY',
+    'PPU',
+    'CCI',
+    'CBC',
+    'SK',
+    'RD',
+  ];
 
   /// Columnas que exporta la app (encabezados del template).
   static const headers = [
@@ -69,6 +95,28 @@ class ExcelCatalogService {
     'stock_inicial',
     'vendido',
   ];
+
+  /// Busca una marca conocida en texto libre (título, hoja, descripción).
+  static String? inferBrandFromText(String raw) {
+    final text = raw.replaceAll('\u00a0', ' ').trim().toUpperCase();
+    if (text.isEmpty) return null;
+    for (final brand in knownMunicionBrands) {
+      final pattern = RegExp(
+        '\\b${RegExp.escape(brand)}\\b',
+        caseSensitive: false,
+      );
+      if (pattern.hasMatch(text)) {
+        // Canonical: primera palabra con mayúsculas típicas (Orbea, CCI…).
+        if (brand == 'SELLIER & BELLOT' || brand == 'SELLIER Y BELLOT') {
+          return 'Sellier & Bellot';
+        }
+        if (brand == 'BARNES BULLETS') return 'Barnes';
+        if (brand.length <= 3) return brand; // CCI, PPU, RD, SK, CBC
+        return brand[0] + brand.substring(1).toLowerCase();
+      }
+    }
+    return null;
+  }
 
   /// Mapea encabezados libres (CCI, mayúsculas, acentos) a claves canónicas.
   static String? _canonicalHeader(String raw) {
@@ -105,6 +153,10 @@ class ExcelCatalogService {
       case 'tipo':
         return 'tipo';
       case 'marca':
+      case 'brand':
+      case 'fabricante':
+      case 'maker':
+      case 'proveedor':
         return 'marca';
       case 'calibre':
       case 'calib':
@@ -250,9 +302,14 @@ class ExcelCatalogService {
     return (calibre: calibre, modelo: modelo);
   }
 
-  static String? _detectBrand(List<List<Data?>> rows, int upTo) {
+  static String? _detectBrand(
+    List<List<Data?>> rows,
+    int upTo, {
+    String? sheetName,
+  }) {
     final withColon = RegExp(r'marca\s*:\s*(.+)', caseSensitive: false);
     final withoutColon = RegExp(r'^marca\s+(.+)$', caseSensitive: false);
+    // 1) Explicit "Marca: Orbea" / "MARCA PPU" in the preamble.
     for (var r = 0; r < upTo && r < rows.length; r++) {
       for (final cell in rows[r]) {
         final text = _cellText(cell).replaceAll('\u00a0', ' ').trim();
@@ -264,7 +321,15 @@ class ExcelCatalogService {
         }
       }
     }
-    return null;
+    // 2) Título / celda con marca conocida ("LISTADO ORBEA", "ORBEA", etc.).
+    for (var r = 0; r < upTo && r < rows.length; r++) {
+      for (final cell in rows[r]) {
+        final inferred = inferBrandFromText(_cellText(cell));
+        if (inferred != null) return inferred;
+      }
+    }
+    // 3) Nombre de la hoja del Excel.
+    return inferBrandFromText(sheetName ?? '');
   }
 
   Uint8List exportProducts(List<Product> products) {
@@ -309,17 +374,22 @@ class ExcelCatalogService {
       throw Exception('El Excel está vacío');
     }
 
-    final sheet = excel.tables.values.first;
+    final sheetName = excel.tables.keys.first;
+    final sheet = excel.tables[sheetName]!;
     if (sheet.rows.isEmpty) {
       throw Exception('El Excel no tiene filas');
     }
 
     // No exigimos "marca"/"calibre" (las planillas de proveedor tipo CCI no las
     // traen). Detectamos la fila de encabezados (que puede estar más abajo o
-    // partida en dos filas) y la marca del preámbulo ("Marca: CCI").
+    // partida en dos filas) y la marca del preámbulo / hoja / título.
     final header = _findHeader(sheet.rows);
     final columnIndex = header.columns;
-    final brand = _detectBrand(sheet.rows, header.dataStart);
+    final brand = _detectBrand(
+      sheet.rows,
+      header.dataStart,
+      sheetName: sheetName,
+    );
 
     final rows = <Map<String, String>>[];
 
@@ -448,18 +518,18 @@ class ExcelProductRow {
       }
     }
 
-    // Si la planilla no trae marca (típico en munición de proveedor), usamos
-    // una por defecto para que el producto sea válido; se puede editar luego.
-    var marca = data['marca']?.trim() ?? '';
-    if (marca.isEmpty && type == ProductType.municion) {
-      marca = ExcelCatalogService.defaultMunicionBrand;
-    }
-
     var calibre = data['calibre']?.trim() ?? '';
     var modelo = data['modelo']?.trim() ?? '';
     final descripcion = data['descripcion']?.trim() ?? '';
 
-    // Munición CCI: los datos vienen empaquetados en la descripción
+    // Marca: columna → pista en la descripción → CCI solo como último recurso.
+    var marca = data['marca']?.trim() ?? '';
+    if (marca.isEmpty && type == ProductType.municion) {
+      marca = ExcelCatalogService.inferBrandFromText(descripcion) ??
+          ExcelCatalogService.defaultMunicionBrand;
+    }
+
+    // Munición estilo proveedor: datos empaquetados en la descripción
     // ("C.22 40G LR MINI MAG 1235FPS CCI M.960 (50)"). Extraemos calibre y
     // modelo cuando la planilla no trae esas columnas por separado.
     if (type == ProductType.municion && descripcion.isNotEmpty) {
