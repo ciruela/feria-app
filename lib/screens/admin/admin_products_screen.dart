@@ -493,8 +493,20 @@ class _ProductAdminTile extends StatelessWidget {
 
   final Product product;
 
-  /// Muestra todos los identificadores cargados (modelo, código/ref, calibre),
-  /// omitiendo solo los vacíos, para que el admin vea todo lo que cargó.
+  /// Título legible: en munición la descripción (qué Águila es); en armas el modelo.
+  String get _title {
+    if (product.isArma) {
+      final modelo = product.modelo.trim();
+      return modelo.isNotEmpty ? modelo : product.modeloDisplay;
+    }
+    final descripcion = product.descripcion.trim();
+    if (descripcion.isNotEmpty) return descripcion;
+    final short = product.sellerShortTitle.trim();
+    if (short.isNotEmpty) return short;
+    return product.codigo;
+  }
+
+  /// Identificadores secundarios (código, calibre, modelo si no es el título).
   List<Widget> _identityLines(Product product) {
     final lines = <Widget>[];
     void add(String label, String value) {
@@ -504,13 +516,20 @@ class _ProductAdminTile extends StatelessWidget {
     }
 
     if (product.isArma) {
-      add('MODELO', product.modelo);
       add('REF.', product.codigo);
       add('CALIBRE', product.calibre);
+      if (product.descripcion.trim().isNotEmpty) {
+        add('DESC.', product.descripcion.trim());
+      }
     } else {
       add('CÓDIGO', product.codigo);
-      add('MODELO', product.modelo);
       add('CALIBRE', product.calibre);
+      add('MODELO', product.modelo);
+      // Si el título ya es la descripción completa, no la repetimos abajo.
+      final desc = product.descripcion.trim();
+      if (desc.isNotEmpty && desc != _title) {
+        add('DESC.', desc);
+      }
     }
     return lines;
   }
@@ -524,6 +543,8 @@ class _ProductAdminTile extends StatelessWidget {
             : product.isMunicion
                 ? '${product.stock} cajas'
                 : 'Stock: ${product.stock}';
+    final title = _title;
+    final tags = product.sellerTagLabels;
 
     return Material(
       color: AppColors.surface,
@@ -553,12 +574,53 @@ class _ProductAdminTile extends StatelessWidget {
                     Text(
                       product.marcaUpper,
                       style: const TextStyle(
-                        fontSize: 22,
+                        fontSize: 13,
                         fontWeight: FontWeight.w800,
                         color: AppColors.primary,
+                        letterSpacing: 0.6,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    if (title.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                    if (tags.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: tags
+                            .map(
+                              (tag) => Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accent.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  tag,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.accent,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
                     ..._identityLines(product),
                     const SizedBox(height: 10),
                     Text(
