@@ -24,6 +24,21 @@ class AdminPinEntry extends StatefulWidget {
 
 class AdminPinEntryState extends State<AdminPinEntry> {
   String _pin = '';
+  final _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
 
   void clear() => setState(() => _pin = '');
 
@@ -46,48 +61,95 @@ class AdminPinEntryState extends State<AdminPinEntry> {
     widget.onSubmit?.call(_pin);
   }
 
+  KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.backspace || key == LogicalKeyboardKey.delete) {
+      _backspace();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.numpadEnter) {
+      _submit();
+      return KeyEventResult.handled;
+    }
+
+    final digit = _digitFromKey(key);
+    if (digit != null) {
+      _append(digit);
+      return KeyEventResult.handled;
+    }
+
+    return KeyEventResult.ignored;
+  }
+
+  String? _digitFromKey(LogicalKeyboardKey key) {
+    return switch (key) {
+      LogicalKeyboardKey.digit0 || LogicalKeyboardKey.numpad0 => '0',
+      LogicalKeyboardKey.digit1 || LogicalKeyboardKey.numpad1 => '1',
+      LogicalKeyboardKey.digit2 || LogicalKeyboardKey.numpad2 => '2',
+      LogicalKeyboardKey.digit3 || LogicalKeyboardKey.numpad3 => '3',
+      LogicalKeyboardKey.digit4 || LogicalKeyboardKey.numpad4 => '4',
+      LogicalKeyboardKey.digit5 || LogicalKeyboardKey.numpad5 => '5',
+      LogicalKeyboardKey.digit6 || LogicalKeyboardKey.numpad6 => '6',
+      LogicalKeyboardKey.digit7 || LogicalKeyboardKey.numpad7 => '7',
+      LogicalKeyboardKey.digit8 || LogicalKeyboardKey.numpad8 => '8',
+      LogicalKeyboardKey.digit9 || LogicalKeyboardKey.numpad9 => '9',
+      _ => null,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final boxColor = widget.wrong ? AppColors.accent : AppColors.border;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(widget.maxDigits, (index) {
-            final filled = index < _pin.length;
-            return Container(
-              width: 44,
-              height: 52,
-              margin: EdgeInsets.only(
-                right: index < widget.maxDigits - 1 ? 10 : 0,
-              ),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceTouch,
-                borderRadius: BorderRadius.circular(AppDecorations.radius),
-                border: Border.all(
-                  color: boxColor,
-                  width: widget.wrong ? 1 : AppDecorations.hairline,
-                ),
-              ),
-              child: Text(
-                filled ? '•' : '',
-                style: AppText.display.copyWith(
-                  color: widget.wrong ? AppColors.accent : AppColors.textPrimary,
-                ),
-              ),
-            );
-          }),
+    return Focus(
+      focusNode: _focusNode,
+      autofocus: true,
+      onKeyEvent: _handleKey,
+      child: GestureDetector(
+        onTap: _focusNode.requestFocus,
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(widget.maxDigits, (index) {
+                final filled = index < _pin.length;
+                return Container(
+                  width: 44,
+                  height: 52,
+                  margin: EdgeInsets.only(
+                    right: index < widget.maxDigits - 1 ? 10 : 0,
+                  ),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceTouch,
+                    borderRadius: BorderRadius.circular(AppDecorations.radius),
+                    border: Border.all(
+                      color: boxColor,
+                      width: widget.wrong ? 1 : AppDecorations.hairline,
+                    ),
+                  ),
+                  child: Text(
+                    filled ? '•' : '',
+                    style: AppText.display.copyWith(
+                      color: widget.wrong ? AppColors.accent : AppColors.textPrimary,
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 20),
+            _Keypad(
+              onDigit: _append,
+              onBackspace: _backspace,
+              onSubmit: _submit,
+            ),
+          ],
         ),
-        const SizedBox(height: 20),
-        _Keypad(
-          onDigit: _append,
-          onBackspace: _backspace,
-          onSubmit: _submit,
-        ),
-      ],
+      ),
     );
   }
 }
