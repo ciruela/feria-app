@@ -8,10 +8,12 @@ class CatalogCategoryChips extends StatelessWidget {
     super.key,
     required this.selected,
     required this.onSelected,
+    this.desktopHandoff = false,
   });
 
   final ProductType? selected;
   final ValueChanged<ProductType?> onSelected;
+  final bool desktopHandoff;
 
   static const _labels = {
     null: 'Todo',
@@ -22,32 +24,40 @@ class CatalogCategoryChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final horizontalPadding = desktopHandoff ? 28.0 : 20.0;
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
       child: Row(
         children: _labels.entries.map((entry) {
           final isSelected = selected == entry.key;
+          final selectedBg =
+              desktopHandoff ? AppColors.textPrimary : AppColors.textPrimary;
+          final selectedFg =
+              desktopHandoff ? AppColors.canvas : AppColors.surface;
+
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: Material(
-              color: isSelected ? AppColors.textPrimary : AppColors.surfaceTouch,
+              color: isSelected ? selectedBg : AppColors.surfaceTouch,
               borderRadius: BorderRadius.circular(AppDecorations.radius),
               child: InkWell(
                 onTap: () => onSelected(entry.key),
                 borderRadius: BorderRadius.circular(AppDecorations.radius),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(AppDecorations.radius),
                     border: Border.all(
-                      color: isSelected ? AppColors.textPrimary : AppColors.border,
+                      color: isSelected ? selectedBg : AppColors.border,
                     ),
                   ),
                   child: Text(
                     entry.value,
                     style: AppText.bodySmall.copyWith(
-                      color: isSelected ? AppColors.surface : AppColors.textMuted,
+                      color: isSelected ? selectedFg : AppColors.textMuted,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

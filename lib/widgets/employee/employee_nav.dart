@@ -22,12 +22,7 @@ class EmployeeSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 220,
-      decoration: const BoxDecoration(
-        color: AppColors.surfaceRaised,
-        border: Border(
-          right: BorderSide(color: AppColors.border, width: AppDecorations.hairline),
-        ),
-      ),
+      color: AppColors.canvas,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -65,13 +60,19 @@ class EmployeeSidebar extends StatelessWidget {
             ),
           ],
           const Spacer(),
-          _NavTile(
-            label: 'Salir',
-            icon: Icons.logout_rounded,
-            selected: false,
-            onTap: () => onSelected(EmployeeNavItem.exit),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+            child: OutlinedButton.icon(
+              onPressed: () => onSelected(EmployeeNavItem.exit),
+              icon: const Icon(Icons.logout_rounded, size: 18),
+              label: const Text('Salir'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.textMuted,
+                side: const BorderSide(color: AppColors.border),
+                minimumSize: const Size.fromHeight(44),
+              ),
+            ),
           ),
-          const SizedBox(height: 20),
         ],
       ),
     );
@@ -119,7 +120,7 @@ class _NavTile extends StatelessWidget {
           decoration: BoxDecoration(
             border: selected
                 ? const Border(
-                    left: BorderSide(color: AppColors.textPrimary, width: 3),
+                    left: BorderSide(color: AppColors.accent, width: 3),
                   )
                 : null,
           ),

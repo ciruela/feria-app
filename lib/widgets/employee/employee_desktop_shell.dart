@@ -25,7 +25,7 @@ class EmployeeDesktopShell extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           EmployeeSidebar(selected: selected, onSelected: onNav),
-          Expanded(child: ColoredBox(color: AppColors.surface, child: body)),
+          Expanded(child: ColoredBox(color: AppColors.canvas, child: body)),
           const EmployeeCartPanel(),
         ],
       ),

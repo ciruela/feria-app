@@ -231,7 +231,10 @@ class _CatalogBody extends StatelessWidget {
                       children: [
                         Text(
                           'Hola, $sellerName',
-                          style: AppText.heading.copyWith(fontSize: 28),
+                          style: AppText.heading.copyWith(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         const Text(
@@ -268,18 +271,6 @@ class _CatalogBody extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    if (onSync != null)
-                      IconButton(
-                        tooltip: 'Actualizar catálogo',
-                        onPressed: isSyncing ? null : onSync,
-                        icon: isSyncing
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.cloud_download_outlined),
-                      ),
                     Material(
                       color: AppColors.surfaceTouch,
                       borderRadius: BorderRadius.circular(AppDecorations.radius),
@@ -316,8 +307,9 @@ class _CatalogBody extends StatelessWidget {
           CatalogCategoryChips(
             selected: typeFilter,
             onSelected: onTypeChanged,
+            desktopHandoff: true,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Expanded(
             child: products.isEmpty
                 ? const EmptyState(
@@ -503,14 +495,16 @@ class _DesktopStatsRow extends StatelessWidget {
         Expanded(
           child: _StatBox(
             label: 'ÚLTIMAS UNIDADES',
-            value: '$lowStockCount productos',
+            value: '$lowStockCount',
+            subtitle: 'productos',
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: _StatBox(
             label: 'MOSTRANDO',
-            value: '$showing de $totalLoaded cargados',
+            value: '$showing',
+            subtitle: 'de $totalLoaded cargados',
           ),
         ),
       ],
@@ -554,15 +548,18 @@ class _StatBox extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             value,
-            style: AppText.bodyLarge.copyWith(
+            style: AppText.number.copyWith(
               fontWeight: FontWeight.w700,
               color: accent ? AppColors.accent : AppColors.textPrimary,
-              fontSize: accent ? 22 : 16,
+              fontSize: accent ? 28 : 24,
             ),
           ),
           if (subtitle != null) ...[
-            const SizedBox(height: 4),
-            Text(subtitle!, style: AppText.bodySmall),
+            const SizedBox(height: 2),
+            Text(
+              subtitle!,
+              style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+            ),
           ],
         ],
       ),

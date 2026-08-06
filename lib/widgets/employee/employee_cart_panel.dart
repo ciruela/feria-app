@@ -4,8 +4,9 @@ import 'package:provider/provider.dart';
 import '../../services/cart_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/employee/employee_cart_body.dart';
+import 'handoff_dashed_border.dart';
 
-/// Panel lateral de carrito en catálogo desktop (diseño 05 desk).
+/// Panel lateral de carrito — mock 03_Desk / 05_Desk.
 class EmployeeCartPanel extends StatelessWidget {
   const EmployeeCartPanel({super.key});
 
@@ -15,53 +16,48 @@ class EmployeeCartPanel extends StatelessWidget {
 
     return Container(
       width: 320,
-      decoration: const BoxDecoration(
-        color: AppColors.surfaceRaised,
-        border: Border(
-          left: BorderSide(color: AppColors.border, width: AppDecorations.hairline),
-        ),
-      ),
+      color: AppColors.canvas,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-            child: Text(
-              'Carrito',
-              style: AppText.heading.copyWith(fontSize: 20),
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Carrito',
+                  style: AppText.heading.copyWith(fontSize: 20),
+                ),
+                if (cart.isEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Todavía no cargaste nada',
+                    style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+                  ),
+                ],
+              ],
             ),
           ),
-          const Divider(height: 1, color: AppColors.border),
           Expanded(
             child: cart.isEmpty
                 ? Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          'Todavía no cargaste nada',
-                          style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                    child: HandoffDashedBorder(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 48,
                         ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(AppDecorations.radius),
-                            border: Border.all(
-                              color: AppColors.border,
-                              width: AppDecorations.hairline,
-                            ),
-                          ),
-                          child: const Text(
-                            'El carrito está vacío.\n'
-                            'Tocá un producto de la tabla para sumarlo.',
-                            textAlign: TextAlign.center,
-                            style: AppText.bodySmall,
+                        child: Text(
+                          'El carrito está vacío.\n'
+                          'Tocá un producto de la tabla para sumarlo.',
+                          textAlign: TextAlign.center,
+                          style: AppText.bodySmall.copyWith(
+                            color: AppColors.textMuted,
                           ),
                         ),
-                        const Spacer(),
-                      ],
+                      ),
                     ),
                   )
                 : const EmployeeCartBody(compact: true, showHeader: false),

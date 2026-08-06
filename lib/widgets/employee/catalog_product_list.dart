@@ -164,7 +164,7 @@ class CatalogProductTable extends StatelessWidget {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 10),
           decoration: const BoxDecoration(
             border: Border(bottom: BorderSide(color: AppColors.border)),
           ),
@@ -188,7 +188,7 @@ class CatalogProductTable extends StatelessWidget {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          padding: const EdgeInsets.fromLTRB(28, 0, 28, 16),
           child: Row(
             children: [
               Expanded(
@@ -255,7 +255,7 @@ class CatalogProductTableRow extends StatelessWidget {
     final lowStock = isLowStock(product.stock);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
@@ -301,31 +301,36 @@ class CatalogProductTableRow extends StatelessWidget {
           ),
           Expanded(
             flex: 2,
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
+                if (lowStock)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.error_outline_rounded,
+                        color: AppColors.accent,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'BAJO STOCK',
+                        style: AppText.label.copyWith(
+                          color: AppColors.accent,
+                          fontSize: 9,
+                        ),
+                      ),
+                    ],
+                  ),
+                if (lowStock) const SizedBox(height: 4),
                 Text(
                   product.stock == null
                       ? '—'
                       : '${product.stock} ${product.isMunicion ? 'cajas' : 'u.'}',
                   style: AppText.bodySmall,
                 ),
-                if (lowStock) ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.accent.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(AppDecorations.radius),
-                    ),
-                    child: Text(
-                      'BAJO STOCK',
-                      style: AppText.label.copyWith(
-                        color: AppColors.accent,
-                        fontSize: 9,
-                      ),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
@@ -337,7 +342,7 @@ class CatalogProductTableRow extends StatelessWidget {
             flex: 2,
             child: Text(
               exchangeRate.hasServerRate ? formatArs(prices.lista) : '—',
-              style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w600),
+              style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
           SizedBox(
@@ -345,24 +350,54 @@ class CatalogProductTableRow extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                IconButton(
-                  tooltip: 'Ver detalle',
+                _TableActionButton(
+                  icon: Icons.visibility_outlined,
+                  background: AppColors.surfaceTouch,
+                  foreground: AppColors.textPrimary,
                   onPressed: () => _openDetail(context),
-                  icon: const Icon(Icons.visibility_outlined, size: 20),
                 ),
-                IconButton(
-                  tooltip: 'Agregar',
+                const SizedBox(width: 8),
+                _TableActionButton(
+                  icon: Icons.shopping_bag_outlined,
+                  background: AppColors.accent,
+                  foreground: AppColors.onAccent,
                   onPressed: product.inStock ? () => _addToCart(context) : null,
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: AppColors.onAccent,
-                  ),
-                  icon: const Icon(Icons.add_shopping_cart_outlined, size: 18),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TableActionButton extends StatelessWidget {
+  const _TableActionButton({
+    required this.icon,
+    required this.background,
+    required this.foreground,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final Color background;
+  final Color foreground;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: background,
+      borderRadius: BorderRadius.circular(AppDecorations.radius),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(AppDecorations.radius),
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Icon(icon, size: 18, color: foreground),
+        ),
       ),
     );
   }
