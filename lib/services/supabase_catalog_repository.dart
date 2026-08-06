@@ -56,22 +56,29 @@ class SupabaseCatalogRepository {
   /// No usamos `.upsert()` de PostgREST: con grants por columna (036), el
   /// ON CONFLICT intenta UPDATE de `tenant_id`/`id` y revienta con 42501
   /// ("permission denied for table productos") — típico al subir fotos.
-  Future<void> upsert(Product product) async {
+  Future<void> upsert(
+    Product product, {
+    bool updatePhotos = true,
+  }) async {
     final updated = await SupabaseService.client
         .from(_table)
-        .update(_toUpdateRow(product))
+        .update(_toUpdateRow(product, includePhotos: updatePhotos))
         .eq('id', product.id)
         .select('id');
 
     if ((updated as List).isEmpty) {
+      // Alta: las fotos van (vacías al venir de Excel; con paths si es create UI).
       await SupabaseService.client.from(_table).insert(_toInsertRow(product));
     }
   }
 
-  Future<void> upsertAll(List<Product> products) async {
+  Future<void> upsertAll(
+    List<Product> products, {
+    bool updatePhotos = true,
+  }) async {
     if (products.isEmpty) return;
     for (final product in products) {
-      await upsert(product);
+      await upsert(product, updatePhotos: updatePhotos);
     }
   }
 
@@ -280,9 +287,14 @@ class SupabaseCatalogRepository {
   }
 
   /// Columnas con GRANT UPDATE (036). Sin `id`/`tenant_id`/`stock`/`updated_at`.
-  Map<String, dynamic> _toUpdateRow(Product product) {
-    final paths = ProductPhotoService.pathsForStorage(product);
-    return <String, dynamic>{
+  ///
+  /// [includePhotos]: en import Excel va `false` para no pisar fotos ya cargadas
+  /// si la caché local no las tiene.
+  Map<String, dynamic> _toUpdateRow(
+    Product product, {
+    bool includePhotos = true,
+  }) {
+    final row = <String, dynamic>{
       'type': product.type.key,
       'marca': product.marca,
       'calibre': product.calibre,
@@ -290,19 +302,23 @@ class SupabaseCatalogRepository {
       'modelo': product.modelo,
       'descripcion': product.descripcion,
       'precio_usd': product.precioUsd,
-      'foto': product.foto,
-      'foto_url': paths.isNotEmpty ? paths.first : '',
-      'fotos': paths,
       'stock_inicial': product.stockInicial,
       'rounds_per_box': product.roundsPerBox,
       'activo': true,
       // updated_at lo pone el trigger set_updated_at_trg (AR-23).
     };
+    if (includePhotos) {
+      final paths = ProductPhotoService.pathsForStorage(product);
+      row['foto'] = product.foto;
+      row['foto_url'] = paths.isNotEmpty ? paths.first : '';
+      row['fotos'] = paths;
+    }
+    return row;
   }
 
   /// Columnas con GRANT INSERT (036), incluye identidad + tenant.
   Map<String, dynamic> _toInsertRow(Product product) {
-    final row = _toUpdateRow(product);
+    final row = _toUpdateRow(product, includePhotos: true);
     row['id'] = product.id;
     final tenantId = _tenantIdFromJwt();
     if (tenantId != null) {

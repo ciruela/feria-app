@@ -650,7 +650,10 @@ class CatalogService extends ChangeNotifier {
               : existing.stock;
           final newStock = row.stock ?? serverStock;
           stockTargetById[existing.id] = newStock;
+          // Actualiza ficha/stock del Excel. Fotos se preservan (copyWith no
+          // las toca) y el upsert a Supabase tampoco escribe columnas foto*.
           final product = existing.copyWith(
+            marca: row.marca.isNotEmpty ? row.marca : existing.marca,
             precioUsd: row.precioUsd > 0 ? row.precioUsd : existing.precioUsd,
             stock: newStock,
             calibre: row.calibre.isNotEmpty ? row.calibre : existing.calibre,
@@ -685,7 +688,11 @@ class CatalogService extends ChangeNotifier {
     await _persistCache();
     if (SupabaseService.isConfigured && changedProducts.isNotEmpty) {
       await _ensureSupabaseWriteContext();
-      await _supabaseCatalog.upsertAll(changedProducts);
+      // Import Excel: nunca pisar fotos en DB (aunque la caché local esté vacía).
+      await _supabaseCatalog.upsertAll(
+        changedProducts,
+        updatePhotos: false,
+      );
 
       for (final product in changedProducts) {
         final newStock = stockTargetById[product.id];
@@ -776,7 +783,22 @@ class CatalogService extends ChangeNotifier {
     }
   }
 
+  /// Match para reimportar Excel.
+  ///
+  /// Prioridad: mismo tipo + mismo **código** (aunque cambie la marca detectada
+  /// en el título del Excel). Así un reimport actualiza stock y no duplica.
+  /// Fallback: marca + modelo/descripcion (planillas sin código).
   Product? _findMatchingRow(ExcelProductRow row) {
+    final rowCodigo = row.codigo.trim().toLowerCase();
+    if (rowCodigo.isNotEmpty) {
+      for (final product in _products) {
+        if (product.type != row.type) continue;
+        if (product.codigo.trim().toLowerCase() == rowCodigo) {
+          return product;
+        }
+      }
+    }
+
     for (final product in _products) {
       if (product.type != row.type) continue;
       if (product.marca.toLowerCase() != row.marca.toLowerCase()) continue;
@@ -793,10 +815,8 @@ class CatalogService extends ChangeNotifier {
           return product;
         }
       } else {
-        // Munición: matchear por código; si no hay, por modelo o descripción.
-        final rowKey = row.codigo.isNotEmpty
-            ? row.codigo
-            : (row.modelo.isNotEmpty ? row.modelo : row.descripcion);
+        // Munición sin código: modelo o descripción.
+        final rowKey = row.modelo.isNotEmpty ? row.modelo : row.descripcion;
         if (rowKey.isEmpty) continue;
         final key = rowKey.toLowerCase();
         if (product.codigo.toLowerCase() == key ||
