@@ -52,16 +52,27 @@ class SupabaseCatalogRepository {
   }
 
   /// Upsert de ficha de producto **sin** tocar `stock` (AR-6).
+  ///
+  /// No usamos `.upsert()` de PostgREST: con grants por columna (036), el
+  /// ON CONFLICT intenta UPDATE de `tenant_id`/`id` y revienta con 42501
+  /// ("permission denied for table productos") — típico al subir fotos.
   Future<void> upsert(Product product) async {
-    await SupabaseService.client.from(_table).upsert(_toRow(product));
+    final updated = await SupabaseService.client
+        .from(_table)
+        .update(_toUpdateRow(product))
+        .eq('id', product.id)
+        .select('id');
+
+    if ((updated as List).isEmpty) {
+      await SupabaseService.client.from(_table).insert(_toInsertRow(product));
+    }
   }
 
   Future<void> upsertAll(List<Product> products) async {
     if (products.isEmpty) return;
-
-    await SupabaseService.client
-        .from(_table)
-        .upsert(products.map(_toRow).toList());
+    for (final product in products) {
+      await upsert(product);
+    }
   }
 
   /// Borrado lógico (AR-23): un producto con historial de stock no se puede
@@ -268,11 +279,10 @@ class SupabaseCatalogRepository {
     );
   }
 
-  /// Ficha de producto sin `stock`: el inventario solo se escribe por RPC.
-  Map<String, dynamic> _toRow(Product product) {
+  /// Columnas con GRANT UPDATE (036). Sin `id`/`tenant_id`/`stock`/`updated_at`.
+  Map<String, dynamic> _toUpdateRow(Product product) {
     final paths = ProductPhotoService.pathsForStorage(product);
-    final row = <String, dynamic>{
-      'id': product.id,
+    return <String, dynamic>{
       'type': product.type.key,
       'marca': product.marca,
       'calibre': product.calibre,
@@ -285,9 +295,15 @@ class SupabaseCatalogRepository {
       'fotos': paths,
       'stock_inicial': product.stockInicial,
       'rounds_per_box': product.roundsPerBox,
+      'activo': true,
       // updated_at lo pone el trigger set_updated_at_trg (AR-23).
     };
+  }
 
+  /// Columnas con GRANT INSERT (036), incluye identidad + tenant.
+  Map<String, dynamic> _toInsertRow(Product product) {
+    final row = _toUpdateRow(product);
+    row['id'] = product.id;
     final tenantId = _tenantIdFromJwt();
     if (tenantId != null) {
       row['tenant_id'] = tenantId;
