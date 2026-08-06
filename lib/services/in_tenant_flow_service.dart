@@ -10,24 +10,27 @@ enum TenantAppPhase {
 
 /// Coordina empleado/admin dentro del tenant. Cambios de fase = rebuild declarativo.
 class InTenantFlowService extends ChangeNotifier {
-  GlobalKey<NavigatorState>? _stackKey;
+  GlobalKey<NavigatorState>? _employeeStackKey;
+  GlobalKey<NavigatorState>? _adminStackKey;
 
   TenantAppPhase _phase = TenantAppPhase.roleGate;
 
   TenantAppPhase get phase => _phase;
 
-  GlobalKey<NavigatorState> navigatorKeyFor(TenantAppPhase phase) {
-    if (phase == TenantAppPhase.employeeHome ||
-        phase == TenantAppPhase.adminHome) {
-      _stackKey ??= GlobalKey<NavigatorState>();
-      return _stackKey!;
-    }
-    return GlobalKey<NavigatorState>();
+  GlobalKey<NavigatorState> employeeNavigatorKey() {
+    _employeeStackKey ??= GlobalKey<NavigatorState>();
+    return _employeeStackKey!;
+  }
+
+  GlobalKey<NavigatorState> adminNavigatorKey() {
+    _adminStackKey ??= GlobalKey<NavigatorState>();
+    return _adminStackKey!;
   }
 
   void reset() {
     _phase = TenantAppPhase.roleGate;
-    _stackKey = null;
+    _employeeStackKey = null;
+    _adminStackKey = null;
     notifyListeners();
   }
 
@@ -52,6 +55,6 @@ class InTenantFlowService extends ChangeNotifier {
   }
 
   void popToEmployeeHome() {
-    _stackKey?.currentState?.popUntil((route) => route.isFirst);
+    _employeeStackKey?.currentState?.popUntil((route) => route.isFirst);
   }
 }

@@ -36,9 +36,84 @@ class RoleGateScreen extends StatelessWidget {
     final width = MediaQuery.sizeOf(context).width;
     final isDesktop = LayoutBreakpoints.isDesktop(width);
 
+    if (isDesktop) {
+      return Scaffold(
+        backgroundColor: AppColors.surface,
+        body: Stack(
+          children: [
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 48),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 720),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SupabaseConfigBanner(),
+                      const RoleGateHero(),
+                      const SizedBox(height: 32),
+                      Text(
+                        '¿Cómo entrás?',
+                        style: AppText.heading.copyWith(fontSize: 32),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        session.isSellerPortalSession
+                            ? 'Sesión de vendedor: ventas y consulta de precios.'
+                            : session.isTenantManager
+                                ? 'Tu cuenta ya es administración en el servidor. El PIN solo identifica quién opera.'
+                                : 'Empleados consultan precios. Administración edita catálogo.',
+                        style: AppText.bodySmall,
+                      ),
+                      const SizedBox(height: 28),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: RoleEntryCard(
+                              label: AppRole.employee.label,
+                              subtitle: 'Consultar precios, stock y carrito',
+                              icon: Icons.search_rounded,
+                              highlighted: true,
+                              onTap: () {
+                                context.read<AuthService>().loginAs(AppRole.employee);
+                                onEmployee();
+                              },
+                            ),
+                          ),
+                          if (!session.isSellerPortalSession) ...[
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: RoleEntryCard(
+                                label: AppRole.admin.label,
+                                subtitle: session.isTenantManager
+                                    ? 'Panel completo (rol server: ${session.appRole})'
+                                    : 'Editar productos, stock y tipo de cambio',
+                                icon: Icons.tune_rounded,
+                                onTap: () => _askAdminPin(context),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (session.isSignedIn)
+              Positioned(
+                top: 16,
+                right: 16,
+                child: _SessionActions(session: session),
+              ),
+          ],
+        ),
+      );
+    }
+
     return FeriaScaffold(
       constrainBody: false,
-      maxContentWidth: isDesktop ? 1100 : 960,
       appBar: FeriaAppBar(
         title: const TenantAppTitle(),
         showBackButton: false,
@@ -67,12 +142,12 @@ class RoleGateScreen extends StatelessWidget {
         ],
       ),
       body: ListView(
-        padding: EdgeInsets.fromLTRB(isDesktop ? 40 : 20, 24, isDesktop ? 40 : 20, 32),
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
         children: [
           const SupabaseConfigBanner(),
           const RoleGateHero(),
           const SizedBox(height: 28),
-          Text('¿Cómo entrás?', style: AppText.heading.copyWith(fontSize: isDesktop ? 32 : 26)),
+          Text('¿Cómo entrás?', style: AppText.heading.copyWith(fontSize: 26)),
           const SizedBox(height: 8),
           Text(
             session.isSellerPortalSession
@@ -83,59 +158,26 @@ class RoleGateScreen extends StatelessWidget {
             style: AppText.bodySmall,
           ),
           const SizedBox(height: 24),
-          if (isDesktop)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: RoleEntryCard(
-                    label: AppRole.employee.label,
-                    subtitle: 'Consultar precios, stock y carrito',
-                    icon: Icons.search_rounded,
-                    highlighted: true,
-                    onTap: () {
-                      context.read<AuthService>().loginAs(AppRole.employee);
-                      onEmployee();
-                    },
-                  ),
-                ),
-                if (!session.isSellerPortalSession) ...[
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: RoleEntryCard(
-                      label: AppRole.admin.label,
-                      subtitle: session.isTenantManager
-                          ? 'Panel completo (rol server: ${session.appRole})'
-                          : 'Editar productos, stock y tipo de cambio',
-                      icon: Icons.tune_rounded,
-                      onTap: () => _askAdminPin(context),
-                    ),
-                  ),
-                ],
-              ],
-            )
-          else ...[
+          RoleEntryCard(
+            label: AppRole.employee.label,
+            subtitle: 'Consultar precios, stock y carrito',
+            icon: Icons.search_rounded,
+            highlighted: true,
+            onTap: () {
+              context.read<AuthService>().loginAs(AppRole.employee);
+              onEmployee();
+            },
+          ),
+          if (!session.isSellerPortalSession) ...[
+            const SizedBox(height: 16),
             RoleEntryCard(
-              label: AppRole.employee.label,
-              subtitle: 'Consultar precios, stock y carrito',
-              icon: Icons.search_rounded,
-              highlighted: true,
-              onTap: () {
-                context.read<AuthService>().loginAs(AppRole.employee);
-                onEmployee();
-              },
+              label: AppRole.admin.label,
+              subtitle: session.isTenantManager
+                  ? 'Panel completo (rol server: ${session.appRole})'
+                  : 'Editar productos, stock y tipo de cambio',
+              icon: Icons.tune_rounded,
+              onTap: () => _askAdminPin(context),
             ),
-            if (!session.isSellerPortalSession) ...[
-              const SizedBox(height: 16),
-              RoleEntryCard(
-                label: AppRole.admin.label,
-                subtitle: session.isTenantManager
-                    ? 'Panel completo (rol server: ${session.appRole})'
-                    : 'Editar productos, stock y tipo de cambio',
-                icon: Icons.tune_rounded,
-                onTap: () => _askAdminPin(context),
-              ),
-            ],
           ],
           if (exchangeRate.hasServerRate) ...[
             const SizedBox(height: 24),
@@ -169,6 +211,34 @@ class RoleGateScreen extends StatelessWidget {
 
     if (admin == null || !context.mounted) return;
     onAdmin(admin);
+  }
+}
+
+class _SessionActions extends StatelessWidget {
+  const _SessionActions({required this.session});
+
+  final TenantSessionService session;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (session.destinationCount > 1)
+          TextButton.icon(
+            onPressed: () => context.read<TenantSessionService>().backToSelector(),
+            icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+            label: const Text('Cambiar armería'),
+            style: TextButton.styleFrom(foregroundColor: AppColors.textMuted),
+          ),
+        TextButton.icon(
+          onPressed: () => context.read<TenantSessionService>().signOut(),
+          icon: const Icon(Icons.logout_rounded, size: 18),
+          label: const Text('Salir'),
+          style: TextButton.styleFrom(foregroundColor: AppColors.textMuted),
+        ),
+      ],
+    );
   }
 }
 

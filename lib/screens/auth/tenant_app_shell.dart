@@ -25,40 +25,53 @@ class TenantAppShell extends StatelessWidget {
     final phase = context.watch<InTenantFlowService>().phase;
     final flow = context.read<InTenantFlowService>();
 
-    final Widget home;
     switch (phase) {
       case TenantAppPhase.roleGate:
-        home = RoleGateScreen(
+        return RoleGateScreen(
           onEmployee: flow.openSellerSelect,
           onAdmin: (admin) => _startAdminSession(context, admin, flow),
         );
       case TenantAppPhase.sellerSelect:
-        home = SellerSelectScreen(
+        return SellerSelectScreen(
           onSellerSelected: (_) => flow.openEmployeeHome(),
         );
       case TenantAppPhase.employeeHome:
-        home = const EmployeeCatalogScreen();
-      case TenantAppPhase.adminHome:
-        home = const AdminHomeScreen();
-    }
-
-    return Navigator(
-      key: flow.navigatorKeyFor(phase),
-      onGenerateInitialRoutes: (_, __) {
-        return [
-          MaterialPageRoute<void>(
-            settings: const RouteSettings(name: '/'),
-            builder: (_) => home,
-          ),
-        ];
-      },
-      onGenerateRoute: (settings) {
-        return MaterialPageRoute<void>(
-          settings: settings,
-          builder: (_) => home,
+        return Navigator(
+          key: flow.employeeNavigatorKey(),
+          onGenerateInitialRoutes: (_, __) {
+            return [
+              MaterialPageRoute<void>(
+                settings: const RouteSettings(name: '/'),
+                builder: (_) => const EmployeeCatalogScreen(),
+              ),
+            ];
+          },
+          onGenerateRoute: (settings) {
+            return MaterialPageRoute<void>(
+              settings: settings,
+              builder: (_) => const EmployeeCatalogScreen(),
+            );
+          },
         );
-      },
-    );
+      case TenantAppPhase.adminHome:
+        return Navigator(
+          key: flow.adminNavigatorKey(),
+          onGenerateInitialRoutes: (_, __) {
+            return [
+              MaterialPageRoute<void>(
+                settings: const RouteSettings(name: '/'),
+                builder: (_) => const AdminHomeScreen(),
+              ),
+            ];
+          },
+          onGenerateRoute: (settings) {
+            return MaterialPageRoute<void>(
+              settings: settings,
+              builder: (_) => const AdminHomeScreen(),
+            );
+          },
+        );
+    }
   }
 
   void _startAdminSession(

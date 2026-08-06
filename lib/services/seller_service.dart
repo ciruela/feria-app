@@ -297,9 +297,13 @@ class SellerService extends ChangeNotifier {
   Future<void> selectSeller(Seller seller) async {
     if (!seller.activo) return;
     _selected = seller;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_selectedKey, seller.id);
     notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_selectedKey, seller.id);
+    } catch (_) {
+      // Persistencia opcional: la sesión actual sigue con _selected en memoria.
+    }
   }
 
   Future<void> clearSelection() async {
