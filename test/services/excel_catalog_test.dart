@@ -113,28 +113,29 @@ Uint8List _rdReportBytes() {
   return Uint8List.fromList(excel.encode()!);
 }
 
-Uint8List _orbeaReportBytes() {
-  // Planilla Orbea típica: título con la marca (sin "Marca:") y descripción
-  // estilo proveedor. Antes caía en CCI por el default.
+/// Planilla de proveedor genérica: título = marca (celda arriba), sin columna Marca.
+Uint8List _brandTitleReportBytes(String brandTitle) {
   final excel = Excel.createExcel();
   final name = excel.sheets.keys.first;
-  excel.rename(name, 'Orbea');
-  final s = excel['Orbea'];
+  excel.rename(name, 'Hoja');
+  final s = excel['Hoja'];
   void put(int c, int r, String v) => s
       .cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r))
       .value = TextCellValue(v);
 
-  put(0, 0, 'LISTADO ORBEA');
+  put(0, 0, brandTitle);
   put(0, 1, 'Código');
   put(1, 1, 'Descripción');
-  put(2, 1, 'CAJA X');
-  put(3, 1, 'CAJAS');
-  put(4, 1, 'PRECIO');
+  put(2, 1, 'TOTAL');
+  put(3, 1, 'CAJA X');
+  put(4, 1, 'CAJAS');
+  put(5, 1, 'U\$D');
   put(0, 2, '1122803');
-  put(1, 2, 'C.12 28G ORBEA (25)');
+  put(1, 2, 'C.12 28G M3 CARTUCHO $brandTitle (25)');
   put(2, 2, '25');
-  put(3, 2, '19');
-  put(4, 2, '17');
+  put(3, 2, '25');
+  put(4, 2, '1');
+  put(5, 2, '17');
   return Uint8List.fromList(excel.encode()!);
 }
 
@@ -353,28 +354,32 @@ void main() {
       expect(rows.first['marca'], 'RD');
     });
 
-    test('planilla Orbea: detecta marca del título/hoja (no fuerza CCI)', () {
-      final rows = service.parseRows(_orbeaReportBytes());
-      expect(rows.length, 1);
-      expect(rows.first['codigo'], '1122803');
-      expect(rows.first['marca'], 'Orbea');
-      final row = ExcelProductRow.fromMap(rows.first);
-      expect(row.marca, 'Orbea');
-      expect(row.stock, 19);
-      expect(row.precioUsd, 17);
+    test('detecta marca desde fila título (ORBEA, Aguila, etc.)', () {
+      for (final brand in ['ORBEA', 'Aguila', 'ACME']) {
+        final rows = service.parseRows(_brandTitleReportBytes(brand));
+        expect(rows.single['marca'], brand, reason: brand);
+        expect(ExcelProductRow.fromMap(rows.single).marca, brand);
+      }
+    });
+
+    test('detecta marca desde LISTADO + nombre', () {
+      final rows = service.parseRows(_brandTitleReportBytes('LISTADO ORBEA'));
+      expect(rows.single['marca'], 'ORBEA');
     });
   });
 
-  group('inferBrandFromText', () {
-    test('encuentra Orbea en título o descripción', () {
+  group('normalizeBrandCandidate', () {
+    test('acepta títulos de marca y rechaza informes', () {
+      expect(ExcelCatalogService.normalizeBrandCandidate('ORBEA'), 'ORBEA');
       expect(
-        ExcelCatalogService.inferBrandFromText('LISTADO ORBEA'),
-        'Orbea',
+        ExcelCatalogService.normalizeBrandCandidate('LISTADO ORBEA'),
+        'ORBEA',
       );
       expect(
-        ExcelCatalogService.inferBrandFromText('C.12 28G ORBEA (25)'),
-        'Orbea',
+        ExcelCatalogService.normalizeBrandCandidate('Informe de stock por marca'),
+        isNull,
       );
+      expect(ExcelCatalogService.normalizeBrandCandidate('Hoja1'), isNull);
     });
   });
 

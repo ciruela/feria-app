@@ -50,35 +50,8 @@ class ExcelImportPreview {
 }
 
 class ExcelCatalogService {
-  /// Marca por defecto para munición solo si no hay ninguna pista en la planilla
-  /// (columna, preámbulo, hoja o descripción). Caso típico: planilla CCI vieja.
+  /// Último recurso si la planilla no trae marca en columna, título ni hoja.
   static const defaultMunicionBrand = 'CCI';
-
-  /// Marcas de munición frecuentes en planillas AR. Orden: más largas primero
-  /// para no matchear "BELL" dentro de "SELLIER & BELLOT".
-  static const knownMunicionBrands = [
-    'SELLIER & BELLOT',
-    'SELLIER Y BELLOT',
-    'BARNES BULLETS',
-    'WINCHESTER',
-    'REMINGTON',
-    'FEDERAL',
-    'HORNADY',
-    'MAGTECH',
-    'NORMA',
-    'ORBEA',
-    'AGUILA',
-    'NOSLER',
-    'SPEER',
-    'LAPUA',
-    'GECO',
-    'ELEY',
-    'PPU',
-    'CCI',
-    'CBC',
-    'SK',
-    'RD',
-  ];
 
   /// Columnas que exporta la app (encabezados del template).
   static const headers = [
@@ -96,26 +69,45 @@ class ExcelCatalogService {
     'vendido',
   ];
 
-  /// Busca una marca conocida en texto libre (título, hoja, descripción).
-  static String? inferBrandFromText(String raw) {
-    final text = raw.replaceAll('\u00a0', ' ').trim().toUpperCase();
-    if (text.isEmpty) return null;
-    for (final brand in knownMunicionBrands) {
-      final pattern = RegExp(
-        '\\b${RegExp.escape(brand)}\\b',
-        caseSensitive: false,
-      );
-      if (pattern.hasMatch(text)) {
-        // Canonical: primera palabra con mayúsculas típicas (Orbea, CCI…).
-        if (brand == 'SELLIER & BELLOT' || brand == 'SELLIER Y BELLOT') {
-          return 'Sellier & Bellot';
-        }
-        if (brand == 'BARNES BULLETS') return 'Barnes';
-        if (brand.length <= 3) return brand; // CCI, PPU, RD, SK, CBC
-        return brand[0] + brand.substring(1).toLowerCase();
-      }
+  /// Normaliza un candidato a marca leído del Excel (título, hoja, "Marca: X").
+  /// Devuelve null si el texto parece un encabezado/informe, no una marca.
+  static String? normalizeBrandCandidate(String raw) {
+    var t = raw.replaceAll('\u00a0', ' ').trim();
+    if (t.isEmpty) return null;
+
+    final listado = RegExp(
+      r'^(?:listado|lista|cat[aá]logo)\s+(.+)$',
+      caseSensitive: false,
+    ).firstMatch(t);
+    if (listado != null) {
+      t = listado.group(1)!.trim();
     }
-    return null;
+
+    final lower = t.toLowerCase();
+    if (lower.contains('informe') ||
+        lower.contains('stock por') ||
+        lower.contains('encabezado') ||
+        lower.contains('por marca') ||
+        lower.startsWith('precio') ||
+        lower == 'total' ||
+        lower == 'cajas' ||
+        lower == 'descripcion' ||
+        lower == 'descripción') {
+      return null;
+    }
+
+    if (t.length > 40) return null;
+    if (_canonicalHeader(t) != null) return null;
+    if (RegExp(r'^[\d.,\s\$]+$').hasMatch(t)) return null;
+    if (RegExp(
+      r'^(hoja\s*\d*|sheet\s*\d*|catalogo|catálogo)$',
+      caseSensitive: false,
+    ).hasMatch(t)) {
+      return null;
+    }
+    // Marcas suelen ser 1–4 palabras ("Sellier & Bellot").
+    if (t.split(RegExp(r'\s+')).length > 4) return null;
+    return t;
   }
 
   /// Mapea encabezados libres (CCI, mayúsculas, acentos) a claves canónicas.
@@ -302,6 +294,10 @@ class ExcelCatalogService {
     return (calibre: calibre, modelo: modelo);
   }
 
+  /// Detecta marca de forma estructural (sin lista fija de marcas):
+  /// 1) "Marca: X" / "MARCA X" en el preámbulo
+  /// 2) Fila título con un solo valor (ej. celda fusionada "ORBEA")
+  /// 3) Nombre de la hoja si parece una marca
   static String? _detectBrand(
     List<List<Data?>> rows,
     int upTo, {
@@ -309,27 +305,40 @@ class ExcelCatalogService {
   }) {
     final withColon = RegExp(r'marca\s*:\s*(.+)', caseSensitive: false);
     final withoutColon = RegExp(r'^marca\s+(.+)$', caseSensitive: false);
-    // 1) Explicit "Marca: Orbea" / "MARCA PPU" in the preamble.
+
     for (var r = 0; r < upTo && r < rows.length; r++) {
       for (final cell in rows[r]) {
         final text = _cellText(cell).replaceAll('\u00a0', ' ').trim();
-        final match = withColon.firstMatch(text) ??
-            withoutColon.firstMatch(text);
+        final match =
+            withColon.firstMatch(text) ?? withoutColon.firstMatch(text);
         if (match != null) {
-          final brand = match.group(1)?.trim() ?? '';
-          if (brand.isNotEmpty) return brand;
+          final brand = normalizeBrandCandidate(match.group(1) ?? '');
+          if (brand != null) return brand;
         }
       }
     }
-    // 2) Título / celda con marca conocida ("LISTADO ORBEA", "ORBEA", etc.).
+
     for (var r = 0; r < upTo && r < rows.length; r++) {
-      for (final cell in rows[r]) {
-        final inferred = inferBrandFromText(_cellText(cell));
-        if (inferred != null) return inferred;
-      }
+      final fromTitle = _brandFromTitleRow(rows[r]);
+      if (fromTitle != null) return fromTitle;
     }
-    // 3) Nombre de la hoja del Excel.
-    return inferBrandFromText(sheetName ?? '');
+
+    return normalizeBrandCandidate(sheetName ?? '');
+  }
+
+  /// Fila de título típica de proveedor: una sola celda con texto (a veces
+  /// fusionada). Ej: fila "ORBEA" arriba de Código / Descripción / …
+  static String? _brandFromTitleRow(List<Data?> row) {
+    final texts = <String>[];
+    for (final cell in row) {
+      final t = _cellText(cell).replaceAll('\u00a0', ' ').trim();
+      if (t.isNotEmpty) texts.add(t);
+    }
+    if (texts.isEmpty) return null;
+    // Misma marca repetida en celdas fusionadas, o un único valor.
+    final unique = texts.toSet();
+    if (unique.length != 1) return null;
+    return normalizeBrandCandidate(unique.first);
   }
 
   Uint8List exportProducts(List<Product> products) {
@@ -522,11 +531,10 @@ class ExcelProductRow {
     var modelo = data['modelo']?.trim() ?? '';
     final descripcion = data['descripcion']?.trim() ?? '';
 
-    // Marca: columna → pista en la descripción → CCI solo como último recurso.
+    // Marca ya viene de columna o del preámbulo (parseRows). Sin pista → default.
     var marca = data['marca']?.trim() ?? '';
     if (marca.isEmpty && type == ProductType.municion) {
-      marca = ExcelCatalogService.inferBrandFromText(descripcion) ??
-          ExcelCatalogService.defaultMunicionBrand;
+      marca = ExcelCatalogService.defaultMunicionBrand;
     }
 
     // Munición estilo proveedor: datos empaquetados en la descripción
