@@ -45,13 +45,49 @@ check_table() {
   return 1
 }
 
+# AR-25: este script tiene que verificar RLS de verdad, no solo que la tabla
+# responda. Una tabla sensible que devuelve filas al anónimo es una FALLA.
+assert_anon_blocked() {
+  local table="$1"
+  local code
+  code=$(curl -s -o /tmp/supabase_rls.json -w "%{http_code}" \
+    "$BASE/rest/v1/$table?select=*&limit=1" "${HDR[@]}")
+  # Bloqueado correctamente: 401/403, o 200 con lista vacía (RLS filtra todo).
+  if [[ "$code" == "401" || "$code" == "403" ]]; then
+    echo "  ✓ $table (anon bloqueado, HTTP $code)"
+    return 0
+  fi
+  if [[ "$code" == "200" ]] && grep -q '^\s*\[\s*\]\s*$' /tmp/supabase_rls.json; then
+    echo "  ✓ $table (anon sin filas)"
+    return 0
+  fi
+  echo "  ✗ $table (anon LEE datos sensibles, HTTP $code) — RLS abierta"
+  return 1
+}
+
+assert_column_hidden() {
+  local table="$1"; local column="$2"
+  local body
+  body=$(curl -s "$BASE/rest/v1/$table?select=$column&limit=1" "${HDR[@]}")
+  if echo "$body" | grep -qi "$column"; then
+    echo "  ✗ $table.$column expuesto al anónimo"
+    return 1
+  fi
+  echo "  ✓ $table.$column no expuesto"
+  return 0
+}
+
 ok=true
 check_table tenants || ok=false
 check_table memberships || ok=false
 check_table productos || ok=false
 check_table vendedores || ok=false
-check_table ventas || ok=false
 check_table app_config || ok=false
+
+echo
+echo "RLS (el anónimo NO debe leer datos sensibles):"
+assert_anon_blocked ventas || ok=false
+assert_column_hidden tenants codigo_vendedores || ok=false
 
 echo
 echo "Storage buckets:"

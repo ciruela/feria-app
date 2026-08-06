@@ -13,8 +13,24 @@ set -euo pipefail
 : "${SUPABASE_URL:?Falta SUPABASE_URL}"
 : "${SUPABASE_ANON_KEY:?Falta SUPABASE_ANON_KEY}"
 
-flutter build web --release \
-  --dart-define=SUPABASE_URL="${SUPABASE_URL}" \
-  --dart-define=SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY}"
+GIT_SHA="${GIT_SHA:-${GITHUB_SHA:-}}"
+APP_VERSION="${APP_VERSION:-1.0.0}"
+SENTRY_DSN="${SENTRY_DSN:-}"
 
-echo "OK. Salida en build/web/"
+DEFINES=(
+  "--dart-define=SUPABASE_URL=${SUPABASE_URL}"
+  "--dart-define=SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}"
+  "--dart-define=APP_VERSION=${APP_VERSION}"
+)
+
+if [[ -n "$GIT_SHA" ]]; then
+  DEFINES+=("--dart-define=GIT_SHA=${GIT_SHA}")
+fi
+
+if [[ -n "$SENTRY_DSN" ]]; then
+  DEFINES+=("--dart-define=SENTRY_DSN=${SENTRY_DSN}")
+fi
+
+flutter build web --release "${DEFINES[@]}"
+
+echo "OK. Salida en build/web/ (release=${APP_VERSION}+${GIT_SHA:-local})"

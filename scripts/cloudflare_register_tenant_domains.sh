@@ -45,10 +45,20 @@ register_domain() {
   return 1
 }
 
+# AR-17: solo slugs seguros (letras, números, guiones). Rechaza metacaracteres.
+assert_safe_subdomain() {
+  local sub="$1"
+  if [[ ! "$sub" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+    echo "Subdominio inválido (solo [a-z0-9-]): ${sub}" >&2
+    return 1
+  fi
+}
+
 subdomain_to_host() {
   local sub="$1"
+  assert_safe_subdomain "$sub" || return 1
+  # Host Pages: sin guiones internos (convención del producto).
   sub="${sub//-/}"
-  sub="$(echo "$sub" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9')"
   echo "${sub}.${BASE_DOMAIN}"
 }
 
@@ -64,7 +74,12 @@ fi
 
 failed=0
 for sub in "${SUBDOMAINS[@]}"; do
-  host="$(subdomain_to_host "$sub")"
+  sub="$(echo "$sub" | tr '[:upper:]' '[:lower:]')"
+  if ! assert_safe_subdomain "$sub"; then
+    failed=1
+    continue
+  fi
+  host="$(subdomain_to_host "$sub")" || { failed=1; continue; }
   register_domain "$host" || failed=1
 done
 

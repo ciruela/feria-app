@@ -5,6 +5,7 @@ import '../models/presupuesto_branding.dart';
 import '../utils/app_logger.dart';
 import '../utils/ids.dart';
 import '../utils/jwt.dart';
+import '../utils/retry.dart';
 import 'audit_service.dart';
 import 'catalog_service.dart';
 import 'pricing_settings_service.dart';
@@ -393,35 +394,16 @@ class SupabaseSalesRepository {
   Future<Map<String, dynamic>> _registerSaleWithRetry(
     Map<String, dynamic> params,
   ) async {
-    Object? lastError;
-    StackTrace? lastStack;
-    for (var attempt = 1; attempt <= 2; attempt++) {
-      try {
-        final raw = await SupabaseService.client.rpc(
-          'register_sale',
-          params: params,
-        );
-        return _asStringKeyedMap(raw);
-      } catch (error, stackTrace) {
-        lastError = error;
-        lastStack = stackTrace;
-        final message = error.toString().toLowerCase();
-        final transient = message.contains('socket') ||
-            message.contains('timeout') ||
-            message.contains('network') ||
-            message.contains('connection');
-        if (!transient || attempt == 2) break;
-        AppLogger.warn(
-          'Reintento register_sale (mismo idempotency_key)',
-          error: error,
-          stackTrace: stackTrace,
-        );
-      }
-    }
-    Error.throwWithStackTrace(
-      lastError ?? StateError('register_sale falló'),
-      lastStack ?? StackTrace.current,
+    final raw = await withTimeoutRetry(
+      () => SupabaseService.client.rpc(
+        'register_sale',
+        params: params,
+      ),
+      timeout: const Duration(seconds: 25),
+      maxAttempts: 3,
+      operation: 'register_sale',
     );
+    return _asStringKeyedMap(raw);
   }
 
   Map<String, dynamic> _asStringKeyedMap(dynamic raw) {

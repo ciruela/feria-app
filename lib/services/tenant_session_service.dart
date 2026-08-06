@@ -14,6 +14,7 @@ import '../utils/jwt.dart';
 import '../utils/tenant_slug.dart';
 import 'seller_portal_service.dart';
 import 'supabase_service.dart';
+import 'telemetry_service.dart';
 import 'tenant_subdomain_service.dart';
 
 /// Una armeria a la que el usuario tiene acceso (una de sus membresias).
@@ -752,6 +753,7 @@ class TenantSessionService extends ChangeNotifier {
       _readClaims();
       _selectedTenantId = tenantId;
       _syncActiveTenantBranding(tenantId);
+      Telemetry.setTenant(tenantId);
       _view = WorkspaceView.tenant;
       _preferWorkspaceSelector = false;
       _busy = false;

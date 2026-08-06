@@ -24,6 +24,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: cors });
   }
+  if (req.method !== "GET" && req.method !== "POST") {
+    return json({ error: "Metodo no permitido" }, 405);
+  }
 
   try {
     const url = Deno.env.get("SUPABASE_URL")!;
@@ -117,7 +120,9 @@ Deno.serve(async (req) => {
 
     return json(result, 200);
   } catch (e) {
-    return json({ error: String(e) }, 500);
+    // AR-24: detalle al log del servidor, mensaje genérico al cliente.
+    console.error("platform-metrics error:", e);
+    return json({ error: "Error interno" }, 500);
   }
 });
 

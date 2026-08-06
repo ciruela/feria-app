@@ -155,7 +155,8 @@ Deno.serve(async (req) => {
       200,
     );
   } catch (e) {
-    return json({ error: String(e) }, 500);
+    console.error("remove-team-member error:", e);
+    return json({ error: "Error interno" }, 500);
   }
 });
 

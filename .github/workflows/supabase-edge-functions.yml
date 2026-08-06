@@ -16,6 +16,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -52,3 +54,11 @@ jobs:
           do
             supabase functions deploy "$fn" --project-ref ihotjvimurztbhrsiabs
           done
+
+      - name: Smoke test edge functions
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          chmod +x scripts/smoke_edge_functions.sh
+          ./scripts/smoke_edge_functions.sh

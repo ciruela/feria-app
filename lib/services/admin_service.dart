@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -8,6 +9,7 @@ import '../config/app_config.dart';
 import '../models/admin_user.dart';
 import '../utils/app_logger.dart';
 import '../utils/ids.dart';
+import '../utils/jwt.dart';
 import '../utils/pin_hash.dart';
 import 'supabase_admin_repository.dart';
 import 'supabase_service.dart';
@@ -227,33 +229,56 @@ class AdminService extends ChangeNotifier {
 
   void _subscribeRealtime() {
     if (!SupabaseService.isConfigured) return;
+    final tenantId = _tenantIdFromJwt();
     _realtimeChannel?.unsubscribe();
-    _realtimeChannel = SupabaseService.client
-        .channel('public:administradores')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'administradores',
-          callback: (payload) {
-            try {
-              switch (payload.eventType) {
-                case PostgresChangeEvent.insert:
-                case PostgresChangeEvent.update:
-                  final record = payload.newRecord;
-                  if (record.isEmpty) return;
-                  _applyRemote(_repo.adminFromRow(record));
-                case PostgresChangeEvent.delete:
-                  final id = payload.oldRecord['id'] as String?;
-                  if (id != null) _removeRemote(id);
-                default:
-                  break;
-              }
-            } catch (error) {
-              debugPrint('AdminService realtime: $error');
-            }
-          },
-        )
-        .subscribe();
+    var channel = SupabaseService.client.channel(
+      'administradores:${tenantId ?? 'all'}',
+    );
+    channel = channel.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'administradores',
+      filter: tenantId == null
+          ? null
+          : PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'tenant_id',
+              value: tenantId,
+            ),
+      callback: (payload) {
+        try {
+          switch (payload.eventType) {
+            case PostgresChangeEvent.insert:
+            case PostgresChangeEvent.update:
+              final record = payload.newRecord;
+              if (record.isEmpty) return;
+              _applyRemote(_repo.adminFromRow(record));
+            case PostgresChangeEvent.delete:
+              final id = payload.oldRecord['id'] as String?;
+              if (id != null) _removeRemote(id);
+            default:
+              break;
+          }
+        } catch (error) {
+          debugPrint('AdminService realtime: $error');
+        }
+      },
+    );
+    _realtimeChannel = channel.subscribe((status, error) {
+      if (status == RealtimeSubscribeStatus.channelError ||
+          status == RealtimeSubscribeStatus.timedOut) {
+        debugPrint('AdminService realtime status=$status error=$error');
+        unawaited(syncFromCloud(silent: true));
+      }
+    });
+  }
+
+  String? _tenantIdFromJwt() {
+    final session = SupabaseService.client.auth.currentSession;
+    if (session == null) return null;
+    final claim = decodeJwtPayload(session.accessToken)['tenant_id'];
+    final tenantId = (claim is String ? claim : claim?.toString())?.trim();
+    return tenantId == null || tenantId.isEmpty ? null : tenantId;
   }
 
   void _applyRemote(AdminUser admin) {

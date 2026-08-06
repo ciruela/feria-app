@@ -16,15 +16,23 @@ import 'services/pricing_settings_service.dart';
 import 'services/in_tenant_flow_service.dart';
 import 'services/seller_service.dart';
 import 'services/supabase_service.dart';
+import 'services/telemetry_service.dart';
 import 'services/tenant_session_service.dart';
 import 'theme/app_theme.dart';
+import 'utils/app_logger.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Telemetry.init(_bootstrap);
+}
 
+Future<void> _bootstrap() async {
   if (AppConfig.useSupabase) {
     await SupabaseService.initialize();
+    Telemetry.bindAuth();
   }
+
+  AppLogger.info('Build ${AppConfig.releaseLabel}');
 
   final catalogService = CatalogService();
   final exchangeRateService = ExchangeRateService();

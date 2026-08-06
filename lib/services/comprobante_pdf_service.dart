@@ -11,6 +11,7 @@ import '../models/sale_record.dart';
 import '../utils/app_logger.dart';
 import '../utils/jwt.dart';
 import '../utils/presupuesto_pdf.dart';
+import '../utils/retry.dart';
 import 'supabase_service.dart';
 
 class ComprobantePdfService {
@@ -169,7 +170,12 @@ class ComprobantePdfService {
       throw StateError('No se pudo resolver la URL del comprobante');
     }
 
-    final response = await http.get(Uri.parse(url));
+    final response = await withTimeoutRetry(
+      () => http.get(Uri.parse(url)),
+      timeout: const Duration(seconds: 30),
+      maxAttempts: 3,
+      operation: 'download comprobante pdf',
+    );
     if (response.statusCode != 200) {
       throw StateError('No se pudo descargar el PDF (${response.statusCode})');
     }

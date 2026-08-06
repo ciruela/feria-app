@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/audit_entry.dart';
+import '../utils/jwt.dart';
 import 'audit_service.dart';
 import 'supabase_config_repository.dart';
 import 'supabase_service.dart';
@@ -108,35 +111,58 @@ class ExchangeRateService extends ChangeNotifier {
   void _subscribeRealtime() {
     if (!SupabaseService.isConfigured) return;
 
+    final tenantId = _tenantIdFromJwt();
     _realtimeChannel?.unsubscribe();
-    _realtimeChannel = SupabaseService.client
-        .channel('public:app_config')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'app_config',
-          callback: (payload) {
-            final record = payload.newRecord;
-            if (record.isEmpty) return;
+    var channel = SupabaseService.client.channel(
+      'app_config:${tenantId ?? 'all'}',
+    );
+    channel = channel.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'app_config',
+      filter: tenantId == null
+          ? null
+          : PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'tenant_id',
+              value: tenantId,
+            ),
+      callback: (payload) {
+        final record = payload.newRecord;
+        if (record.isEmpty) return;
 
-            final rate = (record['exchange_rate_ars'] as num?)?.toDouble();
-            if (rate == null || rate <= 0) return;
+        final rate = (record['exchange_rate_ars'] as num?)?.toDouble();
+        if (rate == null || rate <= 0) return;
 
-            DateTime? updatedAt;
-            final rawUpdatedAt = record['updated_at'] as String?;
-            if (rawUpdatedAt != null) {
-              updatedAt = DateTime.tryParse(rawUpdatedAt);
-            }
+        DateTime? updatedAt;
+        final rawUpdatedAt = record['updated_at'] as String?;
+        if (rawUpdatedAt != null) {
+          updatedAt = DateTime.tryParse(rawUpdatedAt);
+        }
 
-            _applyRate(
-              rate,
-              updatedAt: updatedAt,
-              persist: true,
-              fromServer: true,
-            );
-          },
-        )
-        .subscribe();
+        _applyRate(
+          rate,
+          updatedAt: updatedAt,
+          persist: true,
+          fromServer: true,
+        );
+      },
+    );
+    _realtimeChannel = channel.subscribe((status, error) {
+      if (status == RealtimeSubscribeStatus.channelError ||
+          status == RealtimeSubscribeStatus.timedOut) {
+        debugPrint('ExchangeRateService realtime status=$status error=$error');
+        unawaited(syncFromCloud(silent: true));
+      }
+    });
+  }
+
+  String? _tenantIdFromJwt() {
+    final session = SupabaseService.client.auth.currentSession;
+    if (session == null) return null;
+    final claim = decodeJwtPayload(session.accessToken)['tenant_id'];
+    final tenantId = (claim is String ? claim : claim?.toString())?.trim();
+    return tenantId == null || tenantId.isEmpty ? null : tenantId;
   }
 
   void _applyRate(

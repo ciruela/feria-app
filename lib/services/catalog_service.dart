@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -192,15 +193,29 @@ class CatalogService extends ChangeNotifier {
     if (SupabaseService.isConfigured &&
         updated.stock != null &&
         previous.stock != updated.stock) {
-      final next = await _supabaseCatalog.setStock(
-        updated.id,
-        updated.stock!,
-        motivo: previous.stock == null ? StockMotivo.carga : StockMotivo.ajuste,
-        nota: 'Ajuste manual desde admin',
-        label: _productStockLabel(updated),
-      );
-      _products[index] = updated.copyWith(stock: next);
-      await _persistCache();
+      try {
+        final next = await _supabaseCatalog.setStock(
+          updated.id,
+          updated.stock!,
+          motivo:
+              previous.stock == null ? StockMotivo.carga : StockMotivo.ajuste,
+          nota: 'Ajuste manual desde admin',
+          label: _productStockLabel(updated),
+        );
+        _products[index] = updated.copyWith(stock: next);
+        await _persistCache();
+      } catch (error, stackTrace) {
+        // AR-19: ficha puede haberse guardado; el stock NO se da por ok.
+        _products[index] = updated.copyWith(stock: previous.stock);
+        await _persistCache();
+        notifyListeners();
+        AppLogger.error(
+          'Ajuste de stock falló; movimiento no registrado',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        rethrow;
+      }
     }
 
     _auditProductUpdate(previous, updated);
@@ -378,17 +393,26 @@ class CatalogService extends ChangeNotifier {
     await _pushToSupabase(product);
 
     if (SupabaseService.isConfigured && stock != null) {
-      final next = await _supabaseCatalog.setStock(
-        product.id,
-        stock,
-        motivo: StockMotivo.carga,
-        nota: 'Alta de producto',
-        label: _productStockLabel(product),
-      );
-      final index = _products.indexWhere((item) => item.id == product.id);
-      if (index != -1) {
-        _products[index] = product.copyWith(stock: next);
-        await _persistCache();
+      try {
+        final next = await _supabaseCatalog.setStock(
+          product.id,
+          stock,
+          motivo: StockMotivo.carga,
+          nota: 'Alta de producto',
+          label: _productStockLabel(product),
+        );
+        final index = _products.indexWhere((item) => item.id == product.id);
+        if (index != -1) {
+          _products[index] = product.copyWith(stock: next);
+          await _persistCache();
+        }
+      } catch (error, stackTrace) {
+        AppLogger.error(
+          'Alta de producto sin movimiento de stock',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        rethrow;
       }
     }
 
@@ -624,18 +648,27 @@ class CatalogService extends ChangeNotifier {
             : null;
         if (before == newStock) continue;
 
-        final next = await _supabaseCatalog.setStock(
-          product.id,
-          newStock,
-          motivo: before == null || before == 0
-              ? StockMotivo.carga
-              : StockMotivo.ajuste,
-          nota: 'Importación Excel',
-          label: _productStockLabel(product),
-        );
-        final index = _products.indexWhere((item) => item.id == product.id);
-        if (index != -1) {
-          _products[index] = _products[index].copyWith(stock: next);
+        try {
+          final next = await _supabaseCatalog.setStock(
+            product.id,
+            newStock,
+            motivo: before == null || before == 0
+                ? StockMotivo.carga
+                : StockMotivo.ajuste,
+            nota: 'Importación Excel',
+            label: _productStockLabel(product),
+          );
+          final index = _products.indexWhere((item) => item.id == product.id);
+          if (index != -1) {
+            _products[index] = _products[index].copyWith(stock: next);
+          }
+        } catch (error, stackTrace) {
+          AppLogger.error(
+            'Import Excel: stock no registrado para ${product.id}',
+            error: error,
+            stackTrace: stackTrace,
+          );
+          rethrow;
         }
       }
       await _persistCache();
@@ -959,36 +992,51 @@ class CatalogService extends ChangeNotifier {
   void _subscribeRealtime() {
     if (!SupabaseService.isConfigured) return;
 
+    final tenantId = _tenantScope?.trim();
     _realtimeChannel?.unsubscribe();
-    _realtimeChannel = SupabaseService.client
-        .channel('public:productos')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'productos',
-          callback: (payload) {
-            try {
-              switch (payload.eventType) {
-                case PostgresChangeEvent.insert:
-                case PostgresChangeEvent.update:
-                  final record = payload.newRecord;
-                  if (record.isEmpty) return;
-                  _applyRemoteProduct(
-                    _supabaseCatalog.productFromRow(record),
-                  );
-                case PostgresChangeEvent.delete:
-                  final record = payload.oldRecord;
-                  final id = record['id'] as String?;
-                  if (id != null) _removeRemoteProduct(id);
-                default:
-                  break;
-              }
-            } catch (error) {
-              debugPrint('CatalogService realtime: $error');
-            }
-          },
-        )
-        .subscribe();
+    var channel = SupabaseService.client.channel(
+      'productos:${tenantId ?? 'all'}',
+    );
+    channel = channel.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'productos',
+      filter: tenantId == null || tenantId.isEmpty
+          ? null
+          : PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'tenant_id',
+              value: tenantId,
+            ),
+      callback: (payload) {
+        try {
+          switch (payload.eventType) {
+            case PostgresChangeEvent.insert:
+            case PostgresChangeEvent.update:
+              final record = payload.newRecord;
+              if (record.isEmpty) return;
+              _applyRemoteProduct(
+                _supabaseCatalog.productFromRow(record),
+              );
+            case PostgresChangeEvent.delete:
+              final record = payload.oldRecord;
+              final id = record['id'] as String?;
+              if (id != null) _removeRemoteProduct(id);
+            default:
+              break;
+          }
+        } catch (error) {
+          debugPrint('CatalogService realtime: $error');
+        }
+      },
+    );
+    _realtimeChannel = channel.subscribe((status, error) {
+      if (status == RealtimeSubscribeStatus.channelError ||
+          status == RealtimeSubscribeStatus.timedOut) {
+        debugPrint('CatalogService realtime status=$status error=$error');
+        unawaited(syncFromCloud(silent: true));
+      }
+    });
   }
 
   void _applyRemoteProduct(Product product) {

@@ -4,6 +4,7 @@ import '../models/product.dart';
 import '../models/stock_movimiento.dart';
 import '../utils/app_logger.dart';
 import '../utils/jwt.dart';
+import '../utils/retry.dart';
 import 'product_photo_service.dart';
 import 'stock_errors.dart';
 import 'supabase_service.dart';
@@ -17,6 +18,7 @@ class SupabaseCatalogRepository {
     final rows = await SupabaseService.client
         .from(_table)
         .select()
+        .eq('activo', true)
         .order('marca')
         .order('codigo');
 
@@ -62,8 +64,14 @@ class SupabaseCatalogRepository {
         .upsert(products.map(_toRow).toList());
   }
 
+  /// Borrado lógico (AR-23): un producto con historial de stock no se puede
+  /// borrar físicamente (FK on delete restrict); se marca inactivo para
+  /// preservar la trazabilidad de sus movimientos.
   Future<void> delete(String productId) async {
-    await SupabaseService.client.from(_table).delete().eq('id', productId);
+    await SupabaseService.client
+        .from(_table)
+        .update({'activo': false})
+        .eq('id', productId);
   }
 
   Product productFromRow(Map<String, dynamic> row) => _fromRow(row);
@@ -77,14 +85,19 @@ class SupabaseCatalogRepository {
     String label = '',
   }) async {
     try {
-      final result = await SupabaseService.client.rpc<int>(
-        _rpcSetStock,
-        params: {
-          'p_product_id': productId,
-          'p_stock': stock,
-          'p_motivo': motivo.key,
-          'p_nota': nota,
-        },
+      final result = await withTimeoutRetry(
+        () => SupabaseService.client.rpc<int>(
+          _rpcSetStock,
+          params: {
+            'p_product_id': productId,
+            'p_stock': stock,
+            'p_motivo': motivo.key,
+            'p_nota': nota,
+          },
+        ),
+        timeout: const Duration(seconds: 20),
+        maxAttempts: 2,
+        operation: 'set_product_stock',
       );
       return result;
     } on PostgrestException catch (error) {
@@ -151,16 +164,21 @@ class SupabaseCatalogRepository {
     String nota = '',
   }) async {
     try {
-      final result = await SupabaseService.client.rpc<int>(
-        _rpcApplyDelta,
-        params: {
-          'p_product_id': productId,
-          'p_delta': delta,
-          'p_motivo': motivo.key,
-          'p_venta_id': ventaId,
-          'p_vendedor_id': vendedorId,
-          'p_nota': nota,
-        },
+      final result = await withTimeoutRetry(
+        () => SupabaseService.client.rpc<int>(
+          _rpcApplyDelta,
+          params: {
+            'p_product_id': productId,
+            'p_delta': delta,
+            'p_motivo': motivo.key,
+            'p_venta_id': ventaId,
+            'p_vendedor_id': vendedorId,
+            'p_nota': nota,
+          },
+        ),
+        timeout: const Duration(seconds: 20),
+        maxAttempts: 2,
+        operation: 'apply_product_stock_delta',
       );
       return result;
     } on PostgrestException catch (error) {
@@ -267,7 +285,7 @@ class SupabaseCatalogRepository {
       'fotos': paths,
       'stock_inicial': product.stockInicial,
       'rounds_per_box': product.roundsPerBox,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
+      // updated_at lo pone el trigger set_updated_at_trg (AR-23).
     };
 
     final tenantId = _tenantIdFromJwt();

@@ -11,6 +11,8 @@
 // POST /register-tenant-subdomain
 // Authorization: Bearer <jwt owner recién provisionado>
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -48,6 +50,46 @@ Deno.serve(async (req) => {
       return json({ error: "Sin armería activa en la sesión" }, 400);
     }
 
+    // AR-24: autorización propia. No alcanza con tener sesión: el llamante
+    // debe ser owner/admin (o platform admin) de ESE tenant.
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const authClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false },
+    });
+    const { data: userData, error: userErr } = await authClient.auth.getUser(
+      jwt,
+    );
+    if (userErr || !userData?.user) {
+      return json({ error: "No autorizado" }, 401);
+    }
+
+    const isPlatformAdmin = payload.is_platform_admin === true ||
+      payload.is_platform_admin === "true";
+    if (!isPlatformAdmin) {
+      const admin = createClient(supabaseUrl, serviceKey, {
+        auth: { persistSession: false },
+      });
+      const { data: membership } = await admin
+        .from("memberships")
+        .select("rol,activo")
+        .eq("user_id", userData.user.id)
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+      if (
+        !membership?.activo ||
+        (membership.rol !== "owner" && membership.rol !== "admin")
+      ) {
+        return json(
+          { error: "Requiere rol owner/admin de la armería" },
+          403,
+        );
+      }
+    }
+
     const slug = await fetchTenantSlug(tenantId);
     if (!slug) {
       return json({ error: "No se encontró el slug del tenant" }, 404);
@@ -76,8 +118,8 @@ Deno.serve(async (req) => {
       cloudflare: cf,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return json({ error: message }, 500);
+    console.error("register-tenant-subdomain error:", error);
+    return json({ error: "Error interno" }, 500);
   }
 });
 

@@ -1,0 +1,27 @@
+# Configuración del proyecto Supabase (AR-24 / AR-21).
+#
+# Fija verify_jwt por función para que la protección NO dependa del default
+# del CLI. Todas requieren un JWT válido en el gateway (la anon key es un JWT
+# válido con rol anon para las funciones públicas de la tienda / portal).
+project_id = "ihotjvimurztbhrsiabs"
+
+[functions.platform-metrics]
+verify_jwt = true
+
+[functions.register-tenant-subdomain]
+verify_jwt = true
+
+[functions.invite-team-member]
+verify_jwt = true
+
+[functions.remove-team-member]
+verify_jwt = true
+
+[functions.storefront-catalog]
+verify_jwt = true
+
+[functions.storefront-order]
+verify_jwt = true
+
+[functions.seller-portal-validate]
+verify_jwt = true

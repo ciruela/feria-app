@@ -13,6 +13,8 @@ on:
       - 'pubspec.lock'
       - 'analysis_options.yaml'
       - '.github/workflows/**'
+      - 'supabase/**'
+      - 'scripts/**'
   pull_request:
   workflow_dispatch:
 
@@ -24,6 +26,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -41,3 +45,23 @@ jobs:
 
       - name: Test
         run: flutter test
+
+  hygiene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Repo hygiene (functions/config coverage)
+        run: |
+          chmod +x scripts/check_repo_hygiene.sh
+          ./scripts/check_repo_hygiene.sh
+
+      - name: Shellcheck scripts
+        run: |
+          sudo apt-get update -y >/dev/null 2>&1 || true
+          sudo apt-get install -y shellcheck >/dev/null 2>&1 || true
+          shellcheck -S warning scripts/*.sh || true

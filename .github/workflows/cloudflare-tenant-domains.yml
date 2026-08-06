@@ -37,10 +37,14 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # AR-17: nunca interpolar inputs dentro de `run:` (inyección de shell).
+          EXTRA_SUBDOMAINS: ${{ inputs.subdomains }}
         run: |
+          set -euo pipefail
           chmod +x ./scripts/cloudflare_register_tenant_domains.sh
-          if [[ -n "${{ inputs.subdomains }}" ]]; then
-            ./scripts/cloudflare_register_tenant_domains.sh ${{ inputs.subdomains }}
+          if [[ -n "${EXTRA_SUBDOMAINS:-}" ]]; then
+            read -r -a extras <<< "$EXTRA_SUBDOMAINS"
+            ./scripts/cloudflare_register_tenant_domains.sh "${extras[@]}"
           else
             ./scripts/cloudflare_register_tenant_domains.sh
           fi

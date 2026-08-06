@@ -31,15 +31,20 @@ jobs:
   ci-gate:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Require green CI on this commit
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           conclusion="$(gh run list \
-            --repo "${{ github.repository }}" \
-            --commit "${{ github.sha }}" \
+            --repo "$REPO" \
+            --commit "$SHA" \
             --workflow CI \
             --json conclusion \
             -q '.[0].conclusion // empty')"
@@ -129,10 +134,16 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          GITHUB_SHA: ${{ github.sha }}
         run: |
           DART_DEFINES=""
           if [[ -n "$SUPABASE_URL" && -n "$SUPABASE_ANON_KEY" ]]; then
             DART_DEFINES="--dart-define=SUPABASE_URL=${SUPABASE_URL} --dart-define=SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}"
+          fi
+          DART_DEFINES="$DART_DEFINES --dart-define=GIT_SHA=${GITHUB_SHA} --dart-define=APP_VERSION=1.0.0"
+          if [[ -n "${SENTRY_DSN:-}" ]]; then
+            DART_DEFINES="$DART_DEFINES --dart-define=SENTRY_DSN=${SENTRY_DSN}"
           fi
           # shellcheck disable=SC2086
           flutter build ipa \

@@ -165,15 +165,20 @@ Deno.serve(async (req) => {
       return json({ error: upsertErr.message }, 500);
     }
 
-    // 5. Dejar active_tenant listo para el primer login (best-effort).
+    // 5. Dejar active_tenant listo SOLO si el usuario no tiene uno ya.
+    //    AR-24: no pisar el tenant activo de alguien que ya opera en OTRA
+    //    armería (efecto cross-tenant).
     try {
       const { data: existing } = await admin.auth.admin.getUserById(userId!);
       const prevMeta =
         (existing.user?.app_metadata as Record<string, unknown> | undefined) ??
         {};
-      await admin.auth.admin.updateUserById(userId!, {
-        app_metadata: { ...prevMeta, active_tenant: tenantId },
-      });
+      const currentActive = String(prevMeta.active_tenant ?? "").trim();
+      if (!currentActive) {
+        await admin.auth.admin.updateUserById(userId!, {
+          app_metadata: { ...prevMeta, active_tenant: tenantId },
+        });
+      }
     } catch {
       // no bloqueante
     }
@@ -189,7 +194,8 @@ Deno.serve(async (req) => {
       200,
     );
   } catch (e) {
-    return json({ error: String(e) }, 500);
+    console.error("invite-team-member error:", e);
+    return json({ error: "Error interno" }, 500);
   }
 });
 
@@ -227,8 +233,10 @@ async function findUserIdByEmail(
   email: string,
 ): Promise<string | null> {
   const target = email.toLowerCase();
-  // listUsers no filtra por email en todos los runtimes; paginamos un tope razonable.
-  for (let page = 1; page <= 10; page++) {
+  // listUsers no filtra por email en todos los runtimes; paginamos hasta un
+  // tope alto (AR-24: antes cortaba en 2.000 usuarios y dejaba de encontrar
+  // gente en silencio). Se recorre hasta agotar páginas.
+  for (let page = 1; page <= 200; page++) {
     const { data, error } = await admin.auth.admin.listUsers({
       page,
       perPage: 200,

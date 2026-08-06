@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -318,35 +319,50 @@ class SellerService extends ChangeNotifier {
   void _subscribeRealtime() {
     if (!SupabaseService.isConfigured) return;
 
+    final tenantId = _tenantScope?.trim();
     _realtimeChannel?.unsubscribe();
-    _realtimeChannel = SupabaseService.client
-        .channel('public:vendedores')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'vendedores',
-          callback: (payload) {
-            try {
-              switch (payload.eventType) {
-                case PostgresChangeEvent.insert:
-                case PostgresChangeEvent.update:
-                  final record = payload.newRecord;
-                  if (record.isEmpty) return;
-                  _applyRemoteSeller(
-                    _supabaseSellers.sellerFromRow(record),
-                  );
-                case PostgresChangeEvent.delete:
-                  final id = payload.oldRecord['id'] as String?;
-                  if (id != null) _removeRemoteSeller(id);
-                default:
-                  break;
-              }
-            } catch (error) {
-              debugPrint('SellerService realtime: $error');
-            }
-          },
-        )
-        .subscribe();
+    var channel = SupabaseService.client.channel(
+      'vendedores:${tenantId ?? 'all'}',
+    );
+    channel = channel.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'vendedores',
+      filter: tenantId == null || tenantId.isEmpty
+          ? null
+          : PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'tenant_id',
+              value: tenantId,
+            ),
+      callback: (payload) {
+        try {
+          switch (payload.eventType) {
+            case PostgresChangeEvent.insert:
+            case PostgresChangeEvent.update:
+              final record = payload.newRecord;
+              if (record.isEmpty) return;
+              _applyRemoteSeller(
+                _supabaseSellers.sellerFromRow(record),
+              );
+            case PostgresChangeEvent.delete:
+              final id = payload.oldRecord['id'] as String?;
+              if (id != null) _removeRemoteSeller(id);
+            default:
+              break;
+          }
+        } catch (error) {
+          debugPrint('SellerService realtime: $error');
+        }
+      },
+    );
+    _realtimeChannel = channel.subscribe((status, error) {
+      if (status == RealtimeSubscribeStatus.channelError ||
+          status == RealtimeSubscribeStatus.timedOut) {
+        debugPrint('SellerService realtime status=$status error=$error');
+        unawaited(syncFromCloud(silent: true));
+      }
+    });
   }
 
   void _applyRemoteSeller(Seller seller) {
