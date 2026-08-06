@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -104,6 +105,13 @@ class FeriaApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       home: const AuthGate(),
+      // En web habilitamos selección/copia de texto en TODA la app: administración
+      // trabaja con dos software en paralelo y necesita copiar y pegar datos
+      // constantemente. En mobile no se activa para no afectar los gestos.
+      builder: (context, child) {
+        if (child == null) return const SizedBox.shrink();
+        return kIsWeb ? SelectionArea(child: child) : child;
+      },
     );
   }
 }

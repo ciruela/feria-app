@@ -14,36 +14,42 @@ class ProductDetailSpecTable extends StatelessWidget {
   Widget build(BuildContext context) {
     final lowStock = isLowStock(product.stock);
 
+    final rows = <Widget>[];
+    void addRow(String label, String value, {bool accent = false}) {
+      if (value.trim().isEmpty) return;
+      if (rows.isNotEmpty) {
+        rows.add(const Divider(height: 1, color: AppColors.border));
+      }
+      rows.add(_SpecRow(label: label, value: value, accent: accent));
+    }
+
+    // Datos completos para que el vendedor se los pase al cliente.
+    addRow('Marca', product.marca);
+    if (product.isArma) {
+      addRow('Modelo', product.modeloDisplay);
+      addRow('Calibre', product.calibre);
+      addRow('Ref. interna', product.codigo);
+    } else {
+      addRow('Código', product.codigo);
+      addRow('Calibre', product.calibre);
+      addRow('Modelo', product.modelo);
+    }
+
+    if (product.stock != null) {
+      final unit = product.isMunicion ? 'cajas' : 'u.';
+      addRow(
+        'Stock',
+        '${product.stock} $unit${lowStock ? ' · ÚLTIMAS UNIDADES' : ''}',
+        accent: lowStock,
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(AppDecorations.radius),
       ),
-      child: Column(
-        children: [
-          if (product.isArma) ...[
-            _SpecRow(label: 'Modelo', value: product.modeloDisplay),
-            const Divider(height: 1, color: AppColors.border),
-            _SpecRow(label: 'Calibre', value: product.calibre),
-            const Divider(height: 1, color: AppColors.border),
-            _SpecRow(label: 'Ref. interna', value: product.codigo),
-          ] else ...[
-            _SpecRow(label: 'Código', value: product.codigo),
-            const Divider(height: 1, color: AppColors.border),
-            _SpecRow(label: 'Calibre', value: product.calibre),
-          ],
-          if (product.stock != null) ...[
-            const Divider(height: 1, color: AppColors.border),
-            _SpecRow(
-              label: 'Stock',
-              value: lowStock
-                  ? '${product.stock} u. · ÚLTIMAS UNIDADES'
-                  : '${product.stock} ${product.isMunicion ? 'cajas' : 'u.'}',
-              accent: lowStock,
-            ),
-          ],
-        ],
-      ),
+      child: Column(children: rows),
     );
   }
 }

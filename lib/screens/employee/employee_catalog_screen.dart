@@ -15,6 +15,7 @@ import '../../utils/formatters.dart';
 import '../../utils/layout_breakpoints.dart';
 import '../../widgets/employee/catalog_category_chips.dart';
 import '../../widgets/employee/catalog_desktop_header.dart';
+import '../../widgets/employee/catalog_filter_bar.dart';
 import '../../widgets/employee/catalog_mobile_layout.dart';
 import '../../widgets/employee/catalog_product_list.dart';
 import '../../widgets/employee/employee_desktop_shell.dart';
@@ -32,6 +33,8 @@ class EmployeeCatalogScreen extends StatefulWidget {
 
 class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
   ProductType? _typeFilter;
+  String? _marcaFilter;
+  String? _calibreFilter;
   String _searchQuery = '';
   EmployeeNavItem _nav = EmployeeNavItem.catalog;
   final _searchController = TextEditingController();
@@ -44,12 +47,72 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
     super.dispose();
   }
 
+  /// Productos del tipo elegido (sin aplicar marca/calibre/búsqueda).
+  List<Product> _typeSource(CatalogService catalog) =>
+      _typeFilter == null ? catalog.products : catalog.byType(_typeFilter!);
+
+  /// Marcas disponibles para el tipo elegido.
+  List<String> _marcaOptions(CatalogService catalog) =>
+      _distinct(_typeSource(catalog), (p) => p.marca);
+
+  /// Calibres disponibles para el tipo (acotados por la marca elegida).
+  List<String> _calibreOptions(CatalogService catalog) {
+    final source = _typeSource(catalog).where(
+      (p) => _marcaFilter == null || p.marca == _marcaFilter,
+    );
+    return _distinct(source, (p) => p.calibre);
+  }
+
+  List<String> _distinct(
+    Iterable<Product> source,
+    String Function(Product) selector,
+  ) {
+    final set = <String>{};
+    for (final product in source) {
+      final value = selector(product).trim();
+      if (value.isNotEmpty) set.add(value);
+    }
+    final list = set.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return list;
+  }
+
+  void _onTypeChanged(ProductType? type) {
+    setState(() {
+      _typeFilter = type;
+      // Las marcas/calibres dependen del tipo: se limpian para no quedar vacíos.
+      _marcaFilter = null;
+      _calibreFilter = null;
+    });
+  }
+
+  void _onMarcaChanged(String? marca) {
+    setState(() {
+      _marcaFilter = marca;
+      // Si el calibre elegido ya no aplica a la marca, se limpia.
+      if (_calibreFilter != null &&
+          !_calibreOptions(context.read<CatalogService>())
+              .contains(_calibreFilter)) {
+        _calibreFilter = null;
+      }
+    });
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _marcaFilter = null;
+      _calibreFilter = null;
+    });
+  }
+
   List<Product> _products(CatalogService catalog) {
-    final source =
-        _typeFilter == null ? catalog.products : catalog.byType(_typeFilter!);
     final query = _searchQuery.trim().toUpperCase();
 
-    final results = source.where((product) {
+    final results = _typeSource(catalog).where((product) {
+      if (_marcaFilter != null && product.marca != _marcaFilter) return false;
+      if (_calibreFilter != null && product.calibre != _calibreFilter) {
+        return false;
+      }
       if (query.isEmpty) return true;
       if (product.codigo.toUpperCase().contains(query)) return true;
       if (product.modeloDisplay.toUpperCase().contains(query)) return true;
@@ -130,6 +193,8 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
     final lowStockCount = _lowStockCount(catalog.products);
     final sellerName = seller != null ? formatSellerFirstName(seller.nombre) : '—';
     final sellerInitial = sellerName.isNotEmpty ? sellerName[0].toUpperCase() : '?';
+    final marcaOptions = _marcaOptions(catalog);
+    final calibreOptions = _calibreOptions(catalog);
 
     final catalogBody = _CatalogDesktopBody(
       products: products,
@@ -138,11 +203,18 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
       searchController: _searchController,
       searchFocus: _searchFocus,
       typeFilter: _typeFilter,
+      marcaOptions: marcaOptions,
+      calibreOptions: calibreOptions,
+      marcaFilter: _marcaFilter,
+      calibreFilter: _calibreFilter,
       sellerName: sellerName,
       sellerInitial: sellerInitial,
       exchangeRate: exchangeRate,
       onSearchChanged: (value) => setState(() => _searchQuery = value),
-      onTypeChanged: (type) => setState(() => _typeFilter = type),
+      onTypeChanged: _onTypeChanged,
+      onMarcaChanged: _onMarcaChanged,
+      onCalibreChanged: (value) => setState(() => _calibreFilter = value),
+      onClearFilters: _clearFilters,
       onChangeSeller: _changeSeller,
     );
 
@@ -165,11 +237,18 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
           searchController: _searchController,
           searchFocus: _searchFocus,
           typeFilter: _typeFilter,
+          marcaOptions: marcaOptions,
+          calibreOptions: calibreOptions,
+          marcaFilter: _marcaFilter,
+          calibreFilter: _calibreFilter,
           sellerName: sellerName,
           sellerInitial: sellerInitial,
           exchangeRate: exchangeRate,
           onSearchChanged: (value) => setState(() => _searchQuery = value),
-          onTypeChanged: (type) => setState(() => _typeFilter = type),
+          onTypeChanged: _onTypeChanged,
+          onMarcaChanged: _onMarcaChanged,
+          onCalibreChanged: (value) => setState(() => _calibreFilter = value),
+          onClearFilters: _clearFilters,
           onChangeSeller: _changeSeller,
           onSync: catalogMobileShowSync() && !catalog.isSyncing
               ? () => catalog.syncFromCloud()
@@ -196,11 +275,18 @@ class _CatalogDesktopBody extends StatelessWidget {
     required this.searchController,
     required this.searchFocus,
     required this.typeFilter,
+    required this.marcaOptions,
+    required this.calibreOptions,
+    required this.marcaFilter,
+    required this.calibreFilter,
     required this.sellerName,
     required this.sellerInitial,
     required this.exchangeRate,
     required this.onSearchChanged,
     required this.onTypeChanged,
+    required this.onMarcaChanged,
+    required this.onCalibreChanged,
+    required this.onClearFilters,
     required this.onChangeSeller,
   });
 
@@ -210,11 +296,18 @@ class _CatalogDesktopBody extends StatelessWidget {
   final TextEditingController searchController;
   final FocusNode searchFocus;
   final ProductType? typeFilter;
+  final List<String> marcaOptions;
+  final List<String> calibreOptions;
+  final String? marcaFilter;
+  final String? calibreFilter;
   final String sellerName;
   final String sellerInitial;
   final ExchangeRateService exchangeRate;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<ProductType?> onTypeChanged;
+  final ValueChanged<String?> onMarcaChanged;
+  final ValueChanged<String?> onCalibreChanged;
+  final VoidCallback onClearFilters;
   final VoidCallback onChangeSeller;
 
   @override
@@ -237,6 +330,17 @@ class _CatalogDesktopBody extends StatelessWidget {
         CatalogCategoryChips(
           selected: typeFilter,
           onSelected: onTypeChanged,
+          desktopHandoff: true,
+        ),
+        const SizedBox(height: 10),
+        CatalogFilterBar(
+          marcas: marcaOptions,
+          calibres: calibreOptions,
+          selectedMarca: marcaFilter,
+          selectedCalibre: calibreFilter,
+          onMarcaChanged: onMarcaChanged,
+          onCalibreChanged: onCalibreChanged,
+          onClear: onClearFilters,
           desktopHandoff: true,
         ),
         const SizedBox(height: 12),

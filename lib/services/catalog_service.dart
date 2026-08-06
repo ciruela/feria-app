@@ -561,6 +561,38 @@ class CatalogService extends ChangeNotifier {
     return json.encode(data);
   }
 
+  /// Interpreta el Excel sin escribir nada, para que el admin revise los datos
+  /// (marca, calibre, modelo, código, precio, stock) antes de confirmar.
+  ExcelImportPreview previewExcel(Uint8List bytes) {
+    final parser = ExcelCatalogService();
+    final rawRows = parser.parseRows(bytes);
+    final rows = <ExcelImportPreviewRow>[];
+    var unreadable = 0;
+
+    for (final raw in rawRows) {
+      try {
+        final row = ExcelProductRow.fromMap(raw);
+        final existing = _findMatchingRow(row);
+        final action = existing != null
+            ? ExcelImportAction.update
+            : (_canCreateFromRow(row)
+                ? ExcelImportAction.create
+                : ExcelImportAction.skip);
+        rows.add(
+          ExcelImportPreviewRow(
+            row: row,
+            action: action,
+            existingId: existing?.id,
+          ),
+        );
+      } catch (_) {
+        unreadable++;
+      }
+    }
+
+    return ExcelImportPreview(rows: rows, unreadable: unreadable);
+  }
+
   Future<ExcelImportResult> importFromExcel(Uint8List bytes) async {
     final parser = ExcelCatalogService();
     final rows = parser.parseRows(bytes);

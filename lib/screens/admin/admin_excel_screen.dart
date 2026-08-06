@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../services/catalog_service.dart';
 import '../../services/tenant_session_service.dart';
+import '../../widgets/admin/excel_import_preview_dialog.dart';
 import '../../widgets/feria_shell.dart';
 
 class AdminExcelScreen extends StatefulWidget {
@@ -60,11 +61,15 @@ class _AdminExcelScreenState extends State<AdminExcelScreen> {
         return;
       }
 
+      final bytes = picked.files.single.bytes!;
+      final preview = catalog.previewExcel(bytes);
+      if (!mounted) return;
+      final confirmed = await showExcelImportPreview(context, preview);
+      if (!confirmed || !mounted) return;
+
       await session.ensureSupabaseWriteContext();
       if (!mounted) return;
-      final result = await catalog.importFromExcel(
-        picked.files.single.bytes!,
-      );
+      final result = await catalog.importFromExcel(bytes);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

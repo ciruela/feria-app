@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -656,9 +657,39 @@ class _AdminComprobanteDetailScreenState
     }
   }
 
+  /// Bloque de texto con los datos del cliente para pegar en el otro software.
+  String _customerBlock(SaleRecord sale) {
+    final cust = sale.customerDetail;
+    final name = cust.fullName.trim().isNotEmpty
+        ? cust.fullName.trim()
+        : sale.clienteNombre.trim();
+    final dni =
+        cust.dni.trim().isNotEmpty ? cust.dni.trim() : sale.clienteDni.trim();
+
+    final lines = <String>[];
+    if (name.isNotEmpty) lines.add(name);
+    if (dni.isNotEmpty) lines.add('DNI/CUIT: $dni');
+    if (cust.fiscalCondition.trim().isNotEmpty) {
+      lines.add('Cond. fiscal: ${cust.fiscalCondition.trim()}');
+    }
+    if (cust.clu.trim().isNotEmpty) lines.add('CLU: ${cust.clu.trim()}');
+    if (cust.domicilioLine.isNotEmpty) {
+      lines.add('Domicilio: ${cust.domicilioLine}');
+    }
+    if (cust.phone.trim().isNotEmpty) lines.add('Tel: ${cust.phone.trim()}');
+    if (cust.email.trim().isNotEmpty) lines.add('Email: ${cust.email.trim()}');
+    return lines.join('\n');
+  }
+
   @override
   Widget build(BuildContext context) {
     final sale = _effectiveSale;
+    final cust = sale.customerDetail;
+    final clientName = cust.fullName.trim().isNotEmpty
+        ? cust.fullName.trim()
+        : sale.clienteNombre.trim();
+    final clientDni =
+        cust.dni.trim().isNotEmpty ? cust.dni.trim() : sale.clienteDni.trim();
     final time = TimeOfDay.fromDateTime(sale.createdAt);
     final timeLabel =
         '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
@@ -748,8 +779,22 @@ class _AdminComprobanteDetailScreenState
             const SizedBox(height: 16),
           ],
           _InfoRow(label: 'Fecha', value: '${formatDate(sale.createdAt)} · $timeLabel'),
-          if (sale.clienteDni.trim().isNotEmpty)
-            _InfoRow(label: 'DNI', value: sale.clienteDni.trim()),
+          if (clientName.isNotEmpty)
+            _InfoRow(label: 'Cliente', value: clientName),
+          if (clientDni.isNotEmpty)
+            _InfoRow(label: 'DNI/CUIT', value: clientDni),
+          if (cust.fiscalCondition.trim().isNotEmpty)
+            _InfoRow(label: 'Cond. fiscal', value: cust.fiscalCondition.trim()),
+          if (cust.clu.trim().isNotEmpty)
+            _InfoRow(label: 'CLU', value: cust.clu.trim()),
+          if (cust.address.trim().isNotEmpty)
+            _InfoRow(label: 'Domicilio', value: cust.address.trim()),
+          if (cust.city.trim().isNotEmpty)
+            _InfoRow(label: 'Ciudad', value: cust.city.trim()),
+          if (cust.phone.trim().isNotEmpty)
+            _InfoRow(label: 'Teléfono', value: cust.phone.trim()),
+          if (cust.email.trim().isNotEmpty)
+            _InfoRow(label: 'Email', value: cust.email.trim()),
           if (sale.sellerName != null && sale.sellerName!.trim().isNotEmpty)
             _InfoRow(label: 'Vendedor', value: sale.sellerName!.trim()),
           _InfoRow(
@@ -760,40 +805,98 @@ class _AdminComprobanteDetailScreenState
             label: 'Total USD',
             value: sale.collectedUsd > 0 ? formatUsd(sale.collectedUsd) : '—',
           ),
+          if (sale.facturaNumero.trim().isNotEmpty)
+            _InfoRow(label: 'Nº factura', value: sale.facturaNumero.trim()),
+          if (_customerBlock(sale).isNotEmpty) ...[
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => copyToClipboard(
+                context,
+                _customerBlock(sale),
+                label: 'Datos del cliente',
+              ),
+              icon: const Icon(Icons.copy_all_rounded, size: 18),
+              label: const Text('COPIAR DATOS DEL CLIENTE'),
+            ),
+          ],
           const SizedBox(height: 20),
           const SectionHeader(
             title: 'Ítems',
             subtitle: 'Detalle guardado de la venta',
           ),
           const SizedBox(height: 10),
-          ...sale.lines.map(
-            (line) => Container(
+          ...sale.lines.map((line) {
+            final title = line.detail.isNotEmpty
+                ? line.detail
+                : (line.code.isNotEmpty ? line.code : 'Ítem');
+            final amount = line.paysInUsd
+                ? formatUsd(line.lineUsd)
+                : formatArs(line.lineArs);
+            final hasSerial = line.serialNumber.trim().isNotEmpty;
+
+            final copyParts = <String>[title];
+            if (line.code.isNotEmpty && line.detail.isNotEmpty) {
+              copyParts.add('Cód: ${line.code}');
+            }
+            copyParts.add('Cant: ${line.quantity}');
+            copyParts.add(amount);
+            if (hasSerial) copyParts.add('Serie: ${line.serialNumber.trim()}');
+
+            return Container(
               margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.fromLTRB(14, 14, 6, 14),
               decoration: BoxDecoration(
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.border),
               ),
-              child: Column(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    line.detail.isNotEmpty
-                        ? line.detail
-                        : (line.code.isNotEmpty ? line.code : 'Ítem'),
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Cant: ${line.quantity} · $amount',
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                        if (hasSerial) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Serie: ${line.serialNumber.trim()}',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Cant: ${line.quantity} · '
-                    '${line.paysInUsd ? formatUsd(line.lineUsd) : formatArs(line.lineArs)}',
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    tooltip: 'Copiar ítem',
+                    icon: const Icon(Icons.copy_rounded, size: 16),
+                    color: AppColors.textSecondary,
+                    onPressed: () => copyToClipboard(
+                      context,
+                      copyParts.join(' · '),
+                      label: 'Ítem',
+                    ),
                   ),
                 ],
               ),
-            ),
-          ),
+            );
+          }),
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: _pdfBusy ? null : _viewPdf,
@@ -1132,26 +1235,59 @@ class _ComprobanteListTile extends StatelessWidget {
   }
 }
 
+/// Copia [text] al portapapeles y avisa (para pegar en el otro software).
+Future<void> copyToClipboard(
+  BuildContext context,
+  String text, {
+  String? label,
+}) async {
+  final value = text.trim();
+  if (value.isEmpty) return;
+  await Clipboard.setData(ClipboardData(text: value));
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      duration: const Duration(seconds: 1),
+      content: Text(label == null ? 'Copiado' : '$label copiado'),
+    ),
+  );
+}
+
 class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value});
+  const _InfoRow({
+    required this.label,
+    required this.value,
+  });
 
   final String label;
   final String value;
 
   @override
   Widget build(BuildContext context) {
+    final canCopy = value.trim().isNotEmpty && value.trim() != '—';
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
-            width: 88,
+            width: 100,
             child: Text(label, style: const TextStyle(color: AppColors.textSecondary)),
           ),
           Expanded(
             child: Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
+          if (canCopy)
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              tooltip: 'Copiar $label',
+              icon: const Icon(Icons.copy_rounded, size: 16),
+              color: AppColors.textSecondary,
+              onPressed: () => copyToClipboard(context, value, label: label),
+            ),
         ],
       ),
     );

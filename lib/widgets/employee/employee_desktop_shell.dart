@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
 import 'employee_cart_panel.dart';
 import 'employee_nav.dart';
@@ -19,12 +21,19 @@ class EmployeeDesktopShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // El portal de vendedor (sesión sin cuenta) no tiene administración.
+    final isSellerPortal =
+        context.watch<TenantSessionService>().isSellerPortalSession;
     return Scaffold(
       backgroundColor: AppColors.canvas,
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          EmployeeSidebar(selected: selected, onSelected: onNav),
+          EmployeeSidebar(
+            selected: selected,
+            onSelected: onNav,
+            showAdminSection: !isSellerPortal,
+          ),
           Expanded(child: ColoredBox(color: AppColors.canvas, child: body)),
           const EmployeeCartPanel(),
         ],

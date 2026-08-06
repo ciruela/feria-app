@@ -7,6 +7,7 @@ import '../../services/catalog_service.dart';
 import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
+import '../../widgets/admin/excel_import_preview_dialog.dart';
 import '../../widgets/filter_buttons.dart';
 import '../../widgets/feria_shell.dart';
 import 'admin_product_create_screen.dart';
@@ -76,11 +77,15 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
         return;
       }
 
+      final bytes = picked.files.single.bytes!;
+      final preview = catalog.previewExcel(bytes);
+      if (!mounted) return;
+      final confirmed = await showExcelImportPreview(context, preview);
+      if (!confirmed || !mounted) return;
+
       await session.ensureSupabaseWriteContext();
       if (!mounted) return;
-      final result = await catalog.importFromExcel(
-        picked.files.single.bytes!,
-      );
+      final result = await catalog.importFromExcel(bytes);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -428,6 +433,28 @@ class _ProductAdminTile extends StatelessWidget {
 
   final Product product;
 
+  /// Muestra todos los identificadores cargados (modelo, código/ref, calibre),
+  /// omitiendo solo los vacíos, para que el admin vea todo lo que cargó.
+  List<Widget> _identityLines(Product product) {
+    final lines = <Widget>[];
+    void add(String label, String value) {
+      if (value.trim().isEmpty) return;
+      if (lines.isNotEmpty) lines.add(const SizedBox(height: 4));
+      lines.add(_DetailLine(label: label, value: value));
+    }
+
+    if (product.isArma) {
+      add('MODELO', product.modelo);
+      add('REF.', product.codigo);
+      add('CALIBRE', product.calibre);
+    } else {
+      add('CÓDIGO', product.codigo);
+      add('MODELO', product.modelo);
+      add('CALIBRE', product.calibre);
+    }
+    return lines;
+  }
+
   @override
   Widget build(BuildContext context) {
     final stockLabel = product.stock == null
@@ -472,18 +499,7 @@ class _ProductAdminTile extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    if (product.isArma) ...[
-                      _DetailLine(
-                        label: 'MODELO',
-                        value: product.modeloDisplay,
-                      ),
-                      const SizedBox(height: 4),
-                      _DetailLine(label: 'CALIBRE', value: product.calibre),
-                    ] else ...[
-                      _DetailLine(label: 'CÓDIGO', value: product.codigo),
-                      const SizedBox(height: 4),
-                      _DetailLine(label: 'CALIBRE', value: product.calibre),
-                    ],
+                    ..._identityLines(product),
                     const SizedBox(height: 10),
                     Text(
                       formatUsd(product.precioUsd),

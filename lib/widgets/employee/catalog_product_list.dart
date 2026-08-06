@@ -232,7 +232,7 @@ class CatalogProductTable extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'El ojo abre el detalle · el carrito suma una unidad',
+                  'Tocá la fila para ver el detalle · el carrito suma una unidad',
                   style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
                 ),
               ),
@@ -294,14 +294,20 @@ class CatalogProductTableRow extends StatelessWidget {
     final photoUrls = ProductPhotoService.displayUrls(product.fotoUrls);
     final lowStock = isLowStock(product.stock);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _openDetail(context),
+        hoverColor: AppColors.surfaceTouch,
+        mouseCursor: SystemMouseCursors.click,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: AppColors.border)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
           Expanded(
             flex: 4,
             child: Row(
@@ -416,7 +422,9 @@ class CatalogProductTableRow extends StatelessWidget {
               ],
             ),
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }

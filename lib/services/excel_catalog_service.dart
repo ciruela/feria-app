@@ -16,6 +16,39 @@ class ExcelImportResult {
   final int skipped;
 }
 
+/// Qué haría cada fila del Excel al importarse.
+enum ExcelImportAction { create, update, skip }
+
+/// Fila del Excel ya interpretada, para mostrarla en el preview de importación.
+class ExcelImportPreviewRow {
+  const ExcelImportPreviewRow({
+    required this.row,
+    required this.action,
+    this.existingId,
+  });
+
+  final ExcelProductRow row;
+  final ExcelImportAction action;
+  final String? existingId;
+}
+
+/// Resultado de interpretar un Excel sin escribir nada (para revisar antes).
+class ExcelImportPreview {
+  const ExcelImportPreview({required this.rows, required this.unreadable});
+
+  final List<ExcelImportPreviewRow> rows;
+
+  /// Filas debajo de los encabezados que no se pudieron interpretar.
+  final int unreadable;
+
+  int get toCreate =>
+      rows.where((r) => r.action == ExcelImportAction.create).length;
+  int get toUpdate =>
+      rows.where((r) => r.action == ExcelImportAction.update).length;
+  int get toSkip =>
+      rows.where((r) => r.action == ExcelImportAction.skip).length;
+}
+
 class ExcelCatalogService {
   /// Marca por defecto para munición cuando la planilla no trae columna "marca"
   /// (caso típico: planilla de proveedor CCI). Se puede editar luego por producto.

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/product.dart';
 import '../../models/product_prices.dart';
 import '../../theme/app_theme.dart';
-import '../../utils/formatters.dart';
+import '../product_prices_panel.dart';
 import 'catalog_product_list.dart';
 import 'product_detail_spec_table.dart';
 
@@ -64,9 +64,10 @@ class ProductDetailMobileLayout extends StatelessWidget {
                     const SizedBox(height: 16),
                     ProductDetailSpecTable(product: product),
                     const SizedBox(height: 16),
-                    ProductDetailMobilePricing(
+                    ProductPricesPanel(
                       prices: prices,
                       showArs: showArs,
+                      compact: true,
                     ),
                     const SizedBox(height: 20),
                     FilledButton.icon(
@@ -148,57 +149,3 @@ class ProductDetailMobileHeader extends StatelessWidget {
   }
 }
 
-class ProductDetailMobilePricing extends StatelessWidget {
-  const ProductDetailMobilePricing({
-    super.key,
-    required this.prices,
-    required this.showArs,
-  });
-
-  final ProductPrices prices;
-  final bool showArs;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceRaised,
-        borderRadius: BorderRadius.circular(AppDecorations.radius),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: showArs
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'PRECIO DE LISTA',
-                      style: AppText.label.copyWith(
-                        color: AppColors.textMuted,
-                        fontSize: 10,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(formatUsd(prices.usd), style: AppText.bodySmall),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  formatArs(prices.lista),
-                  style: AppText.number.copyWith(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            )
-          : Text(
-              'Precios en pesos no disponibles: falta el tipo de cambio.',
-              style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
-            ),
-    );
-  }
-}

@@ -6,6 +6,7 @@ import '../../services/exchange_rate_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/section_header.dart';
 import 'catalog_category_chips.dart';
+import 'catalog_filter_bar.dart';
 import 'catalog_product_list.dart';
 import 'employee_role_widgets.dart';
 
@@ -19,11 +20,18 @@ class CatalogMobileLayout extends StatelessWidget {
     required this.searchController,
     required this.searchFocus,
     required this.typeFilter,
+    required this.marcaOptions,
+    required this.calibreOptions,
+    required this.marcaFilter,
+    required this.calibreFilter,
     required this.sellerName,
     required this.sellerInitial,
     required this.exchangeRate,
     required this.onSearchChanged,
     required this.onTypeChanged,
+    required this.onMarcaChanged,
+    required this.onCalibreChanged,
+    required this.onClearFilters,
     required this.onChangeSeller,
     this.onSync,
     this.isSyncing = false,
@@ -35,11 +43,18 @@ class CatalogMobileLayout extends StatelessWidget {
   final TextEditingController searchController;
   final FocusNode searchFocus;
   final ProductType? typeFilter;
+  final List<String> marcaOptions;
+  final List<String> calibreOptions;
+  final String? marcaFilter;
+  final String? calibreFilter;
   final String sellerName;
   final String sellerInitial;
   final ExchangeRateService exchangeRate;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<ProductType?> onTypeChanged;
+  final ValueChanged<String?> onMarcaChanged;
+  final ValueChanged<String?> onCalibreChanged;
+  final VoidCallback onClearFilters;
   final VoidCallback onChangeSeller;
   final VoidCallback? onSync;
   final bool isSyncing;
@@ -140,6 +155,16 @@ class CatalogMobileLayout extends StatelessWidget {
         CatalogCategoryChips(
           selected: typeFilter,
           onSelected: onTypeChanged,
+        ),
+        const SizedBox(height: 10),
+        CatalogFilterBar(
+          marcas: marcaOptions,
+          calibres: calibreOptions,
+          selectedMarca: marcaFilter,
+          selectedCalibre: calibreFilter,
+          onMarcaChanged: onMarcaChanged,
+          onCalibreChanged: onCalibreChanged,
+          onClear: onClearFilters,
         ),
         const SizedBox(height: 12),
         Padding(
