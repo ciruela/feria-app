@@ -68,6 +68,7 @@ class ProductDetailMobileLayout extends StatelessWidget {
                       prices: prices,
                       showArs: showArs,
                       compact: true,
+                      fixed: product.fixedPrices,
                     ),
                     const SizedBox(height: 20),
                     FilledButton.icon(

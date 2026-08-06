@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/product.dart';
+import '../models/product_prices.dart';
 import '../models/stock_movimiento.dart';
 import '../utils/app_logger.dart';
 import '../utils/jwt.dart';
@@ -283,6 +284,9 @@ class SupabaseCatalogRepository {
       stock: row['stock'] as int?,
       stockInicial: row['stock_inicial'] as int?,
       roundsPerBox: row['rounds_per_box'] as int?,
+      fixedPrices: FixedPrices.fromJson(
+        (row['fixed_prices'] as Map?)?.cast<String, dynamic>(),
+      ),
     );
   }
 
@@ -307,6 +311,11 @@ class SupabaseCatalogRepository {
       'activo': true,
       // updated_at lo pone el trigger set_updated_at_trg (AR-23).
     };
+    // Solo se envía para productos con precios fijos (Urban). Así el resto de
+    // los tenants no toca esta columna y no depende del grant de la 041.
+    if (product.fixedPrices != null) {
+      row['fixed_prices'] = product.fixedPrices!.toJson();
+    }
     if (includePhotos) {
       final paths = ProductPhotoService.pathsForStorage(product);
       row['foto'] = product.foto;

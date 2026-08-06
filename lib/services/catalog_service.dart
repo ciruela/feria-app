@@ -693,6 +693,7 @@ class CatalogService extends ChangeNotifier {
           final product = existing.copyWith(
             marca: row.marca.isNotEmpty ? row.marca : existing.marca,
             precioUsd: row.precioUsd > 0 ? row.precioUsd : existing.precioUsd,
+            fixedPrices: row.fixedPrices ?? existing.fixedPrices,
             stock: newStock,
             calibre: row.calibre.isNotEmpty ? row.calibre : existing.calibre,
             modelo: row.modelo.isNotEmpty ? row.modelo : existing.modelo,
@@ -797,6 +798,7 @@ class CatalogService extends ChangeNotifier {
       stock: row.stock,
       stockInicial: row.stock,
       roundsPerBox: row.isMunicion ? row.roundsPerBox : null,
+      fixedPrices: row.fixedPrices,
     );
   }
 

@@ -1,3 +1,5 @@
+import 'product_prices.dart';
+
 enum ProductType {
   municion('municion', 'Munición'),
   armaCorta('arma_corta', 'Armas cortas'),
@@ -28,6 +30,7 @@ class Product {
     this.stock,
     this.stockInicial,
     this.roundsPerBox,
+    this.fixedPrices,
   });
 
   final String id;
@@ -53,6 +56,13 @@ class Product {
 
   /// Balas por caja (CAJA X). Solo munición; null/0 en armas.
   final int? roundsPerBox;
+
+  /// Precios cargados tal cual desde el Excel (Urban Tactical). Cuando no es
+  /// null, la app muestra estos montos y NO recalcula nada para este producto.
+  final FixedPrices? fixedPrices;
+
+  /// True cuando el producto trae precios fijos del Excel (sin cálculo interno).
+  bool get hasFixedPrices => fixedPrices != null;
 
   String get marcaUpper => marca.toUpperCase();
 
@@ -216,6 +226,7 @@ class Product {
     int? stock,
     int? stockInicial,
     int? roundsPerBox,
+    FixedPrices? fixedPrices,
   }) {
     return Product(
       id: id ?? this.id,
@@ -231,6 +242,7 @@ class Product {
       stock: stock ?? this.stock,
       stockInicial: stockInicial ?? this.stockInicial,
       roundsPerBox: roundsPerBox ?? this.roundsPerBox,
+      fixedPrices: fixedPrices ?? this.fixedPrices,
     );
   }
 
@@ -251,6 +263,9 @@ class Product {
       stock: json['stock'] as int?,
       stockInicial: json['stockInicial'] as int?,
       roundsPerBox: json['roundsPerBox'] as int?,
+      fixedPrices: FixedPrices.fromJson(
+        (json['fixedPrices'] as Map?)?.cast<String, dynamic>(),
+      ),
     );
   }
 
@@ -288,6 +303,7 @@ class Product {
       if (stock != null) 'stock': stock,
       if (stockInicial != null) 'stockInicial': stockInicial,
       if (roundsPerBox != null) 'roundsPerBox': roundsPerBox,
+      if (fixedPrices != null) 'fixedPrices': fixedPrices!.toJson(),
     };
   }
 }

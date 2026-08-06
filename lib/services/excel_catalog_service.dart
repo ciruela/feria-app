@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:excel/excel.dart';
 
 import '../models/product.dart';
+import '../models/product_prices.dart';
 
 class ExcelImportResult {
   const ExcelImportResult({
@@ -199,6 +200,21 @@ class ExcelCatalogService {
         return 'stock_inicial';
       case 'vendido':
         return 'vendido';
+      // Precios fijos (Urban Tactical): se cargan tal cual, sin recalcular.
+      case 'efectivo_ars':
+      case 'transferencia_ars':
+        return 'efectivo_ars';
+      case 'efectivo_usd':
+        return 'efectivo_usd';
+      case 'tarjeta_ars':
+      case 'pvp_tarjeta_ars':
+        return 'tarjeta_ars';
+      case 'cuota3_ars':
+        return 'cuota3_ars';
+      case 'cuota6_ars':
+        return 'cuota6_ars';
+      case 'cuota12_ars':
+        return 'cuota12_ars';
       default:
         return null;
     }
@@ -502,6 +518,7 @@ class ExcelProductRow {
     this.descripcion = '',
     this.stock,
     this.roundsPerBox,
+    this.fixedPrices,
   });
 
   final ProductType type;
@@ -517,6 +534,9 @@ class ExcelProductRow {
 
   /// Balas por caja (munición).
   final int? roundsPerBox;
+
+  /// Precios fijos del Excel (Urban): se muestran tal cual, sin recalcular.
+  final FixedPrices? fixedPrices;
 
   bool get isMunicion => type == ProductType.municion;
 
@@ -566,6 +586,15 @@ class ExcelProductRow {
       if (modelo.isEmpty) modelo = parsed.modelo;
     }
 
+    final fixedPrices = FixedPrices.fromJson({
+      'efectivo_ars': _parseFixed(data['efectivo_ars']),
+      'efectivo_usd': _parseFixed(data['efectivo_usd']),
+      'tarjeta_ars': _parseFixed(data['tarjeta_ars']),
+      'cuota3_ars': _parseFixed(data['cuota3_ars']),
+      'cuota6_ars': _parseFixed(data['cuota6_ars']),
+      'cuota12_ars': _parseFixed(data['cuota12_ars']),
+    });
+
     return ExcelProductRow(
       type: type,
       marca: marca,
@@ -576,7 +605,16 @@ class ExcelProductRow {
       precioUsd: precio,
       stock: stock,
       roundsPerBox: roundsPerBox,
+      fixedPrices: fixedPrices,
     );
+  }
+
+  /// Monto de precio fijo: vacío/0 → null (no se computa nada, se muestra tal cual).
+  static double? _parseFixed(String? raw) {
+    final value = (raw ?? '').trim();
+    if (value.isEmpty) return null;
+    final parsed = _parsePrice(value);
+    return parsed > 0 ? parsed : null;
   }
 
   static int? _parseInt(String? raw) {
@@ -655,6 +693,7 @@ class ExcelProductRow {
       stock: stock,
       stockInicial: stock,
       roundsPerBox: isMunicion ? roundsPerBox : null,
+      fixedPrices: fixedPrices,
     );
   }
 }

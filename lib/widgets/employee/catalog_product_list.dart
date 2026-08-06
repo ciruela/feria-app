@@ -149,29 +149,51 @@ class CatalogProductRow extends StatelessWidget {
                         size: 18,
                       ),
                     ),
-                  // El vendedor carga en USD: ese es el precio ancla de la tarjeta.
-                  Text(
-                    formatUsd(prices.usd),
-                    style: AppText.bodyLarge.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.accent,
-                    ),
-                  ),
-                  if (exchangeRate.hasServerRate && prices.usd > 0) ...[
-                    const SizedBox(height: 2),
+                  if (product.hasFixedPrices) ...[
+                    // Urban: precio fiel del Excel (sin cálculo interno).
                     Text(
-                      formatArs(prices.lista),
-                      style: AppText.bodySmall.copyWith(
-                        fontWeight: FontWeight.w600,
+                      prices.usd > 0
+                          ? formatUsd(prices.usd)
+                          : formatArs(prices.efectivo),
+                      style: AppText.bodyLarge.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.accent,
                       ),
                     ),
+                    if (prices.usd > 0) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Efect. ${formatArs(prices.efectivo)}',
+                        style: AppText.bodySmall.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ] else ...[
+                    // El vendedor carga en USD: ese es el precio ancla de la tarjeta.
                     Text(
-                      'Efect. ${formatArs(prices.efectivo)}',
-                      style: AppText.bodySmall.copyWith(
-                        color: AppColors.textMuted,
-                        fontSize: 11,
+                      formatUsd(prices.usd),
+                      style: AppText.bodyLarge.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.accent,
                       ),
                     ),
+                    if (exchangeRate.hasServerRate && prices.usd > 0) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        formatArs(prices.lista),
+                        style: AppText.bodySmall.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        'Efect. ${formatArs(prices.efectivo)}',
+                        style: AppText.bodySmall.copyWith(
+                          color: AppColors.textMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                   ],
                 ],
               ),
@@ -395,12 +417,19 @@ class CatalogProductTableRow extends StatelessWidget {
           ),
           Expanded(
             flex: 2,
-            child: Text(formatUsd(prices.usd), style: AppText.bodySmall),
+            child: Text(
+              product.hasFixedPrices && prices.usd <= 0
+                  ? '—'
+                  : formatUsd(prices.usd),
+              style: AppText.bodySmall,
+            ),
           ),
           Expanded(
             flex: 2,
             child: Text(
-              exchangeRate.hasServerRate ? formatArs(prices.lista) : '—',
+              product.hasFixedPrices
+                  ? formatArs(prices.efectivo)
+                  : (exchangeRate.hasServerRate ? formatArs(prices.lista) : '—'),
               style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w700),
             ),
           ),

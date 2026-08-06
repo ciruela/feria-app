@@ -10,6 +10,7 @@ class ProductPricesPanel extends StatelessWidget {
     required this.prices,
     this.compact = false,
     this.showArs = true,
+    this.fixed,
   });
 
   final ProductPrices prices;
@@ -18,8 +19,13 @@ class ProductPricesPanel extends StatelessWidget {
   /// Si es false, no se inventan precios ARS (AR-11: falta tipo de cambio server).
   final bool showArs;
 
+  /// Precios fijos del Excel (Urban): cuando no es null se muestran tal cual y
+  /// se ignora el cálculo interno / el gate de tipo de cambio.
+  final FixedPrices? fixed;
+
   @override
   Widget build(BuildContext context) {
+    if (fixed != null) return _buildFixed(context, fixed!);
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(compact ? 14 : 16),
@@ -124,6 +130,79 @@ class ProductPricesPanel extends StatelessWidget {
             multiline: compact,
           ),
           ],
+        ],
+      ),
+    );
+  }
+
+  /// Panel fiel al Excel (Urban): efectivo/transferencia, PVP tarjeta y
+  /// 3/6/12 cuotas. Sin débito ni 1/9/18 cuotas.
+  Widget _buildFixed(BuildContext context, FixedPrices f) {
+    final hasUsd = (f.efectivoUsd ?? 0) > 0;
+    final efectivo = f.efectivoArs ?? 0;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(compact ? 14 : 16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: AppDecorations.radiusSm,
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (hasUsd) ...[
+            _PriceLine(
+              label: 'USD',
+              value: formatUsd(f.efectivoUsd!),
+              bold: true,
+              highlight: true,
+              compact: compact,
+            ),
+            const Divider(height: 18),
+          ],
+          _PriceLine(
+            label: 'EFECTIVO',
+            value: formatArs(efectivo),
+            bold: !compact,
+            large: !compact,
+            compact: compact,
+          ),
+          _PriceLine(
+            label: 'TRANSFER.',
+            value: formatArs(efectivo),
+            compact: compact,
+          ),
+          if ((f.tarjetaArs ?? 0) > 0)
+            _PriceLine(
+              label: 'TARJETA',
+              value: formatArs(f.tarjetaArs!),
+              compact: compact,
+            ),
+          if ((f.cuota3Ars ?? 0) > 0)
+            _PriceLine(
+              label: '3 CUOTAS',
+              value:
+                  '${formatArs(f.tarjeta3Total!)} (${formatArs(f.cuota3Ars!)}/cuota)',
+              compact: compact,
+              multiline: compact,
+            ),
+          if ((f.cuota6Ars ?? 0) > 0)
+            _PriceLine(
+              label: '6 CUOTAS',
+              value:
+                  '${formatArs(f.tarjeta6Total!)} (${formatArs(f.cuota6Ars!)}/cuota)',
+              compact: compact,
+              multiline: compact,
+            ),
+          if ((f.cuota12Ars ?? 0) > 0)
+            _PriceLine(
+              label: '12 CUOTAS',
+              value:
+                  '${formatArs(f.tarjeta12Total!)} (${formatArs(f.cuota12Ars!)}/cuota)',
+              compact: compact,
+              multiline: compact,
+            ),
         ],
       ),
     );

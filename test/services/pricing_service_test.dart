@@ -1,4 +1,5 @@
 import 'package:app_feria/models/product.dart';
+import 'package:app_feria/models/product_prices.dart';
 import 'package:app_feria/services/exchange_rate_service.dart';
 import 'package:app_feria/services/pricing_service.dart';
 import 'package:app_feria/services/pricing_settings_service.dart';
@@ -38,6 +39,45 @@ void main() {
     final exchange = ExchangeRateService();
     expect(exchange.rate, ExchangeRateService.defaultRate);
     expect(exchange.toArs(2), 3000);
+    exchange.dispose();
+  });
+
+  test('precios fijos (Urban): se muestran tal cual, sin recalcular', () {
+    const urbanProduct = Product(
+      id: 'u',
+      type: ProductType.armaLarga,
+      marca: 'Sibian Armory',
+      calibre: '.223',
+      codigo: 'SIBIANFA15223',
+      precioUsd: 3500,
+      fixedPrices: FixedPrices(
+        efectivoArs: 5495000,
+        efectivoUsd: 3500,
+        tarjetaArs: 5659850,
+        cuota3Ars: 2058864.77,
+        cuota6Ars: 1100463.50,
+        cuota12Ars: 644232.43,
+      ),
+    );
+
+    final exchange = ExchangeRateService(); // rate 1500 — NO debe usarse
+    final settings = PricingSettingsService();
+
+    final prices = PricingService().pricesFor(urbanProduct, exchange, settings);
+
+    // Nada de tipo de cambio ni recargos: montos exactos del Excel.
+    expect(prices.usd, 3500);
+    expect(prices.efectivo, 5495000);
+    expect(prices.lista, 5495000); // transferencia = efectivo
+    expect(prices.debito, 0); // Urban no usa débito
+    expect(prices.tarjeta1, 5659850); // PVP tarjeta 1 pago
+    expect(prices.tarjeta3, closeTo(2058864.77 * 3, 0.01));
+    expect(prices.cuota3, closeTo(2058864.77, 0.01));
+    expect(prices.tarjeta6, closeTo(1100463.50 * 6, 0.01));
+    expect(prices.tarjeta12, closeTo(644232.43 * 12, 0.01));
+    expect(prices.tarjeta9, 0); // Urban no usa 9 cuotas
+    expect(prices.tarjeta18, 0);
+
     exchange.dispose();
   });
 }

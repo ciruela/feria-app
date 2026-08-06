@@ -1,3 +1,75 @@
+/// Precios cargados **tal cual** desde el Excel de un tenant (ej. Urban Tactical).
+///
+/// A diferencia del resto del catálogo, la app NO recalcula nada con estos
+/// montos: los muestra fielmente. Todo en ARS salvo [efectivoUsd], que es la
+/// referencia en dólares de las armas cotizadas en USD (Gral/Taurus).
+class FixedPrices {
+  const FixedPrices({
+    this.efectivoArs,
+    this.efectivoUsd,
+    this.tarjetaArs,
+    this.cuota3Ars,
+    this.cuota6Ars,
+    this.cuota12Ars,
+  });
+
+  /// Precio efectivo / transferencia (mismo valor en el Excel de Urban).
+  final double? efectivoArs;
+
+  /// Referencia en USD (armas Gral/Taurus). null cuando el Excel es solo ARS.
+  final double? efectivoUsd;
+
+  /// PVP con tarjeta en 1 pago.
+  final double? tarjetaArs;
+
+  /// Valor de CADA cuota (no el total) en 3/6/12 cuotas.
+  final double? cuota3Ars;
+  final double? cuota6Ars;
+  final double? cuota12Ars;
+
+  double? get tarjeta3Total => cuota3Ars == null ? null : cuota3Ars! * 3;
+  double? get tarjeta6Total => cuota6Ars == null ? null : cuota6Ars! * 6;
+  double? get tarjeta12Total => cuota12Ars == null ? null : cuota12Ars! * 12;
+
+  bool get isEmpty =>
+      (efectivoArs ?? 0) <= 0 &&
+      (tarjetaArs ?? 0) <= 0 &&
+      (cuota3Ars ?? 0) <= 0 &&
+      (cuota6Ars ?? 0) <= 0 &&
+      (cuota12Ars ?? 0) <= 0;
+
+  Map<String, dynamic> toJson() => {
+        if (efectivoArs != null) 'efectivo_ars': efectivoArs,
+        if (efectivoUsd != null) 'efectivo_usd': efectivoUsd,
+        if (tarjetaArs != null) 'tarjeta_ars': tarjetaArs,
+        if (cuota3Ars != null) 'cuota3_ars': cuota3Ars,
+        if (cuota6Ars != null) 'cuota6_ars': cuota6Ars,
+        if (cuota12Ars != null) 'cuota12_ars': cuota12Ars,
+      };
+
+  static double? _num(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    final parsed = double.tryParse(v.toString().trim());
+    return parsed;
+  }
+
+  /// Reconstruye desde JSON (Supabase jsonb o caché local). Devuelve null si
+  /// no hay ningún monto útil (así el resto del catálogo sigue el cálculo normal).
+  static FixedPrices? fromJson(Map<String, dynamic>? json) {
+    if (json == null || json.isEmpty) return null;
+    final fp = FixedPrices(
+      efectivoArs: _num(json['efectivo_ars']),
+      efectivoUsd: _num(json['efectivo_usd']),
+      tarjetaArs: _num(json['tarjeta_ars']),
+      cuota3Ars: _num(json['cuota3_ars']),
+      cuota6Ars: _num(json['cuota6_ars']),
+      cuota12Ars: _num(json['cuota12_ars']),
+    );
+    return fp.isEmpty ? null : fp;
+  }
+}
+
 class ProductPrices {
   const ProductPrices({
     required this.usd,

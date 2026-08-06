@@ -173,6 +173,7 @@ class _ProductDetailCard extends StatelessWidget {
                   canAdd: canAdd,
                   inStock: product.inStock,
                   onAddToCart: onAddToCart,
+                  fixed: product.fixedPrices,
                 ),
               ),
             ],
@@ -191,6 +192,7 @@ class _DetailPricingColumn extends StatelessWidget {
     required this.canAdd,
     required this.inStock,
     required this.onAddToCart,
+    this.fixed,
   });
 
   final ProductPrices prices;
@@ -199,9 +201,11 @@ class _DetailPricingColumn extends StatelessWidget {
   final bool canAdd;
   final bool inStock;
   final VoidCallback onAddToCart;
+  final FixedPrices? fixed;
 
   @override
   Widget build(BuildContext context) {
+    if (fixed != null) return _buildFixed(context, fixed!);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -260,6 +264,68 @@ class _DetailPricingColumn extends StatelessWidget {
             'Precios en pesos no disponibles: falta el tipo de cambio.',
             style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
           ),
+        const SizedBox(height: 20),
+        FilledButton.icon(
+          onPressed: canAdd ? onAddToCart : null,
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.accent,
+            foregroundColor: AppColors.onAccent,
+            minimumSize: const Size.fromHeight(AppDecorations.buttonPrimary),
+          ),
+          icon: const Icon(Icons.shopping_bag_outlined),
+          label: Text(
+            !inStock
+                ? 'Sin stock'
+                : canAdd
+                    ? 'Agregar al carrito'
+                    : 'Stock máximo en carrito',
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Columna de precios fiel al Excel (Urban): efectivo/transferencia, PVP
+  /// tarjeta y 3/6/12 cuotas. Sin débito ni 1/9/18 cuotas.
+  Widget _buildFixed(BuildContext context, FixedPrices f) {
+    final hasUsd = (f.efectivoUsd ?? 0) > 0;
+    final efectivo = f.efectivoArs ?? 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'EFECTIVO / TRANSFERENCIA',
+          style: AppText.label.copyWith(color: AppColors.textMuted, fontSize: 10),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              formatArs(efectivo),
+              style: AppText.number.copyWith(
+                fontSize: 32,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (hasUsd) ...[
+              const SizedBox(width: 10),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(formatUsd(f.efectivoUsd!), style: AppText.bodySmall),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 20),
+        if ((f.tarjetaArs ?? 0) > 0)
+          _PaymentRow(label: 'Tarjeta (1 pago)', value: formatArs(f.tarjetaArs!)),
+        if ((f.cuota3Ars ?? 0) > 0)
+          _CuotaRow(count: 3, total: f.tarjeta3Total!, cuota: f.cuota3Ars!),
+        if ((f.cuota6Ars ?? 0) > 0)
+          _CuotaRow(count: 6, total: f.tarjeta6Total!, cuota: f.cuota6Ars!),
+        if ((f.cuota12Ars ?? 0) > 0)
+          _CuotaRow(count: 12, total: f.tarjeta12Total!, cuota: f.cuota12Ars!),
         const SizedBox(height: 20),
         FilledButton.icon(
           onPressed: canAdd ? onAddToCart : null,

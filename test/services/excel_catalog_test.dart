@@ -426,6 +426,61 @@ void main() {
     });
   });
 
+  group('precios fijos (Urban)', () {
+    test('parsea columnas de precios fijos del Excel limpio', () {
+      final bytes = _sheetBytes(
+        [
+          'tipo', 'marca', 'calibre', 'modelo', 'codigo', 'descripcion',
+          'precio_usd', 'stock',
+          'efectivo_ars', 'efectivo_usd', 'tarjeta_ars',
+          'cuota3_ars', 'cuota6_ars', 'cuota12_ars',
+        ],
+        [
+          [
+            'arma_larga', 'Sibian Armory', '.223', 'FA15', 'SIBIANFA15223',
+            'Carabina', '3500', '10',
+            '5495000', '3500', '5659850',
+            '2058864.77', '1100463.50', '644232.43',
+          ],
+        ],
+      );
+
+      final rows = ExcelCatalogService().parseRows(bytes);
+      final row = ExcelProductRow.fromMap(rows.single);
+
+      expect(row.type, ProductType.armaLarga);
+      expect(row.codigo, 'SIBIANFA15223');
+      final fixed = row.fixedPrices;
+      expect(fixed, isNotNull);
+      expect(fixed!.efectivoArs, 5495000);
+      expect(fixed.efectivoUsd, 3500);
+      expect(fixed.tarjetaArs, 5659850);
+      expect(fixed.cuota3Ars, closeTo(2058864.77, 0.01));
+      expect(fixed.cuota6Ars, closeTo(1100463.50, 0.01));
+      expect(fixed.cuota12Ars, closeTo(644232.43, 0.01));
+
+      final product = row.toNewProduct(0);
+      expect(product.hasFixedPrices, isTrue);
+      // Roundtrip JSON (caché local / Supabase).
+      final restored = Product.fromJson(product.toJson());
+      expect(restored.fixedPrices?.efectivoArs, 5495000);
+      expect(restored.fixedPrices?.cuota12Ars, closeTo(644232.43, 0.01));
+    });
+
+    test('sin columnas de precios fijos, fixedPrices queda null', () {
+      final bytes = _sheetBytes(
+        ['tipo', 'marca', 'calibre', 'modelo', 'codigo', 'precio_usd', 'stock'],
+        [
+          ['arma_corta', 'Glock', '9', 'G17', 'G17', '600', '5'],
+        ],
+      );
+      final row = ExcelProductRow.fromMap(
+        ExcelCatalogService().parseRows(bytes).single,
+      );
+      expect(row.fixedPrices, isNull);
+    });
+  });
+
   group('export/import roundtrip', () {
     test('lo exportado se puede volver a parsear', () {
       const products = [
