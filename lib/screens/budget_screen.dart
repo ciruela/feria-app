@@ -371,9 +371,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
     );
 
     if (cart.isEmpty) {
-      return FeriaScaffold(
-        appBar: FeriaAppBar(title: const Text('Presupuesto')),
-        body: const Center(child: Text('El carrito está vacío')),
+      return const FeriaScaffold(
+        appBar: FeriaAppBar(title: Text('Presupuesto')),
+        body: Center(child: Text('El carrito está vacío')),
       );
     }
 
