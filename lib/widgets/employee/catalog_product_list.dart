@@ -19,16 +19,38 @@ String catalogProductTitle(Product product) {
   if (product.isArma) {
     return '${product.marcaUpper} ${product.modeloDisplay}'.trim();
   }
-  return product.codigo.isNotEmpty ? product.codigo : product.sellerShortTitle;
+
+  final short = product.sellerShortTitle;
+  if (product.marca.isNotEmpty && short.isNotEmpty) {
+    return '${product.marcaUpper} $short'.trim();
+  }
+  if (short.isNotEmpty) return short;
+
+  final description = product.descripcion.trim();
+  if (description.isNotEmpty) {
+    return description.length > 56 ? '${description.substring(0, 53)}…' : description;
+  }
+
+  if (product.codigo.isNotEmpty) return product.codigo;
+  return product.marca.isNotEmpty ? product.marcaUpper : 'Munición';
 }
 
 String catalogProductSubtitle(Product product) {
   final parts = <String>[];
+
+  if (product.isMunicion) {
+    if (product.codigo.isNotEmpty) parts.add(product.codigo);
+    if (product.calibre.isNotEmpty) parts.add('Cal. ${product.calibre}');
+    if (product.modelo.isNotEmpty) parts.add(product.modelo);
+    if (product.stock != null) parts.add('${product.stock} cajas');
+    return parts.join(' · ');
+  }
+
   if (product.calibre.isNotEmpty) {
     parts.add('Cal. ${product.calibre}');
   }
   if (product.stock != null) {
-    parts.add('${product.stock} ${product.isMunicion ? 'cajas' : 'u.'}');
+    parts.add('${product.stock} u.');
   }
   return parts.join(' · ');
 }
@@ -89,9 +111,25 @@ class CatalogProductRow extends StatelessWidget {
                     Text(
                       catalogProductTitle(product),
                       style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w600),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2),
-                    Text(catalogProductSubtitle(product), style: AppText.bodySmall),
+                    if (catalogProductSubtitle(product).isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        catalogProductSubtitle(product),
+                        style: AppText.bodySmall,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    if (product.isMunicion && product.sellerTagLabels.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      ProductSellerTags(
+                        labels: product.sellerTagLabels,
+                        accent: AppColors.accent,
+                      ),
+                    ],
                   ],
                 ),
               ),
