@@ -66,14 +66,14 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
 
   Future<void> _invite() async {
     if (!_canManage) return;
+    final session = context.read<TenantSessionService>();
 
     final result = await showDialog<_InviteForm>(
       context: context,
       builder: (_) => const _InviteDialog(),
     );
-    if (result == null) return;
+    if (result == null || !mounted) return;
 
-    final session = context.read<TenantSessionService>();
     setState(() => _loading = true);
     try {
       await session.ensureSupabaseWriteContext();
@@ -112,6 +112,7 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
 
   Future<void> _removeMember(TeamMember member) async {
     if (!_canManage || member.userId == _currentUserId) return;
+    final session = context.read<TenantSessionService>();
 
     final ok = await showDialog<bool>(
       context: context,
@@ -134,9 +135,8 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
         ],
       ),
     );
-    if (ok != true) return;
+    if (ok != true || !mounted) return;
 
-    final session = context.read<TenantSessionService>();
     setState(() => _loading = true);
     try {
       await session.ensureSupabaseWriteContext();
