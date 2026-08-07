@@ -2,6 +2,7 @@ import 'package:app_feria/models/product.dart';
 import 'package:app_feria/models/product_prices.dart';
 import 'package:app_feria/services/cart_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Product _prod({int? stock}) => Product(
       id: 'municion_1',
@@ -14,6 +15,10 @@ Product _prod({int? stock}) => Product(
     );
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   test('Urban: producto con USD 0 pero precios fijos se puede agregar', () {
     final cart = CartService();
     const p = Product(

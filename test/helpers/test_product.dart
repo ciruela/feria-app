@@ -6,6 +6,8 @@ Product testProduct({
   String marca = 'TEST',
   String calibre = '9MM',
   String codigo = 'M001',
+  String modelo = '',
+  String descripcion = '',
   double precioUsd = 100,
   int? stock,
 }) {
@@ -15,6 +17,8 @@ Product testProduct({
     marca: marca,
     calibre: calibre,
     codigo: codigo,
+    modelo: modelo,
+    descripcion: descripcion,
     precioUsd: precioUsd,
     stock: stock,
   );

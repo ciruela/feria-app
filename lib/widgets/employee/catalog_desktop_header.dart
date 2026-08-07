@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../../services/exchange_rate_service.dart';
 import '../../theme/app_theme.dart';
@@ -19,6 +18,7 @@ class CatalogDesktopHeader extends StatelessWidget {
     this.searchController,
     this.searchFocus,
     this.onSearchChanged,
+    this.onBackToCatalog,
   });
 
   final String sellerName;
@@ -31,6 +31,9 @@ class CatalogDesktopHeader extends StatelessWidget {
   final TextEditingController? searchController;
   final FocusNode? searchFocus;
   final ValueChanged<String>? onSearchChanged;
+
+  /// AR-44: en ficha de producto no hay search activo; mostrar volver.
+  final VoidCallback? onBackToCatalog;
 
   @override
   Widget build(BuildContext context) {
@@ -61,29 +64,52 @@ class CatalogDesktopHeader extends StatelessWidget {
               ),
               const SizedBox(width: 24),
               Expanded(
-                child: TextField(
-                  controller: searchController,
-                  focusNode: searchFocus,
-                  readOnly: searchController == null,
-                  onChanged: onSearchChanged,
-                  decoration: InputDecoration(
-                    hintText: 'Código, modelo o calibre',
-                    prefixIcon: const Icon(
-                      Icons.search_rounded,
-                      color: AppColors.textMuted,
-                    ),
-                    filled: true,
-                    fillColor: AppColors.surfaceRaised,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppDecorations.radius),
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppDecorations.radius),
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                  ),
-                ),
+                child: searchController != null
+                    ? TextField(
+                        controller: searchController,
+                        focusNode: searchFocus,
+                        onChanged: onSearchChanged,
+                        decoration: InputDecoration(
+                          hintText: 'Código, modelo o calibre',
+                          prefixIcon: const Icon(
+                            Icons.search_rounded,
+                            color: AppColors.textMuted,
+                          ),
+                          filled: true,
+                          fillColor: AppColors.surfaceRaised,
+                          border: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppDecorations.radius),
+                            borderSide:
+                                const BorderSide(color: AppColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppDecorations.radius),
+                            borderSide:
+                                const BorderSide(color: AppColors.border),
+                          ),
+                        ),
+                      )
+                    : onBackToCatalog == null
+                        ? const SizedBox.shrink()
+                        : Align(
+                            alignment: Alignment.centerLeft,
+                            child: OutlinedButton.icon(
+                              onPressed: onBackToCatalog,
+                              icon: const Icon(
+                                Icons.chevron_left_rounded,
+                                size: 18,
+                              ),
+                              label: const Text('Volver al catálogo'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.textPrimary,
+                                side:
+                                    const BorderSide(color: AppColors.border),
+                                minimumSize: const Size(0, 44),
+                              ),
+                            ),
+                          ),
               ),
               const SizedBox(width: 12),
               Material(
@@ -143,7 +169,7 @@ class CatalogDesktopStatsRow extends StatelessWidget {
         Expanded(
           child: _StatBox(
             label: 'DÓLAR DE REFERENCIA',
-            value: rate != null ? _formatReferenceRate(rate!) : '—',
+            value: rate != null ? formatExchangeRate(rate!) : '—',
             subtitle: updatedAt != null ? formatDateTime(updatedAt!) : null,
             accent: true,
           ),
@@ -167,10 +193,6 @@ class CatalogDesktopStatsRow extends StatelessWidget {
       ],
     );
   }
-}
-
-String _formatReferenceRate(double rate) {
-  return NumberFormat('#,##0', 'es_AR').format(rate);
 }
 
 class _StatBox extends StatelessWidget {

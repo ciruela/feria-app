@@ -25,7 +25,7 @@ class SupabaseConfigRepository {
 
     return (
       rate: rate,
-      updatedAt: DateTime.parse(row['updated_at'] as String),
+      updatedAt: DateTime.parse(row['updated_at'] as String).toLocal(),
     );
   }
 

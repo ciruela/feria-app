@@ -24,36 +24,51 @@ class AdminPinEntry extends StatefulWidget {
 
 class AdminPinEntryState extends State<AdminPinEntry> {
   String _pin = '';
-  final _focusNode = FocusNode();
+  final _focusNode = FocusNode(debugLabel: 'AdminPinEntry');
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusNode.requestFocus();
-    });
+    // AR-36: el teclado físico de desktop/web a veces no llega a [Focus.onKeyEvent]
+    // (el diálogo / InkWell del pad se quedan con el foco). Handler global
+    // mientras este widget esté montado.
+    HardwareKeyboard.instance.addHandler(_onHardwareKey);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureFocus());
   }
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onHardwareKey);
     _focusNode.dispose();
     super.dispose();
   }
 
-  void clear() => setState(() => _pin = '');
+  void clear() {
+    setState(() => _pin = '');
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureFocus());
+  }
 
   String get pin => _pin;
+
+  void _ensureFocus() {
+    if (!mounted) return;
+    if (!_focusNode.hasFocus) {
+      _focusNode.requestFocus();
+    }
+  }
 
   void _append(String digit) {
     if (_pin.length >= widget.maxDigits) return;
     setState(() => _pin += digit);
     widget.onChanged?.call(_pin);
+    _ensureFocus();
   }
 
   void _backspace() {
     if (_pin.isEmpty) return;
     setState(() => _pin = _pin.substring(0, _pin.length - 1));
     widget.onChanged?.call(_pin);
+    _ensureFocus();
   }
 
   void _submit() {
@@ -61,26 +76,45 @@ class AdminPinEntryState extends State<AdminPinEntry> {
     widget.onSubmit?.call(_pin);
   }
 
-  KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+  bool _onHardwareKey(KeyEvent event) {
+    if (!mounted) return false;
+    return _consumeKey(event);
+  }
+
+  KeyEventResult _handleFocusKey(FocusNode node, KeyEvent event) {
+    return _consumeKey(event)
+        ? KeyEventResult.handled
+        : KeyEventResult.ignored;
+  }
+
+  /// true si consumimos el evento (dígito / backspace / enter).
+  bool _consumeKey(KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
 
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.backspace || key == LogicalKeyboardKey.delete) {
       _backspace();
-      return KeyEventResult.handled;
+      return true;
     }
     if (key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.numpadEnter) {
       _submit();
-      return KeyEventResult.handled;
+      return true;
     }
 
-    final digit = _digitFromKey(key);
-    if (digit != null) {
-      _append(digit);
-      return KeyEventResult.handled;
+    final fromKey = _digitFromKey(key);
+    if (fromKey != null) {
+      _append(fromKey);
+      return true;
     }
 
-    return KeyEventResult.ignored;
+    // Layouts / web: a veces llega por [character] y no por logicalKey.
+    final char = event.character?.trim();
+    if (char != null && char.length == 1 && RegExp(r'^[0-9]$').hasMatch(char)) {
+      _append(char);
+      return true;
+    }
+
+    return false;
   }
 
   String? _digitFromKey(LogicalKeyboardKey key) {
@@ -106,9 +140,9 @@ class AdminPinEntryState extends State<AdminPinEntry> {
     return Focus(
       focusNode: _focusNode,
       autofocus: true,
-      onKeyEvent: _handleKey,
+      onKeyEvent: _handleFocusKey,
       child: GestureDetector(
-        onTap: _focusNode.requestFocus,
+        onTap: _ensureFocus,
         behavior: HitTestBehavior.opaque,
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -135,17 +169,22 @@ class AdminPinEntryState extends State<AdminPinEntry> {
                   child: Text(
                     filled ? '•' : '',
                     style: AppText.display.copyWith(
-                      color: widget.wrong ? AppColors.accent : AppColors.textPrimary,
+                      color: widget.wrong
+                          ? AppColors.accent
+                          : AppColors.textPrimary,
                     ),
                   ),
                 );
               }),
             ),
             const SizedBox(height: 20),
-            _Keypad(
-              onDigit: _append,
-              onBackspace: _backspace,
-              onSubmit: _submit,
+            // AR-36: el pad táctil no debe robar el foco del teclado físico.
+            ExcludeFocus(
+              child: _Keypad(
+                onDigit: _append,
+                onBackspace: _backspace,
+                onSubmit: _submit,
+              ),
             ),
           ],
         ),

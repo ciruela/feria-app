@@ -40,8 +40,10 @@ class PresupuestoBranding {
 
   static const worldGunsSlug = 'world-guns';
   static const urbanTacticalSlug = 'urban-tactical';
+
+  /// PNG con fondo transparente (para recibo blanco).
   static const urbanWatermarkAsset =
-      'assets/branding/urban_tactical_watermark_color.png';
+      'assets/branding/urban_tactical_watermark.png';
 
   final PresupuestoTemplateKind kind;
   final String slug;
@@ -93,8 +95,7 @@ class PresupuestoBranding {
     adminLine: 'Adm./Gestoria WApp: 11-5147-1705  @wordguns.srl',
     documentTitle: 'PRESUPUESTO',
     documentSubtitle: '(DOC. NO VALIDO COMO FACTURA)',
-    footerNote:
-        'Horario: Lun a Vie 10 a 13 y 15:30 a 19 · Sab 10 a 13\n'
+    footerNote: 'Horario: Lun a Vie 10 a 13 y 15:30 a 19 · Sab 10 a 13\n'
         'Los precios pueden variar sin previo aviso.\n'
         'Reserva de mercaderia con seña del 30%.',
     paperRows: 14,
@@ -117,7 +118,8 @@ class PresupuestoBranding {
     documentTitle: 'RECIBO VENTAS NUEVAS',
     documentSubtitle: 'Documento no válido como factura',
     footerNote: '',
-    paperRows: 10,
+    // Menos filas vacías: deja altura para el campo N° de serie en armas.
+    paperRows: 6,
     tableHeaders: ['Concepto', 'Cant', 'Valor'],
     paymentAllocationTitle: '',
     creditCardsTitle: '',
@@ -178,9 +180,6 @@ class PresupuestoBranding {
       final word = words.first.toUpperCase();
       return word.length >= 2 ? word.substring(0, 2) : word;
     }
-    return words
-        .take(2)
-        .map((word) => word[0].toUpperCase())
-        .join();
+    return words.take(2).map((word) => word[0].toUpperCase()).join();
   }
 }

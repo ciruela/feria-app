@@ -12,6 +12,11 @@ class AuthService extends ChangeNotifier {
   String _adminPin = defaultPin;
   AppRole? _currentRole;
 
+  /// PIN maestro actual (texto plano local). Se muestra en admin para evitar
+  /// confusión con el valor por defecto hardcodeado (AR-49).
+  String get adminPin => _adminPin;
+  bool get isDefaultAdminPin => _adminPin == defaultPin;
+
   AppRole? get currentRole => _currentRole;
   bool get isAdmin => _currentRole == AppRole.admin;
   bool get isEmployee => _currentRole == AppRole.employee;

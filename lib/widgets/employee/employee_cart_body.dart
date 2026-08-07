@@ -158,17 +158,25 @@ class EmployeeCartBody extends StatelessWidget {
                 lineUsd: lineUsd,
                 lineArs: lineArs,
                 showArs: hasRate,
-                canIncrease: !isArma &&
-                    () {
-                      final max = cart.maxQuantityForLine(item);
-                      return max == null || item.quantity < max;
-                    }(),
+                canIncrease: isArma
+                    ? cart.canAddMore(item.product)
+                    : () {
+                        final max = cart.maxQuantityForLine(item);
+                        return max == null || item.quantity < max;
+                      }(),
                 // AR-33: − at qty 1 must not remove the line; use trash instead.
                 onDecrease: isArma || item.quantity <= 1
                     ? null
                     : () => cart.changeQuantity(item.lineKey, item.quantity - 1),
                 onIncrease: isArma
-                    ? null
+                    ? () {
+                        // AR-41: + en arma agrega otra línea (otra serie), no qty.
+                        if (!cart.canAddMore(item.product)) {
+                          showStockLimitMessage(context, item.product);
+                          return;
+                        }
+                        cart.addProduct(item.product);
+                      }
                     : () {
                         final max = cart.maxQuantityForLine(item);
                         if (max != null && item.quantity >= max) {
@@ -268,14 +276,20 @@ class EmployeeCartLine extends StatelessWidget {
                 ),
               ),
               if (isArma) ...[
+                // AR-41: qty fija 1; + agrega otra línea (otra serie).
                 SizedBox(
                   width: 28,
                   child: Text(
-                    '${item.quantity}',
+                    '1',
                     textAlign: TextAlign.center,
                     style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w700),
                   ),
                 ),
+                _QtyButton(
+                  icon: Icons.add,
+                  onTap: canIncrease ? onIncrease : null,
+                ),
+                const SizedBox(width: 4),
                 _QtyButton(icon: Icons.delete_outline, onTap: onRemove),
               ] else ...[
                 _QtyButton(icon: Icons.remove, onTap: onDecrease),

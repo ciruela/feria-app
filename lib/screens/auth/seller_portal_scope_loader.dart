@@ -5,6 +5,7 @@ import '../../config/app_config.dart';
 import '../../models/app_role.dart';
 import '../../models/seller.dart';
 import '../../services/auth_service.dart';
+import '../../services/cart_service.dart';
 import '../../services/catalog_service.dart';
 import '../../services/exchange_rate_service.dart';
 import '../../services/pricing_settings_service.dart';
@@ -56,12 +57,14 @@ class _SellerPortalScopeLoaderState extends State<SellerPortalScopeLoader> {
     context.read<SellerService>().bindTenant(tenantId);
     context.read<ExchangeRateService>().bindTenant(tenantId);
     context.read<PricingSettingsService>().bindTenant(tenantId);
+    context.read<CartService>().bindTenant(tenantId);
     context.read<AuthService>().loginAs(AppRole.employee);
 
     final catalogService = context.read<CatalogService>();
     final exchangeRateService = context.read<ExchangeRateService>();
     final pricingSettings = context.read<PricingSettingsService>();
     final sellerService = context.read<SellerService>();
+    final cartService = context.read<CartService>();
 
     try {
       await Future.wait([
@@ -69,6 +72,7 @@ class _SellerPortalScopeLoaderState extends State<SellerPortalScopeLoader> {
         exchangeRateService.load(),
         pricingSettings.load(),
       ]);
+      await cartService.load(catalog: catalogService);
 
       try {
         await sellerService.load();

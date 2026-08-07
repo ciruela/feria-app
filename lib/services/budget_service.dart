@@ -25,7 +25,13 @@ class BudgetService {
     required PricingSettingsService pricingSettings,
     BudgetCustomer customer = const BudgetCustomer(),
     SellerService? sellerService,
+
+    /// Urban: marca/modelo/calibre sin descripción larga.
+    bool compactLineDetail = false,
   }) {
+    // AR-41: series por unidad — arma con qty>1 se parte antes de armar líneas.
+    cart.ensureWeaponsAreUnitLines();
+
     final checkout = cart.checkoutPayment;
     final method = checkout?.pricingMethod ?? defaultPaymentMethod;
     final lines = <BudgetLine>[];
@@ -52,7 +58,9 @@ class BudgetService {
           productId: item.product.id,
           code: item.product.budgetCode,
           quantity: item.quantity,
-          detail: item.product.budgetDetailFull(),
+          detail: item.product.budgetDetailForReceipt(
+            compact: compactLineDetail,
+          ),
           unitArs: unitArs,
           lineArs: lineArs,
           unitUsd: unitUsd,

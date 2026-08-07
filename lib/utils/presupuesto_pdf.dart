@@ -12,6 +12,7 @@ import 'presupuesto_page_format.dart';
 
 class PresupuestoPdf {
   static pw.MemoryImage? _urbanWatermarkImage;
+  static String? _urbanWatermarkAsset;
 
   static Future<Uint8List> generate(
     Budget budget, {
@@ -37,7 +38,8 @@ class PresupuestoPdf {
             decoration: pw.BoxDecoration(
               border: pw.Border.all(color: PdfColors.black, width: 1.8),
             ),
-            padding: const pw.EdgeInsets.all(PresupuestoPageFormat.borderPadding),
+            padding:
+                const pw.EdgeInsets.all(PresupuestoPageFormat.borderPadding),
             child: document.branding.isUrban
                 ? _buildUrbanPage(document, watermark: urbanWatermark)
                 : _buildStandardPage(document),
@@ -53,6 +55,10 @@ class PresupuestoPdf {
   ) async {
     final asset = branding.watermarkLogoAsset;
     if (asset == null) return null;
+    if (_urbanWatermarkAsset != asset) {
+      _urbanWatermarkImage = null;
+      _urbanWatermarkAsset = asset;
+    }
     _urbanWatermarkImage ??= pw.MemoryImage(
       (await rootBundle.load(asset)).buffer.asUint8List(),
     );
@@ -170,7 +176,7 @@ class PresupuestoPdf {
     final summary = document.summary;
     final branding = document.branding;
 
-    return pw.Column(
+    final page = pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
         _urbanBox(
@@ -268,7 +274,8 @@ class PresupuestoPdf {
               pw.Expanded(
                 child: pw.Column(
                   children: [
-                    _fieldRow('MÉTODO DE PAGO:', summary.paymentAbbrevFor(branding)),
+                    _fieldRow(
+                        'MÉTODO DE PAGO:', summary.paymentAbbrevFor(branding)),
                     _fieldRow('CUIT:', customer.dni),
                     _fieldRow(
                       'CONDICION FISCAL:',
@@ -286,7 +293,6 @@ class PresupuestoPdf {
           child: pw.LayoutBuilder(
             builder: (context, constraints) => _simpleItemsTable(
               document.tableRows,
-              watermark: watermark,
               bodyHeight: constraints?.maxHeight,
             ),
           ),
@@ -324,14 +330,17 @@ class PresupuestoPdf {
             pw.Expanded(
               child: pw.Text(
                 'Recibo ${document.formattedDate}',
-                style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                style:
+                    pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
               ),
             ),
             _urbanBox(
-              padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding:
+                  const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               child: pw.Text(
                 'Saldo: Abonó total',
-                style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold),
+                style:
+                    pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold),
               ),
             ),
           ],
@@ -371,6 +380,21 @@ class PresupuestoPdf {
             style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
           ),
         ],
+      ],
+    );
+
+    if (watermark == null) return page;
+
+    return pw.Stack(
+      alignment: pw.Alignment.center,
+      children: [
+        pw.Center(
+          child: pw.Opacity(
+            opacity: 0.16,
+            child: pw.Image(watermark, width: 320),
+          ),
+        ),
+        page,
       ],
     );
   }
@@ -434,26 +458,32 @@ class PresupuestoPdf {
             children: [
               pw.Text(
                 branding.companyName,
-                style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold),
+                style:
+                    pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold),
               ),
               if (branding.businessLine.isNotEmpty)
                 pw.Text(
                   branding.businessLine,
-                  style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold),
+                  style:
+                      pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold),
                 ),
               if (branding.servicesLine.isNotEmpty)
                 pw.Text(
                   branding.servicesLine,
-                  style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold),
+                  style:
+                      pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold),
                 ),
               if (branding.addressLine.isNotEmpty) ...[
                 pw.SizedBox(height: 2),
-                pw.Text(branding.addressLine, style: const pw.TextStyle(fontSize: 7)),
+                pw.Text(branding.addressLine,
+                    style: const pw.TextStyle(fontSize: 7)),
               ],
               if (branding.phoneLine.isNotEmpty)
-                pw.Text(branding.phoneLine, style: const pw.TextStyle(fontSize: 7)),
+                pw.Text(branding.phoneLine,
+                    style: const pw.TextStyle(fontSize: 7)),
               if (branding.adminLine.isNotEmpty)
-                pw.Text(branding.adminLine, style: const pw.TextStyle(fontSize: 7)),
+                pw.Text(branding.adminLine,
+                    style: const pw.TextStyle(fontSize: 7)),
             ],
           ),
         ),
@@ -465,12 +495,14 @@ class PresupuestoPdf {
             children: [
               pw.Text(
                 branding.documentTitle,
-                style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                style:
+                    pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
               ),
               pw.Text(
                 branding.documentSubtitle,
                 textAlign: pw.TextAlign.right,
-                style: pw.TextStyle(fontSize: 6.5, fontWeight: pw.FontWeight.bold),
+                style:
+                    pw.TextStyle(fontSize: 6.5, fontWeight: pw.FontWeight.bold),
               ),
               pw.SizedBox(height: 4),
               pw.Row(
@@ -540,7 +572,8 @@ class PresupuestoPdf {
               padding: const pw.EdgeInsets.only(bottom: 1),
               child: pw.Text(
                 _display(value),
-                style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+                style:
+                    pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
               ),
             ),
           ),
@@ -564,7 +597,8 @@ class PresupuestoPdf {
     PresupuestoBranding branding, {
     double? bodyHeight,
   }) {
-    final rowHeight = _pdfRowHeight(bodyHeight: bodyHeight, rowCount: rows.length);
+    final rowHeight =
+        _pdfRowHeight(bodyHeight: bodyHeight, rowCount: rows.length);
 
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.black, width: 0.8),
@@ -633,12 +667,12 @@ class PresupuestoPdf {
 
   static pw.Widget _simpleItemsTable(
     List<PresupuestoItemRow> rows, {
-    pw.MemoryImage? watermark,
     double? bodyHeight,
   }) {
-    final rowHeight = _pdfRowHeight(bodyHeight: bodyHeight, rowCount: rows.length);
+    final rowHeight =
+        _pdfRowHeight(bodyHeight: bodyHeight, rowCount: rows.length);
 
-    final table = pw.Table(
+    return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.black, width: 0.8),
       columnWidths: {
         0: const pw.FlexColumnWidth(),
@@ -650,9 +684,11 @@ class PresupuestoPdf {
         pw.TableRow(
           decoration: const pw.BoxDecoration(color: PdfColors.grey300),
           children: [
-            pw.SizedBox(height: _tableHeaderHeight, child: _headerCell('Concepto')),
+            pw.SizedBox(
+                height: _tableHeaderHeight, child: _headerCell('Concepto')),
             pw.SizedBox(height: _tableHeaderHeight, child: _headerCell('Cant')),
-            pw.SizedBox(height: _tableHeaderHeight, child: _headerCell('Valor')),
+            pw.SizedBox(
+                height: _tableHeaderHeight, child: _headerCell('Valor')),
           ],
         ),
         ...rows.map((row) {
@@ -668,37 +704,27 @@ class PresupuestoPdf {
             );
           }
 
+          final height = row.isArma && row.serialNumber.trim().isNotEmpty
+              ? (rowHeight + 10).clamp(rowHeight, 40.0)
+              : rowHeight;
+
           return pw.TableRow(
             children: [
               pw.SizedBox(
-                height: rowHeight,
+                height: height,
                 child: _bodyCell(row.detailWithSerial),
               ),
               pw.SizedBox(
-                height: rowHeight,
+                height: height,
                 child: _bodyCell('${row.quantity}', align: pw.TextAlign.center),
               ),
               pw.SizedBox(
-                height: rowHeight,
+                height: height,
                 child: _bodyCell(row.lineTotal, align: pw.TextAlign.right),
               ),
             ],
           );
         }),
-      ],
-    );
-
-    if (watermark == null) return table;
-
-    return pw.Stack(
-      children: [
-        pw.Center(
-          child: pw.Opacity(
-            opacity: 0.22,
-            child: pw.Image(watermark, width: 210, height: 210),
-          ),
-        ),
-        table,
       ],
     );
   }
@@ -749,7 +775,8 @@ class PresupuestoPdf {
     );
   }
 
-  static pw.Widget _bodyCell(String text, {pw.TextAlign align = pw.TextAlign.left}) {
+  static pw.Widget _bodyCell(String text,
+      {pw.TextAlign align = pw.TextAlign.left}) {
     return pw.Padding(
       padding: const pw.EdgeInsets.all(3),
       child: pw.Text(
@@ -782,7 +809,8 @@ class PresupuestoPdf {
               padding: const pw.EdgeInsets.only(bottom: 2),
               child: pw.Text(
                 '· ${line.label}: ${line.amount}',
-                style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                style:
+                    pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
               ),
             ),
           ),
@@ -812,7 +840,8 @@ class PresupuestoPdf {
           children: [
             pw.Text(
               branding.creditCardsTitle,
-              style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold),
+              style:
+                  pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold),
             ),
             pw.SizedBox(width: 6),
             pw.Expanded(
@@ -845,7 +874,8 @@ class PresupuestoPdf {
           child: checked
               ? pw.Text(
                   'X',
-                  style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+                  style:
+                      pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
                 )
               : null,
         ),

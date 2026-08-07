@@ -80,8 +80,8 @@ class ExchangeRateService extends ChangeNotifier {
       AuditService.instance.log(
         accion: 'Actualizó tipo de cambio',
         entidad: AuditEntidad.tipoCambio,
-        detalle: 'ARS ${previous.toStringAsFixed(0)} → '
-            '${newRate.toStringAsFixed(0)}',
+        detalle: 'ARS ${previous.toStringAsFixed(2)} → '
+            '${newRate.toStringAsFixed(2)}',
       );
     }
 
@@ -161,7 +161,7 @@ class ExchangeRateService extends ChangeNotifier {
         DateTime? updatedAt;
         final rawUpdatedAt = record['updated_at'] as String?;
         if (rawUpdatedAt != null) {
-          updatedAt = DateTime.tryParse(rawUpdatedAt);
+          updatedAt = DateTime.tryParse(rawUpdatedAt)?.toLocal();
         }
 
         _applyRate(

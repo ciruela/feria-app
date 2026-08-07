@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../services/exchange_rate_service.dart';
@@ -22,13 +23,13 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
   void initState() {
     super.initState();
     final rate = context.read<ExchangeRateService>().rate;
-    _controller = TextEditingController(text: rate.toStringAsFixed(0));
+    _controller = TextEditingController(text: formatExchangeRateInput(rate));
     _parsed = rate;
     _controller.addListener(_onTextChanged);
   }
 
   void _onTextChanged() {
-    final parsed = double.tryParse(_controller.text.replaceAll(',', '.'));
+    final parsed = parseExchangeRate(_controller.text);
     setState(() => _parsed = parsed);
   }
 
@@ -43,7 +44,30 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
     final next = _parsed;
     final current = context.read<ExchangeRateService>().rate;
     if (next == null || next <= 0) return false;
-    return (next - current).abs() >= 0.01;
+    return (next - current).abs() >= 0.005;
+  }
+
+  Future<void> _save() async {
+    final parsed = _parsed;
+    if (parsed == null || parsed <= 0) return;
+
+    final exchangeRate = context.read<ExchangeRateService>();
+    await exchangeRate.saveRate(parsed);
+    if (!mounted) return;
+
+    _controller.text = formatExchangeRateInput(exchangeRate.rate);
+    _controller.selection = TextSelection.collapsed(
+      offset: _controller.text.length,
+    );
+    setState(() => _parsed = exchangeRate.rate);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Tipo de cambio guardado: ${formatExchangeRate(exchangeRate.rate)} ARS',
+        ),
+      ),
+    );
   }
 
   @override
@@ -62,7 +86,7 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
             SectionHeader(
               title: 'Tipo de cambio de hoy',
               subtitle: exchangeRate.hasServerRate
-                  ? 'Se sincroniza en tiempo real con todos los celulares de esta armería.'
+                  ? 'Se sincroniza en tiempo real con todos los celulares de esta armería. Podés usar centavos (ej. 1500,50).'
                   : 'Todavía no hay tipo de cambio guardado para esta armería. Guardalo acá para habilitar precios en pesos.',
             ),
             const SizedBox(height: 24),
@@ -83,7 +107,13 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: _controller,
-                    keyboardType: TextInputType.number,
+                    // AR-37: number alone hides decimal key on mobile.
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                    ],
                     style: AppText.displayDesktop.copyWith(
                       color: AppColors.accent,
                     ),
@@ -92,6 +122,7 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
                       suffixStyle: AppText.numberLarge.copyWith(
                         color: AppColors.textMuted,
                       ),
+                      hintText: '1500,50',
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 20,
                         vertical: 18,
@@ -105,18 +136,7 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
             SizedBox(
               height: AppDecorations.buttonPrimary,
               child: ElevatedButton(
-                onPressed: _canSave
-                    ? () async {
-                        final parsed = _parsed!;
-                        await exchangeRate.saveRate(parsed);
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Tipo de cambio guardado.'),
-                          ),
-                        );
-                      }
-                    : null,
+                onPressed: _canSave ? _save : null,
                 child: const Text('GUARDAR'),
               ),
             ),

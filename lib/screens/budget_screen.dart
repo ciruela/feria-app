@@ -26,6 +26,7 @@ import '../widgets/cart_checkout_payment_panel.dart';
 import '../widgets/employee/budget_desktop_layout.dart';
 import '../widgets/employee/budget_mobile_layout.dart';
 import '../widgets/employee/dni_scan_sheet.dart';
+import '../widgets/presupuesto/budget_serial_panel.dart';
 import '../widgets/presupuesto_paper.dart';
 import 'comprobante_screen.dart';
 
@@ -41,6 +42,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
   final _ocr = DniOcrService();
   bool _scanning = false;
   bool _finalizing = false;
+  /// Gate for sidebar actions. Avoid setState on every keystroke: rebuilding
+  /// the A4 FittedBox steals focus from Urban fill-in fields (AR-42).
+  bool _customerReady = false;
 
   @override
   void dispose() {
@@ -62,13 +66,16 @@ class _BudgetScreenState extends State<BudgetScreen> {
       );
 
   Budget _buildBudget(CartService cart) {
+    final slug = context.read<TenantSessionService>().activeTenantSlug;
+    final compact = PresupuestoBranding.forTenant(slug: slug).isUrban;
     return context.read<BudgetService>().buildFromCart(
-      cart: cart,
-      exchangeRate: context.read<ExchangeRateService>(),
-      pricingSettings: context.read<PricingSettingsService>(),
-      customer: _customer,
-      sellerService: context.read<SellerService>(),
-    );
+          cart: cart,
+          exchangeRate: context.read<ExchangeRateService>(),
+          pricingSettings: context.read<PricingSettingsService>(),
+          customer: _customer,
+          sellerService: context.read<SellerService>(),
+          compactLineDetail: compact,
+        );
   }
 
   void _applyScanResult(DniScanResult result, {bool merge = false}) {
@@ -80,7 +87,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
               : 'No pudimos leer esa cara. Completá los datos a mano.',
         );
       } else {
-        _showMessage('No pudimos leer el documento. Completá los datos a mano.');
+        _showMessage(
+            'No pudimos leer el documento. Completá los datos a mano.');
       }
       return;
     }
@@ -115,6 +123,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
           city: result.city,
         );
       }
+      _customerReady = _controllers.fullName.text.trim().length >= 3;
     });
 
     final missing = <String>[];
@@ -122,8 +131,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
         _controllers.fullName.text.trim().isEmpty) {
       missing.add('nombre');
     }
-    if ((result.dni?.isEmpty ?? true) &&
-        _controllers.dni.text.trim().isEmpty) {
+    if ((result.dni?.isEmpty ?? true) && _controllers.dni.text.trim().isEmpty) {
       missing.add('DNI');
     }
     if ((result.address?.isEmpty ?? true) &&
@@ -252,15 +260,15 @@ class _BudgetScreenState extends State<BudgetScreen> {
     }
 
     if (!cart.hasCheckoutPayment) {
-      _showMessage('Configurá cómo abona el cliente antes de generar el comprobante.');
+      _showMessage(
+          'Configurá cómo abona el cliente antes de generar el comprobante.');
       return;
     }
 
     final missingSerial = cart.weaponsMissingSerial;
     if (missingSerial.isNotEmpty) {
-      final labels = missingSerial
-          .map((item) => item.product.modeloDisplay)
-          .join(', ');
+      final labels =
+          missingSerial.map((item) => item.product.modeloDisplay).join(', ');
       _showMessage('Completá el N° de serie para: $labels');
       return;
     }
@@ -343,6 +351,12 @@ class _BudgetScreenState extends State<BudgetScreen> {
     );
   }
 
+  void _onCustomerFieldChanged() {
+    final ready = _controllers.fullName.text.trim().length >= 3;
+    if (ready == _customerReady) return;
+    setState(() => _customerReady = ready);
+  }
+
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartService>();
@@ -350,8 +364,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
     final checkoutConfigured = cart.hasCheckoutPayment;
     final exchangeRate = context.watch<ExchangeRateService>();
     final seller = context.watch<SellerService>().selected;
-    final isDesktop = LayoutBreakpoints.isDesktop(MediaQuery.sizeOf(context).width);
-    final hasCustomerData = _controllers.fullName.text.trim().length >= 3;
+    final isDesktop =
+        LayoutBreakpoints.isDesktop(MediaQuery.sizeOf(context).width);
+    final hasCustomerData = _customerReady;
 
     final listaTotal = context.read<CartTotalsService>().cartTotalAtMethod(
           cart: cart,
@@ -360,14 +375,15 @@ class _BudgetScreenState extends State<BudgetScreen> {
           pricingSettings: context.read<PricingSettingsService>(),
         );
 
-    final checkoutTotal = cart.hasCheckoutPayment && cart.checkoutPayment != null
-        ? context.read<CartTotalsService>().cartTotalAtMethod(
-              cart: cart,
-              method: cart.checkoutPayment!.pricingMethod,
-              exchangeRate: exchangeRate,
-              pricingSettings: context.read<PricingSettingsService>(),
-            )
-        : null;
+    final checkoutTotal =
+        cart.hasCheckoutPayment && cart.checkoutPayment != null
+            ? context.read<CartTotalsService>().cartTotalAtMethod(
+                  cart: cart,
+                  method: cart.checkoutPayment!.pricingMethod,
+                  exchangeRate: exchangeRate,
+                  pricingSettings: context.read<PricingSettingsService>(),
+                )
+            : null;
 
     final displayTotalArs = checkoutTotal?.ars ?? listaTotal.ars;
 
@@ -400,7 +416,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
         child: PresupuestoPaper(
           budget: budget,
           controllers: _controllers,
-          onChanged: () => setState(() {}),
+          onChanged: _onCustomerFieldChanged,
           onSerialChanged: (lineKey, value) {
             context.read<CartService>().updateSerialNumber(lineKey, value);
           },
@@ -414,7 +430,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
         backgroundColor: AppColors.canvas,
         body: BudgetDesktopLayout(
           header: BudgetDesktopHeader(
-            sellerName: seller != null ? formatSellerFirstName(seller.nombre) : null,
+            sellerName:
+                seller != null ? formatSellerFirstName(seller.nombre) : null,
             updatedAt: exchangeRate.updatedAt,
             onBack: () => Navigator.of(context).pop(),
           ),
@@ -448,7 +465,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
       child: PresupuestoPaper(
         budget: budget,
         controllers: _controllers,
-        onChanged: () => setState(() {}),
+        onChanged: _onCustomerFieldChanged,
         onSerialChanged: (lineKey, value) {
           context.read<CartService>().updateSerialNumber(lineKey, value);
         },
@@ -507,7 +524,8 @@ class _BudgetSidebar extends StatelessWidget {
         Text('DATOS DEL CLIENTE', style: sectionLabel),
         const SizedBox(height: 10),
         OutlinedButton.icon(
-          onPressed: scanning ? null : (hasCustomerData ? onRescanDni : onScanDni),
+          onPressed:
+              scanning ? null : (hasCustomerData ? onRescanDni : onScanDni),
           icon: scanning
               ? const SizedBox(
                   width: 18,
@@ -519,7 +537,8 @@ class _BudgetSidebar extends StatelessWidget {
                       ? Icons.document_scanner_outlined
                       : Icons.document_scanner_outlined,
                 ),
-          label: Text(hasCustomerData ? 'Volver a escanear el DNI' : 'Escanear DNI'),
+          label: Text(
+              hasCustomerData ? 'Volver a escanear el DNI' : 'Escanear DNI'),
           style: OutlinedButton.styleFrom(
             foregroundColor: AppColors.textPrimary,
             minimumSize: const Size.fromHeight(44),
@@ -546,11 +565,14 @@ class _BudgetSidebar extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 24),
+        const BudgetSerialPanel(),
+        const SizedBox(height: 24),
         Text('TOTAL DEL PRESUPUESTO', style: sectionLabel),
         const SizedBox(height: 8),
         Text(
           formatArs(displayTotalArs),
-          style: AppText.number.copyWith(fontSize: 32, fontWeight: FontWeight.w700),
+          style: AppText.number
+              .copyWith(fontSize: 32, fontWeight: FontWeight.w700),
         ),
         if (exchangeRate != null) ...[
           const SizedBox(height: 4),

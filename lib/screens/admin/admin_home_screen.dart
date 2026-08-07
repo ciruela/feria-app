@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../config/app_config.dart';
 import '../../models/app_role.dart';
 import '../../models/sales_metrics.dart';
+import '../../services/auth_service.dart';
 import '../../services/catalog_service.dart';
 import '../../services/sales_metrics_service.dart';
 import '../../services/seller_service.dart';
@@ -41,6 +42,7 @@ class AdminHomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final catalog = context.watch<CatalogService>();
     final sellers = context.watch<SellerService>();
+    final auth = context.watch<AuthService>();
 
     return FeriaScaffold(
       appBar: FeriaAppBar(
@@ -279,7 +281,9 @@ class AdminHomeScreen extends StatelessWidget {
           const SizedBox(height: 14),
           BigActionButton(
             label: 'Cambiar PIN admin',
-            subtitle: 'PIN por defecto: 2580',
+            subtitle: auth.isDefaultAdminPin
+                ? 'PIN por defecto: ${AuthService.defaultPin}'
+                : 'PIN actual: ${auth.adminPin}',
             icon: Icons.lock_outline,
             accentColor: AppColors.goldDark,
             onTap: () {

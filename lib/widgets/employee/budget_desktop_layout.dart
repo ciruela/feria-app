@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
@@ -100,6 +99,5 @@ class BudgetDesktopLayout extends StatelessWidget {
   }
 }
 
-String formatReferenceRate(double rate) {
-  return NumberFormat('#,##0', 'es_AR').format(rate);
-}
+/// Alias usado por presupuesto; fuente de verdad en [formatExchangeRate].
+String formatReferenceRate(double rate) => formatExchangeRate(rate);

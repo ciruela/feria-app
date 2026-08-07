@@ -38,48 +38,88 @@ class PresupuestoLabeledField extends StatelessWidget {
             style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w900,
+              color: Colors.black,
             ),
           ),
           const SizedBox(width: 4),
           Expanded(
-            child: TextField(
-              controller: controller,
-              readOnly: readOnly,
-              minLines: minLines,
-              maxLines: minLines,
-              maxLength: maxLength,
-              keyboardType: keyboardType,
-              textCapitalization: inputFormatters == null
-                  ? TextCapitalization.characters
-                  : TextCapitalization.none,
-              inputFormatters:
-                  inputFormatters ?? UpperCaseTextFormatter.formatters,
-              onChanged: (_) => onChanged?.call(),
-              cursorColor: Colors.black,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                height: 1.1,
-                color: Colors.black,
-              ),
-              decoration: const InputDecoration(
-                isDense: true,
-                filled: false,
-                fillColor: Colors.transparent,
-                contentPadding: EdgeInsets.only(bottom: 2),
-                border: UnderlineInputBorder(
-                  borderSide: BorderSide(color: Colors.black, width: 1.2),
-                ),
-                enabledBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: Colors.black, width: 1.2),
-                ),
-                focusedBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: Colors.black, width: 1.5),
-                ),
-              ),
-            ),
+            // AR-51: on the generated comprobante, TextFields inherit the dark
+            // app fill and look like black data bands. Render ink-on-paper text.
+            child: readOnly
+                ? _ReadOnlyUnderlineValue(
+                    value: controller.text,
+                    minLines: minLines,
+                  )
+                : TextField(
+                    controller: controller,
+                    minLines: minLines,
+                    maxLines: minLines,
+                    maxLength: maxLength,
+                    keyboardType: keyboardType,
+                    textCapitalization: inputFormatters == null
+                        ? TextCapitalization.characters
+                        : TextCapitalization.none,
+                    inputFormatters:
+                        inputFormatters ?? UpperCaseTextFormatter.formatters,
+                    onChanged: (_) => onChanged?.call(),
+                    cursorColor: Colors.black,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      height: 1.1,
+                      color: Colors.black,
+                    ),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      filled: false,
+                      fillColor: Colors.transparent,
+                      contentPadding: EdgeInsets.only(bottom: 2),
+                      border: UnderlineInputBorder(
+                        borderSide: BorderSide(color: Colors.black, width: 1.2),
+                      ),
+                      enabledBorder: UnderlineInputBorder(
+                        borderSide: BorderSide(color: Colors.black, width: 1.2),
+                      ),
+                      focusedBorder: UnderlineInputBorder(
+                        borderSide: BorderSide(color: Colors.black, width: 1.5),
+                      ),
+                    ),
+                  ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ReadOnlyUnderlineValue extends StatelessWidget {
+  const _ReadOnlyUnderlineValue({
+    required this.value,
+    this.minLines = 1,
+  });
+
+  final String value;
+  final int minLines;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(minHeight: 14.0 * minLines),
+      padding: const EdgeInsets.only(bottom: 2),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Colors.black, width: 1.2),
+        ),
+      ),
+      alignment: Alignment.bottomLeft,
+      child: Text(
+        value.trim().isEmpty ? ' ' : value,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          height: 1.1,
+          color: Colors.black,
+        ),
       ),
     );
   }

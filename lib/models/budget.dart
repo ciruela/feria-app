@@ -79,6 +79,7 @@ class BudgetCustomer {
   final String cluExpiry;
   final String phone;
   final String email;
+
   /// Condición fiscal en recibo Urban (ej. Cons. final).
   final String fiscalCondition;
   final String address;
@@ -175,7 +176,8 @@ class Budget {
 
   double get totalUsdLines {
     if (paymentAllocations.isNotEmpty) {
-      return paymentAllocations.fold(0.0, (sum, allocation) => sum + allocation.amountUsd);
+      return paymentAllocations.fold(
+          0.0, (sum, allocation) => sum + allocation.amountUsd);
     }
     return lines
         .where((line) => line.paysInUsd)
@@ -184,7 +186,8 @@ class Budget {
 
   double get totalArsLines {
     if (paymentAllocations.isNotEmpty) {
-      return paymentAllocations.fold(0.0, (sum, allocation) => sum + allocation.amountArs);
+      return paymentAllocations.fold(
+          0.0, (sum, allocation) => sum + allocation.amountArs);
     }
     return lines
         .where((line) => !line.paysInUsd)
@@ -193,7 +196,7 @@ class Budget {
 }
 
 extension ProductBudgetX on Product {
-  /// Detalle completo para presupuesto/comprobante (sin recortar a título corto).
+  /// Detalle completo (incluye descripción). World Guns / genérico.
   String budgetDetailFull() {
     if (isMunicion) {
       final desc = descripcion.trim();
@@ -216,18 +219,26 @@ extension ProductBudgetX on Product {
     return parts.join(' · ');
   }
 
+  /// Marca · modelo · calibre (sin descripción larga). Urban Tactical.
   String budgetDetail() {
     if (isArma) {
       return [
         marcaUpper,
         modeloDisplay,
-        'Cal. $calibre',
-      ].join(' · ');
+        if (calibre.trim().isNotEmpty) 'Cal. $calibre',
+      ].where((part) => part.trim().isNotEmpty).join(' · ');
     }
 
-    return '$marcaUpper · $codigo · Cal. $calibre';
+    return [
+      marcaUpper,
+      if (codigo.trim().isNotEmpty) codigo,
+      if (calibre.trim().isNotEmpty) 'Cal. $calibre',
+    ].where((part) => part.trim().isNotEmpty).join(' · ');
   }
 
-  String get budgetCode =>
-      codigo.isNotEmpty ? codigo : id;
+  /// [compact] omite la descripción completa (recibo Urban).
+  String budgetDetailForReceipt({required bool compact}) =>
+      compact ? budgetDetail() : budgetDetailFull();
+
+  String get budgetCode => codigo.isNotEmpty ? codigo : id;
 }

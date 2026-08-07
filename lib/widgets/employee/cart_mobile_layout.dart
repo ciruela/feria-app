@@ -198,8 +198,9 @@ class _CartMobileContent extends StatelessWidget {
                     lineUsd: _lineUsd(cart.items[i]),
                     lineArs: hasRate ? _lineArs(cart.items[i]) : 0,
                     showArs: hasRate,
-                    canIncrease: !cart.items[i].product.isArma &&
-                        _canIncrease(cart, cart.items[i]),
+                    canIncrease: cart.items[i].product.isArma
+                        ? cart.canAddMore(cart.items[i].product)
+                        : _canIncrease(cart, cart.items[i]),
                     // AR-33: − at qty 1 must not remove the line; use trash instead.
                     onDecrease: cart.items[i].product.isArma ||
                             cart.items[i].quantity <= 1
@@ -208,9 +209,8 @@ class _CartMobileContent extends StatelessWidget {
                               cart.items[i].lineKey,
                               cart.items[i].quantity - 1,
                             ),
-                    onIncrease: cart.items[i].product.isArma
-                        ? null
-                        : () => _increase(context, cart, cart.items[i]),
+                    onIncrease: () =>
+                        _increase(context, cart, cart.items[i]),
                     onRemove: () => cart.removeLine(cart.items[i].lineKey),
                   ),
                 ),
@@ -273,7 +273,15 @@ class _CartMobileContent extends StatelessWidget {
   }
 
   void _increase(BuildContext context, CartService cart, CartItem item) {
-    if (item.product.isArma) return;
+    if (item.product.isArma) {
+      // AR-41: otra unidad = otra línea con su N° de serie.
+      if (!cart.canAddMore(item.product)) {
+        showStockLimitMessage(context, item.product);
+        return;
+      }
+      cart.addProduct(item.product);
+      return;
+    }
     final max = cart.maxQuantityForLine(item);
     if (max != null && item.quantity >= max) {
       showStockLimitMessage(context, item.product);

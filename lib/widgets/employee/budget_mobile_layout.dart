@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
 import '../cart_checkout_payment_panel.dart';
+import '../presupuesto/budget_serial_panel.dart';
 
 /// Mock 07_Mob — chrome del presupuesto (sin rediseñar el comprobante).
 class BudgetMobileLayout extends StatelessWidget {
@@ -45,6 +46,8 @@ class BudgetMobileLayout extends StatelessWidget {
                   onScanDni: onScanDni,
                   onRescanDni: onRescanDni,
                 ),
+                const SizedBox(height: 16),
+                const BudgetSerialPanel(),
                 const SizedBox(height: 16),
                 Align(alignment: Alignment.topCenter, child: preview),
                 const SizedBox(height: 20),

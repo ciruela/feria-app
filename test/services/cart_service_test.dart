@@ -41,6 +41,21 @@ void main() {
     expect(cart.weaponsMissingSerial, hasLength(2));
   });
 
+  test('changeQuantity on weapon splits into lines (AR-41)', () {
+    final weapon = testProduct(
+      id: 'arma1',
+      precioUsd: 500,
+      type: ProductType.armaCorta,
+      stock: 5,
+    );
+    expect(cart.addProduct(weapon), CartAddResult.added);
+    cart.changeQuantity(cart.items.single.lineKey, 3);
+
+    expect(cart.items, hasLength(3));
+    expect(cart.items.every((item) => item.quantity == 1), isTrue);
+    expect(cart.weaponsMissingSerial, hasLength(3));
+  });
+
   test('addProductQuantity respects stock limit', () {
     final product = testProduct(id: 'p1', stock: 3);
 
@@ -92,5 +107,31 @@ void main() {
     expect(cart.refreshProducts(catalog), isTrue);
     expect(cart.items.single.product.precioUsd, 150);
     expect(cart.refreshProducts(catalog), isFalse);
+  });
+
+  test('persists cart across reload (AR-47)', () async {
+    final product = testProduct(id: 'persist-1', precioUsd: 40, stock: 4);
+    expect(cart.addProductQuantity(product, 2), CartAddResult.added);
+    cart.updateSerialNumber(cart.items.single.lineKey, 'SN-9');
+    // Allow async SharedPreferences write.
+    await Future<void>.delayed(Duration.zero);
+
+    final restored = CartService();
+    await restored.load();
+    expect(restored.items, hasLength(1));
+    expect(restored.items.single.quantity, 2);
+    expect(restored.items.single.product.id, 'persist-1');
+    expect(restored.items.single.serialNumber, 'SN-9');
+  });
+
+  test('clear removes persisted cart', () async {
+    cart.addProduct(testProduct(id: 'x'));
+    await Future<void>.delayed(Duration.zero);
+    cart.clear();
+    await Future<void>.delayed(Duration.zero);
+
+    final restored = CartService();
+    await restored.load();
+    expect(restored.isEmpty, isTrue);
   });
 }

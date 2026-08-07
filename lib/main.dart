@@ -58,6 +58,7 @@ Future<void> _bootstrap() async {
     // Sin Supabase el TC es local; con Supabase se carga tras bindTenant.
     await exchangeRateService.load();
     await pricingSettingsService.load();
+    await cartService.load(catalog: catalogService);
   }
   await authService.load();
   await adminService.load();

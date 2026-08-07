@@ -1,9 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../models/presupuesto_document.dart';
 import '../../utils/uppercase_input.dart';
-import 'urban_table_watermark.dart';
 
 class PresupuestoItemsTable extends StatelessWidget {
   const PresupuestoItemsTable({
@@ -73,93 +74,102 @@ class _SimpleItemsTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rowHeight = bodyHeight == null
+    final baseHeight = bodyHeight == null
         ? (branding.isUrban ? 28.0 : 22.0)
         : PresupuestoItemsTable.rowHeightFor(
             bodyHeight: bodyHeight!,
             rowCount: rows.length,
           );
+    // Armas necesitan espacio fijo para el campo SERIE (evita clip / no-tap).
+    const armaMinHeight = 54.0;
+    final emptyHeight =
+        math.min(baseHeight, branding.isUrban ? 22.0 : baseHeight);
 
-    return UrbanTableWatermark(
-      branding: branding,
-      child: Table(
-        border: TableBorder.all(color: Colors.black, width: 1.2),
-        columnWidths: const {
-          0: FlexColumnWidth(),
-          1: FixedColumnWidth(52),
-          2: FixedColumnWidth(96),
-        },
-        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-        children: [
-          TableRow(
-            decoration: BoxDecoration(color: Colors.grey.shade300),
-            children: [
-              for (final header in branding.tableHeaders)
-                SizedBox(
-                  height: PresupuestoItemsTable._headerHeight,
-                  child: _HeaderCell(header),
-                ),
-            ],
-          ),
-          ...rows.map((row) {
-            final cellHeight =
-                row.isArma ? (rowHeight + 16).clamp(rowHeight, 52.0) : rowHeight;
-
-            if (row.isEmpty) {
-              return TableRow(
-                children: List.generate(
-                  3,
-                  (_) => SizedBox(
-                    height: rowHeight,
-                    child: const _BodyCell(''),
-                  ),
-                ),
-              );
-            }
-
+    // Marca de agua Urban: página completa en PresupuestoUrbanPaper.
+    return Table(
+      border: TableBorder.all(color: Colors.black, width: 1.2),
+      columnWidths: const {
+        0: FlexColumnWidth(),
+        1: FixedColumnWidth(52),
+        2: FixedColumnWidth(96),
+      },
+      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+      children: [
+        TableRow(
+          decoration: BoxDecoration(color: Colors.grey.shade300),
+          children: [
+            for (final header in branding.tableHeaders)
+              SizedBox(
+                height: PresupuestoItemsTable._headerHeight,
+                child: _HeaderCell(header),
+              ),
+          ],
+        ),
+        ...rows.map((row) {
+          if (row.isEmpty) {
             return TableRow(
-              children: [
-                SizedBox(
-                  height: cellHeight,
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          row.detail,
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                          ),
+              children: List.generate(
+                3,
+                (_) => SizedBox(
+                  height: emptyHeight,
+                  child: const _BodyCell(''),
+                ),
+              ),
+            );
+          }
+
+          final cellHeight =
+              row.isArma ? math.max(baseHeight, armaMinHeight) : baseHeight;
+
+          return TableRow(
+            children: [
+              SizedBox(
+                height: cellHeight,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 2,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        row.detail,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          height: 1.15,
                         ),
-                        if (row.isArma) ...[
-                          const SizedBox(height: 4),
-                          _SerialInlineField(
-                            lineKey: row.lineKey,
-                            initialValue: row.serialNumber,
-                            readOnly: readOnly,
-                            onChanged: onSerialChanged,
-                          ),
-                        ],
+                      ),
+                      if (row.isArma) ...[
+                        const SizedBox(height: 2),
+                        _SerialInlineField(
+                          key: ValueKey('serial-${row.lineKey}'),
+                          lineKey: row.lineKey,
+                          initialValue: row.serialNumber,
+                          readOnly: readOnly,
+                          onChanged: onSerialChanged,
+                        ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
-                SizedBox(
-                  height: cellHeight,
-                  child: _BodyCell('${row.quantity}', align: TextAlign.center),
-                ),
-                SizedBox(
-                  height: cellHeight,
-                  child: _BodyCell(row.lineTotal, align: TextAlign.right),
-                ),
-              ],
-            );
-          }),
-        ],
-      ),
+              ),
+              SizedBox(
+                height: cellHeight,
+                child: _BodyCell('${row.quantity}', align: TextAlign.center),
+              ),
+              SizedBox(
+                height: cellHeight,
+                child: _BodyCell(row.lineTotal, align: TextAlign.right),
+              ),
+            ],
+          );
+        }),
+      ],
     );
   }
 }
@@ -258,6 +268,7 @@ class _DetailedItemsTable extends StatelessWidget {
                 if (row.isArma) ...[
                   const SizedBox(height: 4),
                   _SerialInlineField(
+                    key: ValueKey('serial-${row.lineKey}'),
                     lineKey: row.lineKey,
                     initialValue: row.serialNumber,
                     readOnly: readOnly,
@@ -273,6 +284,7 @@ class _DetailedItemsTable extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(2),
             child: _TcInlineField(
+              key: ValueKey('tc-${row.lineKey}'),
               lineKey: row.lineKey,
               initialValue: row.tc,
               readOnly: readOnly,
@@ -332,6 +344,7 @@ class _BodyCell extends StatelessWidget {
 
 class _TcInlineField extends StatefulWidget {
   const _TcInlineField({
+    super.key,
     required this.lineKey,
     required this.initialValue,
     required this.readOnly,
@@ -378,7 +391,11 @@ class _TcInlineFieldState extends State<_TcInlineField> {
         child: Text(
           widget.initialValue,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: Colors.black,
+          ),
         ),
       );
     }
@@ -419,6 +436,7 @@ class _TcInlineFieldState extends State<_TcInlineField> {
 
 class _SerialInlineField extends StatefulWidget {
   const _SerialInlineField({
+    super.key,
     required this.lineKey,
     required this.initialValue,
     required this.readOnly,
@@ -436,17 +454,21 @@ class _SerialInlineField extends StatefulWidget {
 
 class _SerialInlineFieldState extends State<_SerialInlineField> {
   late final TextEditingController _controller;
+  late final FocusNode _focusNode;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialValue);
+    _focusNode = FocusNode();
   }
 
   @override
   void didUpdateWidget(_SerialInlineField oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialValue != _controller.text &&
+    // No pisar mientras el usuario escribe (evita perder cursor en A4 scaled).
+    if (!_focusNode.hasFocus &&
+        widget.initialValue != _controller.text &&
         widget.initialValue != oldWidget.initialValue) {
       _controller.text = widget.initialValue;
     }
@@ -454,6 +476,7 @@ class _SerialInlineFieldState extends State<_SerialInlineField> {
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -464,40 +487,65 @@ class _SerialInlineFieldState extends State<_SerialInlineField> {
       children: [
         const Text(
           'SERIE:',
-          style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900),
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w900,
+            color: Colors.black,
+          ),
         ),
         const SizedBox(width: 4),
         Expanded(
-          child: TextField(
-            controller: _controller,
-            readOnly: widget.readOnly,
-            textCapitalization: TextCapitalization.characters,
-            inputFormatters: UpperCaseTextFormatter.formatters,
-            onChanged: (value) => widget.onChanged(widget.lineKey, value),
-            cursorColor: Colors.black,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: Colors.black,
-            ),
-            decoration: const InputDecoration(
-              isDense: true,
-              filled: false,
-              fillColor: Colors.transparent,
-              hintText: 'N° serie',
-              hintStyle: TextStyle(color: Colors.black54, fontSize: 10),
-              contentPadding: EdgeInsets.only(bottom: 1),
-              border: UnderlineInputBorder(
-                borderSide: BorderSide(color: Colors.black),
-              ),
-              enabledBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: Colors.black),
-              ),
-              focusedBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: Colors.black, width: 1.2),
-              ),
-            ),
-          ),
+          // AR-51: disabled TextField painted black bands on comprobante.
+          child: widget.readOnly
+              ? Container(
+                  padding: const EdgeInsets.only(bottom: 1),
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: Colors.black),
+                    ),
+                  ),
+                  child: Text(
+                    _controller.text.trim().isEmpty
+                        ? ' '
+                        : _controller.text,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black,
+                    ),
+                  ),
+                )
+              : TextField(
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: UpperCaseTextFormatter.formatters,
+                  onChanged: (value) =>
+                      widget.onChanged(widget.lineKey, value),
+                  cursorColor: Colors.black,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
+                  ),
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    filled: false,
+                    fillColor: Colors.transparent,
+                    hintText: 'N° serie',
+                    hintStyle: TextStyle(color: Colors.black54, fontSize: 10),
+                    contentPadding: EdgeInsets.only(bottom: 1),
+                    border: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black),
+                    ),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black),
+                    ),
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black, width: 1.2),
+                    ),
+                  ),
+                ),
         ),
       ],
     );

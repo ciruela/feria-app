@@ -193,9 +193,12 @@ class _AdminPinDialogState extends State<_AdminPinDialog> {
         onSubmit: _submit,
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Volver'),
+        // AR-36: no robar el foco del teclado del PIN.
+        ExcludeFocus(
+          child: TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Volver'),
+          ),
         ),
       ],
     );

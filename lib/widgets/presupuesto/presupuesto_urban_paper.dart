@@ -5,6 +5,7 @@ import '../../models/budget_customer_controllers.dart';
 import '../../models/presupuesto_document.dart';
 import '../../models/urban_receipt_options.dart';
 import 'presupuesto_items_table.dart';
+import 'urban_table_watermark.dart';
 
 /// Layout Urban Tactical fiel al PDF de referencia (Recibo-urban.pdf).
 class PresupuestoUrbanPaper extends StatelessWidget {
@@ -28,221 +29,233 @@ class PresupuestoUrbanPaper extends StatelessWidget {
     final branding = document.branding;
     final summary = document.summary;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _UrbanBox(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 3,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    // Clip evita franjas de overflow si el pie (checks/firma) aprieta el A4.
+    // Marca de agua a página completa (no solo detrás de la tabla).
+    return ClipRect(
+      child: UrbanTableWatermark(
+        branding: branding,
+        width: 360,
+        opacity: 0.16,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _UrbanBox(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          branding.companyName,
+                          style: _urbanText(13, weight: FontWeight.w900),
+                        ),
+                        Text(
+                          branding.addressLine,
+                          style: _urbanText(8.5),
+                        ),
+                        if (branding.taxLine.isNotEmpty)
+                          Text(
+                            branding.taxLine,
+                            style: _urbanText(8.5, weight: FontWeight.w800),
+                          ),
+                        Text(
+                          branding.phoneLine,
+                          style: _urbanText(8.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          branding.documentTitle,
+                          textAlign: TextAlign.right,
+                          style: _urbanText(12, weight: FontWeight.w900),
+                        ),
+                        Text(
+                          branding.documentSubtitle,
+                          textAlign: TextAlign.right,
+                          style: _urbanText(7, weight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Fecha: ${document.formattedDate}',
+                          style: _urbanText(8.5, weight: FontWeight.w800),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            _UrbanBox(
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      branding.companyName,
-                      style: _urbanText(13, weight: FontWeight.w900),
-                    ),
-                    Text(
-                      branding.addressLine,
-                      style: _urbanText(8.5),
-                    ),
-                    if (branding.taxLine.isNotEmpty)
-                      Text(
-                        branding.taxLine,
-                        style: _urbanText(8.5, weight: FontWeight.w800),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          _UrbanField(
+                            label: 'CLIENTE:',
+                            controller: controllers.fullName,
+                            readOnly: readOnly,
+                            onChanged: onChanged,
+                          ),
+                          _UrbanField(
+                            label: 'NRO CLU :',
+                            controller: controllers.clu,
+                            readOnly: readOnly,
+                            onChanged: onChanged,
+                          ),
+                          _UrbanField(
+                            label: 'TELEFONO:',
+                            controller: controllers.phone,
+                            readOnly: readOnly,
+                            onChanged: onChanged,
+                          ),
+                          _UrbanDomicilioField(
+                            controllers: controllers,
+                            readOnly: readOnly,
+                            onChanged: onChanged,
+                          ),
+                        ],
                       ),
-                    Text(
-                      branding.phoneLine,
-                      style: _urbanText(8.5),
+                    ),
+                    const VerticalDivider(
+                      width: 16,
+                      thickness: 1,
+                      color: Colors.black,
+                    ),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          _UrbanReadOnlyField(
+                            label: 'MÉTODO DE PAGO:',
+                            value: summary.paymentAbbrevFor(document.branding),
+                          ),
+                          _UrbanField(
+                            label: 'CUIT:',
+                            controller: controllers.dni,
+                            readOnly: readOnly,
+                            onChanged: onChanged,
+                          ),
+                          _UrbanFiscalConditionField(
+                            controller: controllers.fiscalCondition,
+                            readOnly: readOnly,
+                            onChanged: onChanged,
+                          ),
+                          _UrbanField(
+                            label: 'Obs:',
+                            controller: controllers.notes,
+                            readOnly: readOnly,
+                            onChanged: onChanged,
+                            minLines: 2,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-              Expanded(
-                flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return PresupuestoItemsTable(
+                    branding: branding,
+                    rows: document.tableRows,
+                    readOnly: readOnly,
+                    onSerialChanged: onSerialChanged,
+                    onTcChanged: (_, __) {},
+                    bodyHeight: constraints.maxHeight,
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerRight,
+              child: _UrbanBox(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      branding.documentTitle,
-                      textAlign: TextAlign.right,
-                      style: _urbanText(12, weight: FontWeight.w900),
+                      'Total:',
+                      style: _urbanText(10, weight: FontWeight.w900),
                     ),
+                    const SizedBox(width: 24),
                     Text(
-                      branding.documentSubtitle,
-                      textAlign: TextAlign.right,
-                      style: _urbanText(7, weight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Fecha: ${document.formattedDate}',
-                      style: _urbanText(8.5, weight: FontWeight.w800),
+                      summary.formattedCombinedTotal,
+                      style: _urbanText(10, weight: FontWeight.w800),
                     ),
                   ],
                 ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Recibo ${document.formattedDate}',
+                    style: _urbanText(9, weight: FontWeight.w800),
+                  ),
+                ),
+                _UrbanBox(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  child: Text(
+                    'Saldo: Abonó total',
+                    style: _urbanText(8, weight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            _UrbanStatusGrid(checks: branding.urbanStatusChecks),
+            const SizedBox(height: 10),
+            const _UrbanDashedRule(),
+            const SizedBox(height: 8),
+            Text(
+              branding.signatureLine,
+              textAlign: TextAlign.center,
+              style: _urbanText(8, weight: FontWeight.w800),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Text('Fecha:', style: _urbanText(8, weight: FontWeight.w900)),
+                const SizedBox(width: 6),
+                Expanded(child: Container(height: 1, color: Colors.black)),
+                const SizedBox(width: 20),
+                Text('FIRMA:', style: _urbanText(8, weight: FontWeight.w900)),
+                const SizedBox(width: 6),
+                Expanded(
+                    flex: 2, child: Container(height: 1, color: Colors.black)),
+              ],
+            ),
+            if (document.sellerName != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Atendido por: ${document.sellerName}',
+                style: _urbanText(8, weight: FontWeight.w700),
               ),
             ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        _UrbanBox(
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: Column(
-                    children: [
-                      _UrbanField(
-                        label: 'CLIENTE:',
-                        controller: controllers.fullName,
-                        readOnly: readOnly,
-                        onChanged: onChanged,
-                      ),
-                      _UrbanField(
-                        label: 'NRO CLU :',
-                        controller: controllers.clu,
-                        readOnly: readOnly,
-                        onChanged: onChanged,
-                      ),
-                      _UrbanField(
-                        label: 'TELEFONO:',
-                        controller: controllers.phone,
-                        readOnly: readOnly,
-                        onChanged: onChanged,
-                      ),
-                      _UrbanDomicilioField(
-                        controllers: controllers,
-                        readOnly: readOnly,
-                        onChanged: onChanged,
-                      ),
-                    ],
-                  ),
-                ),
-                const VerticalDivider(
-                  width: 16,
-                  thickness: 1,
-                  color: Colors.black,
-                ),
-                Expanded(
-                  child: Column(
-                    children: [
-                      _UrbanReadOnlyField(
-                        label: 'MÉTODO DE PAGO:',
-                        value: summary.paymentAbbrevFor(document.branding),
-                      ),
-                      _UrbanField(
-                        label: 'CUIT:',
-                        controller: controllers.dni,
-                        readOnly: readOnly,
-                        onChanged: onChanged,
-                      ),
-                      _UrbanFiscalConditionField(
-                        controller: controllers.fiscalCondition,
-                        readOnly: readOnly,
-                        onChanged: onChanged,
-                      ),
-                      _UrbanField(
-                        label: 'Obs:',
-                        controller: controllers.notes,
-                        readOnly: readOnly,
-                        onChanged: onChanged,
-                        minLines: 2,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return PresupuestoItemsTable(
-                branding: branding,
-                rows: document.tableRows,
-                readOnly: readOnly,
-                onSerialChanged: onSerialChanged,
-                onTcChanged: (_, __) {},
-                bodyHeight: constraints.maxHeight,
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 6),
-        Align(
-          alignment: Alignment.centerRight,
-          child: _UrbanBox(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Total:',
-                  style: _urbanText(10, weight: FontWeight.w900),
-                ),
-                const SizedBox(width: 24),
-                Text(
-                  summary.formattedCombinedTotal,
-                  style: _urbanText(10, weight: FontWeight.w800),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Text(
-                'Recibo ${document.formattedDate}',
-                style: _urbanText(9, weight: FontWeight.w800),
-              ),
-            ),
-            _UrbanBox(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              child: Text(
-                'Saldo: Abonó total',
-                style: _urbanText(8, weight: FontWeight.w800),
-              ),
-            ),
           ],
         ),
-        const SizedBox(height: 6),
-        _UrbanStatusGrid(checks: branding.urbanStatusChecks),
-        const SizedBox(height: 10),
-        const _UrbanDashedRule(),
-        const SizedBox(height: 8),
-        Text(
-          branding.signatureLine,
-          textAlign: TextAlign.center,
-          style: _urbanText(8, weight: FontWeight.w800),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Text('Fecha:', style: _urbanText(8, weight: FontWeight.w900)),
-            const SizedBox(width: 6),
-            Expanded(child: Container(height: 1, color: Colors.black)),
-            const SizedBox(width: 20),
-            Text('FIRMA:', style: _urbanText(8, weight: FontWeight.w900)),
-            const SizedBox(width: 6),
-            Expanded(flex: 2, child: Container(height: 1, color: Colors.black)),
-          ],
-        ),
-        if (document.sellerName != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            'Atendido por: ${document.sellerName}',
-            style: _urbanText(8, weight: FontWeight.w700),
-          ),
-        ],
-      ],
+      ),
     );
   }
 
@@ -255,7 +268,8 @@ class PresupuestoUrbanPaper extends StatelessWidget {
 }
 
 class _UrbanBox extends StatelessWidget {
-  const _UrbanBox({required this.child, this.padding = const EdgeInsets.all(8)});
+  const _UrbanBox(
+      {required this.child, this.padding = const EdgeInsets.all(8)});
 
   final Widget child;
   final EdgeInsets padding;
@@ -304,6 +318,7 @@ class _UrbanReadOnlyField extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 9,
                   fontWeight: FontWeight.w700,
+                  color: Colors.black,
                 ),
               ),
             ),
@@ -331,6 +346,11 @@ class _UrbanField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // AR-51: comprobante read-only must not use TextField (dark fill bands).
+    if (readOnly) {
+      return _UrbanReadOnlyField(label: label, value: controller.text);
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
@@ -344,7 +364,6 @@ class _UrbanField extends StatelessWidget {
           Expanded(
             child: TextField(
               controller: controller,
-              readOnly: readOnly,
               minLines: minLines,
               maxLines: minLines,
               onChanged: (_) => onChanged?.call(),

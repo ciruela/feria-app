@@ -1,19 +1,26 @@
 import 'package:flutter/material.dart';
 
-/// AR-43: presupuesto is a white print sheet inside a dark app theme.
-/// Without this, [InputDecorationTheme.filled] paints fields nearly black.
+/// AR-43 / AR-51: presupuesto/comprobante is a white print sheet inside a dark
+/// app theme. A partial [ColorScheme.copyWith] still leaves M3 container tones
+/// dark, so disabled/read-only inputs paint near-black bands over the paper.
 ThemeData presupuestoPaperTheme(ThemeData base) {
   const black = Colors.black;
   const ink = TextStyle(color: black);
+  const paperScheme = ColorScheme.light(
+    primary: black,
+    onPrimary: Colors.white,
+    secondary: black,
+    onSecondary: Colors.white,
+    surface: Colors.white,
+    onSurface: black,
+    error: Color(0xFFB00020),
+    onError: Colors.white,
+  );
 
   return base.copyWith(
     brightness: Brightness.light,
-    colorScheme: base.colorScheme.copyWith(
-      brightness: Brightness.light,
-      surface: Colors.white,
-      onSurface: black,
-      primary: black,
-    ),
+    colorScheme: paperScheme,
+    disabledColor: Colors.black54,
     textTheme: base.textTheme.apply(
       bodyColor: black,
       displayColor: black,
@@ -21,6 +28,7 @@ ThemeData presupuestoPaperTheme(ThemeData base) {
     inputDecorationTheme: const InputDecorationTheme(
       filled: false,
       fillColor: Colors.transparent,
+      hoverColor: Colors.transparent,
       isDense: true,
       hintStyle: TextStyle(color: Colors.black54, fontSize: 12),
       labelStyle: TextStyle(color: Colors.black87, fontSize: 12),
@@ -32,6 +40,9 @@ ThemeData presupuestoPaperTheme(ThemeData base) {
       ),
       focusedBorder: UnderlineInputBorder(
         borderSide: BorderSide(color: black, width: 1.5),
+      ),
+      disabledBorder: UnderlineInputBorder(
+        borderSide: BorderSide(color: black, width: 1.2),
       ),
       contentPadding: EdgeInsets.only(bottom: 2),
     ),

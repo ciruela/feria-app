@@ -7,6 +7,7 @@ import 'package:app_feria/services/exchange_rate_service.dart';
 import 'package:app_feria/services/pricing_service.dart';
 import 'package:app_feria/services/pricing_settings_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../helpers/test_product.dart';
 
@@ -18,6 +19,7 @@ void main() {
   late CartService cart;
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     pricing = PricingService();
     totalsService = CartTotalsService(pricing: pricing);
     exchangeRate = ExchangeRateService();

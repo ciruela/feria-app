@@ -10,6 +10,8 @@ void main() {
     expect(paper.brightness, Brightness.light);
     expect(paper.inputDecorationTheme.filled, isFalse);
     expect(paper.inputDecorationTheme.fillColor, Colors.transparent);
+    expect(paper.colorScheme.surface, Colors.white);
+    expect(paper.colorScheme.surfaceContainerHighest, isNot(AppColors.surfaceRaised));
     expect(paper.colorScheme.onSurface, Colors.black);
     expect(paper.textSelectionTheme.cursorColor, Colors.black);
   });

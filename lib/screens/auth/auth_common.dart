@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/admin_service.dart';
+import '../../services/cart_service.dart';
 import '../../services/catalog_service.dart';
 import '../../services/exchange_rate_service.dart';
 import '../../services/seller_service.dart';
@@ -15,6 +16,7 @@ Future<void> reloadTenantData(BuildContext context) async {
   context.read<CatalogService>().bindTenant(tenantId);
   context.read<SellerService>().bindTenant(tenantId);
   context.read<ExchangeRateService>().bindTenant(tenantId);
+  context.read<CartService>().bindTenant(tenantId);
 
   await Future.wait([
     context.read<CatalogService>().load(),
@@ -22,6 +24,10 @@ Future<void> reloadTenantData(BuildContext context) async {
     context.read<AdminService>().load(),
     context.read<ExchangeRateService>().load(),
   ]);
+  if (!context.mounted) return;
+  await context.read<CartService>().load(
+        catalog: context.read<CatalogService>(),
+      );
 }
 
 /// Layout compartido de formularios de autenticación.

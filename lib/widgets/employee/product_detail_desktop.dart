@@ -56,6 +56,7 @@ class ProductDetailDesktopLayout extends StatelessWidget {
             showing: totalLoaded,
             totalLoaded: totalLoaded,
             onChangeSeller: onChangeSeller,
+            onBackToCatalog: onBack,
           ),
         ),
         SliverToBoxAdapter(
