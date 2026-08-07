@@ -23,32 +23,31 @@ class AdminPinEntry extends StatefulWidget {
 }
 
 class AdminPinEntryState extends State<AdminPinEntry> {
-  String _pin = '';
+  late final TextEditingController _controller;
   final _focusNode = FocusNode(debugLabel: 'AdminPinEntry');
 
   @override
   void initState() {
     super.initState();
-    // AR-36: el teclado físico de desktop/web a veces no llega a [Focus.onKeyEvent]
-    // (el diálogo / InkWell del pad se quedan con el foco). Handler global
-    // mientras este widget esté montado.
-    HardwareKeyboard.instance.addHandler(_onHardwareKey);
+    _controller = TextEditingController();
+    _controller.addListener(_onControllerChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensureFocus());
   }
 
   @override
   void dispose() {
-    HardwareKeyboard.instance.removeHandler(_onHardwareKey);
+    _controller.removeListener(_onControllerChanged);
+    _controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
   void clear() {
-    setState(() => _pin = '');
+    _controller.clear();
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensureFocus());
   }
 
-  String get pin => _pin;
+  String get pin => _controller.text;
 
   void _ensureFocus() {
     if (!mounted) return;
@@ -57,125 +56,125 @@ class AdminPinEntryState extends State<AdminPinEntry> {
     }
   }
 
+  void _onControllerChanged() {
+    var next = _controller.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (next.length > widget.maxDigits) {
+      next = next.substring(0, widget.maxDigits);
+    }
+    if (next != _controller.text) {
+      _controller.value = TextEditingValue(
+        text: next,
+        selection: TextSelection.collapsed(offset: next.length),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {});
+    widget.onChanged?.call(next);
+
+    if (next.length == widget.maxDigits) {
+      widget.onSubmit?.call(next);
+    }
+  }
+
   void _append(String digit) {
-    if (_pin.length >= widget.maxDigits) return;
-    setState(() => _pin += digit);
-    widget.onChanged?.call(_pin);
+    if (_controller.text.length >= widget.maxDigits) return;
+    _controller.text = '${_controller.text}$digit';
+    _controller.selection = TextSelection.collapsed(offset: _controller.text.length);
     _ensureFocus();
   }
 
   void _backspace() {
-    if (_pin.isEmpty) return;
-    setState(() => _pin = _pin.substring(0, _pin.length - 1));
-    widget.onChanged?.call(_pin);
+    if (_controller.text.isEmpty) return;
+    final next = _controller.text.substring(0, _controller.text.length - 1);
+    _controller.text = next;
+    _controller.selection = TextSelection.collapsed(offset: next.length);
     _ensureFocus();
   }
 
   void _submit() {
-    if (_pin.isEmpty) return;
-    widget.onSubmit?.call(_pin);
-  }
-
-  bool _onHardwareKey(KeyEvent event) {
-    if (!mounted) return false;
-    return _consumeKey(event);
-  }
-
-  KeyEventResult _handleFocusKey(FocusNode node, KeyEvent event) {
-    return _consumeKey(event)
-        ? KeyEventResult.handled
-        : KeyEventResult.ignored;
-  }
-
-  /// true si consumimos el evento (dígito / backspace / enter).
-  bool _consumeKey(KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
-
-    final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.backspace || key == LogicalKeyboardKey.delete) {
-      _backspace();
-      return true;
-    }
-    if (key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.numpadEnter) {
-      _submit();
-      return true;
-    }
-
-    final fromKey = _digitFromKey(key);
-    if (fromKey != null) {
-      _append(fromKey);
-      return true;
-    }
-
-    // Layouts / web: a veces llega por [character] y no por logicalKey.
-    final char = event.character?.trim();
-    if (char != null && char.length == 1 && RegExp(r'^[0-9]$').hasMatch(char)) {
-      _append(char);
-      return true;
-    }
-
-    return false;
-  }
-
-  String? _digitFromKey(LogicalKeyboardKey key) {
-    return switch (key) {
-      LogicalKeyboardKey.digit0 || LogicalKeyboardKey.numpad0 => '0',
-      LogicalKeyboardKey.digit1 || LogicalKeyboardKey.numpad1 => '1',
-      LogicalKeyboardKey.digit2 || LogicalKeyboardKey.numpad2 => '2',
-      LogicalKeyboardKey.digit3 || LogicalKeyboardKey.numpad3 => '3',
-      LogicalKeyboardKey.digit4 || LogicalKeyboardKey.numpad4 => '4',
-      LogicalKeyboardKey.digit5 || LogicalKeyboardKey.numpad5 => '5',
-      LogicalKeyboardKey.digit6 || LogicalKeyboardKey.numpad6 => '6',
-      LogicalKeyboardKey.digit7 || LogicalKeyboardKey.numpad7 => '7',
-      LogicalKeyboardKey.digit8 || LogicalKeyboardKey.numpad8 => '8',
-      LogicalKeyboardKey.digit9 || LogicalKeyboardKey.numpad9 => '9',
-      _ => null,
-    };
+    if (_controller.text.isEmpty) return;
+    widget.onSubmit?.call(_controller.text);
   }
 
   @override
   Widget build(BuildContext context) {
+    final pin = _controller.text;
     final boxColor = widget.wrong ? AppColors.accent : AppColors.border;
 
-    return Focus(
-      focusNode: _focusNode,
-      autofocus: true,
-      onKeyEvent: _handleFocusKey,
+    return SelectionContainer.disabled(
       child: GestureDetector(
         onTap: _ensureFocus,
         behavior: HitTestBehavior.opaque,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(widget.maxDigits, (index) {
-                final filled = index < _pin.length;
-                return Container(
-                  width: 44,
-                  height: 52,
-                  margin: EdgeInsets.only(
-                    right: index < widget.maxDigits - 1 ? 10 : 0,
-                  ),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceTouch,
-                    borderRadius: BorderRadius.circular(AppDecorations.radius),
-                    border: Border.all(
-                      color: boxColor,
-                      width: widget.wrong ? 1 : AppDecorations.hairline,
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(widget.maxDigits, (index) {
+                    final filled = index < pin.length;
+                    return Container(
+                      width: 44,
+                      height: 52,
+                      margin: EdgeInsets.only(
+                        right: index < widget.maxDigits - 1 ? 10 : 0,
+                      ),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceTouch,
+                        borderRadius:
+                            BorderRadius.circular(AppDecorations.radius),
+                        border: Border.all(
+                          color: boxColor,
+                          width: widget.wrong ? 1 : AppDecorations.hairline,
+                        ),
+                      ),
+                      child: Text(
+                        filled ? '•' : '',
+                        style: AppText.display.copyWith(
+                          color: widget.wrong
+                              ? AppColors.accent
+                              : AppColors.textPrimary,
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+                // Teclado físico (web/desktop): el TextField es la fuente de verdad.
+                Opacity(
+                  opacity: 0,
+                  child: SizedBox(
+                    width: 220,
+                    height: 52,
+                    child: TextField(
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      autofocus: true,
+                      keyboardType: TextInputType.number,
+                      obscureText: true,
+                      enableSuggestions: false,
+                      autocorrect: false,
+                      showCursor: false,
+                      enableInteractiveSelection: false,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(widget.maxDigits),
+                      ],
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        isCollapsed: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      style: const TextStyle(fontSize: 1, height: 1),
+                      onSubmitted: (_) => _submit(),
                     ),
                   ),
-                  child: Text(
-                    filled ? '•' : '',
-                    style: AppText.display.copyWith(
-                      color: widget.wrong
-                          ? AppColors.accent
-                          : AppColors.textPrimary,
-                    ),
-                  ),
-                );
-              }),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             // AR-36: el pad táctil no debe robar el foco del teclado físico.
@@ -287,7 +286,8 @@ class _Key extends StatelessWidget {
                 : Text(
                     label ?? '',
                     style: AppText.numberLarge.copyWith(
-                      color: accent ? AppColors.onAccent : AppColors.textPrimary,
+                      color:
+                          accent ? AppColors.onAccent : AppColors.textPrimary,
                     ),
                   ),
           ),
