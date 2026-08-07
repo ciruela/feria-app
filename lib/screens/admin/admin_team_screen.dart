@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/app_config.dart';
 import '../../models/team_member.dart';
+import '../../services/active_tenant.dart';
 import '../../services/supabase_service.dart';
 import '../../services/team_service.dart';
 import '../../services/tenant_session_service.dart';
@@ -91,7 +92,7 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
 
     setState(() => _loading = true);
     try {
-      await _ensureTenantForWrite(session);
+      await _resolveTenantIdForWrite(session);
       final invited = await _service.invite(
         email: result.email,
         nombre: result.nombre,
@@ -113,9 +114,10 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
 
   void _showMessage(String message, {bool isError = false}) {
     if (!mounted) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text(message),
           backgroundColor: isError ? AppColors.danger : null,
@@ -124,13 +126,34 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
     });
   }
 
-  Future<void> _ensureTenantForWrite(TenantSessionService session) async {
-    await session.ensureSupabaseWriteContext();
-    final tenantId = session.effectiveTenantId?.trim();
-    if (tenantId == null || tenantId.isEmpty) return;
-    if (session.tenantId != tenantId) {
-      await session.enterTenant(tenantId);
+  Future<String> _resolveTenantIdForWrite(TenantSessionService session) async {
+    var tenantId =
+        session.effectiveTenantId?.trim() ?? activeTenantIdFromJwt()?.trim();
+    if (tenantId != null && tenantId.isNotEmpty) {
+      if (session.tenantId != tenantId) {
+        final entered = await session.enterTenant(tenantId);
+        if (!entered) {
+          throw StateError('No se pudo activar la armería en la sesión.');
+        }
+      }
+      return tenantId;
     }
+
+    await session.ensureSupabaseWriteContext();
+    tenantId =
+        session.effectiveTenantId?.trim() ?? activeTenantIdFromJwt()?.trim();
+    if (tenantId == null || tenantId.isEmpty) {
+      throw StateError(
+        'No hay armería activa en la sesión. Volvé al selector e intentá de nuevo.',
+      );
+    }
+    if (session.tenantId != tenantId) {
+      final entered = await session.enterTenant(tenantId);
+      if (!entered) {
+        throw StateError('No se pudo activar la armería en la sesión.');
+      }
+    }
+    return tenantId;
   }
 
   String _formatInviteError(Object error) {
@@ -145,11 +168,12 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
 
   Future<void> _removeMember(TeamMember member) async {
     if (!_canRemoveMember(member)) return;
-    final session = context.read<TenantSessionService>();
 
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Eliminar del equipo'),
         content: Text(
           '¿Sacar a ${member.displayName} de la armería?\n\n'
@@ -157,12 +181,12 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
             child: const Text('Cancelar'),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('Eliminar'),
           ),
         ],
@@ -170,12 +194,13 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
     );
     if (ok != true || !mounted) return;
 
+    final session = context.read<TenantSessionService>();
     setState(() => _removingUserId = member.userId);
     try {
-      await _ensureTenantForWrite(session);
+      final tenantId = await _resolveTenantIdForWrite(session);
       await _service.removeMember(
         member.userId,
-        tenantId: session.effectiveTenantId,
+        tenantId: tenantId,
       );
       if (!mounted) return;
       setState(() {
@@ -185,16 +210,19 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
       });
       _showMessage('${member.displayName} fue eliminado del equipo');
       await _load();
-    } catch (error) {
+    } catch (error, stackTrace) {
+      debugPrint('removeMember failed: $error\n$stackTrace');
       if (!mounted) return;
+      final message = _formatInviteError(error);
       await showDialog<void>(
         context: context,
-        builder: (_) => AlertDialog(
+        useRootNavigator: true,
+        builder: (dialogContext) => AlertDialog(
           title: const Text('No se pudo eliminar'),
-          content: Text(_formatInviteError(error)),
+          content: Text(message),
           actions: [
             FilledButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: const Text('Entendido'),
             ),
           ],

@@ -146,8 +146,15 @@ class TeamService {
         msg.contains('function') && msg.contains('does not exist');
   }
 
+  static bool _shouldFallbackToFunction(PostgrestException error) {
+    if (_isMissingRpc(error)) return true;
+    if (error.code == '42501') return true;
+    final msg = error.message.toLowerCase();
+    return msg.contains('permission denied');
+  }
+
   Map<String, dynamic> _rpcParams(String userId, {String? tenantId}) {
-    final scoped = tenantId?.trim();
+    final scoped = tenantId?.trim() ?? activeTenantIdFromJwt()?.trim();
     if (scoped == null || scoped.isEmpty) {
       throw StateError(
         'No hay armería activa. Volvé al selector e ingresá de nuevo.',
@@ -188,14 +195,16 @@ class TeamService {
 
   Future<void> removeMember(String userId, {String? tenantId}) async {
     await _withTimeout(() async {
-      final scopedTenant = tenantId?.trim();
+      final scopedTenant =
+          tenantId?.trim() ?? activeTenantIdFromJwt()?.trim();
 
       // 1) Borrado duro (elimina la fila de membership).
       try {
         await _removeViaRpc(userId, tenantId: scopedTenant);
         return;
       } on PostgrestException catch (error) {
-        if (!_isMissingRpc(error) && !_isRecoverableRemoveError(error)) {
+        if (!_shouldFallbackToFunction(error) &&
+            !_isRecoverableRemoveError(error)) {
           _throwRpcError(error);
         }
       }
@@ -205,10 +214,10 @@ class TeamService {
         await _deactivateViaRpc(userId, tenantId: scopedTenant);
         return;
       } on PostgrestException catch (error) {
-        if (!_isMissingRpc(error)) _throwRpcError(error);
+        if (!_shouldFallbackToFunction(error)) _throwRpcError(error);
       }
 
-      // 3) Edge Function (limpia active_tenant en Auth).
+      // 3) Edge Function (service role + limpia active_tenant en Auth).
       final body = <String, dynamic>{'user_id': userId};
       if (scopedTenant != null && scopedTenant.isNotEmpty) {
         body['tenant_id'] = scopedTenant;

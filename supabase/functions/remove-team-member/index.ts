@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
     try {
       const { data: existing } = await admin.auth.admin.getUserById(targetUserId);
       const prevMeta =
-        (existing.user?.app_metadata as Record<string, unknown> | undefined) ??
+        (existing?.user?.app_metadata as Record<string, unknown> | undefined) ??
         {};
       if (String(prevMeta.active_tenant ?? "") === tenantId) {
         const nextMeta = { ...prevMeta };
