@@ -15,13 +15,18 @@ class SupabaseCatalogRepository {
   static const _rpcApplyDelta = 'apply_product_stock_delta';
   static const _rpcSetStock = 'set_product_stock';
 
-  Future<List<Product>> fetchAll() async {
-    final rows = await SupabaseService.client
-        .from(_table)
-        .select()
-        .eq('activo', true)
-        .order('marca')
-        .order('codigo');
+  /// Catálogo del tenant activo.
+  ///
+  /// IMPORTANTE: filtramos por [tenantId] en la consulta y NO confiamos solo en
+  /// el RLS. Un platform admin pasa el RLS de `productos_select` para TODOS los
+  /// tenants, así que sin este filtro un import cargaría en memoria productos de
+  /// otras armerías y el matcher por código los pisaría (fuga entre tenants).
+  Future<List<Product>> fetchAll({String? tenantId}) async {
+    var query = SupabaseService.client.from(_table).select().eq('activo', true);
+    if (tenantId != null && tenantId.isNotEmpty) {
+      query = query.eq('tenant_id', tenantId);
+    }
+    final rows = await query.order('marca').order('codigo');
 
     return (rows as List<dynamic>)
         .map((row) => _fromRow(row as Map<String, dynamic>))
@@ -313,14 +318,13 @@ class SupabaseCatalogRepository {
       'precio_usd': product.precioUsd,
       'stock_inicial': product.stockInicial,
       'rounds_per_box': product.roundsPerBox,
+      // Siempre se escribe (la 041 ya está aplicada): null cuando el producto no
+      // tiene precios fijos. Así un re-import limpia cualquier fixed_prices que
+      // haya quedado mal seteado (p. ej. contaminación entre tenants).
+      'fixed_prices': product.fixedPrices?.toJson(),
       'activo': true,
       // updated_at lo pone el trigger set_updated_at_trg (AR-23).
     };
-    // Solo se envía para productos con precios fijos (Urban). Así el resto de
-    // los tenants no toca esta columna y no depende del grant de la 041.
-    if (product.fixedPrices != null) {
-      row['fixed_prices'] = product.fixedPrices!.toJson();
-    }
     if (includePhotos) {
       final paths = ProductPhotoService.pathsForStorage(product);
       row['foto'] = product.foto;

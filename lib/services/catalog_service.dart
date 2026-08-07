@@ -91,7 +91,7 @@ class CatalogService extends ChangeNotifier {
 
     try {
       if (AppConfig.useSupabase) {
-        final remote = await _supabaseCatalog.fetchAll();
+        final remote = await _supabaseCatalog.fetchAll(tenantId: _tenantScope);
         if (silent) {
           if (!_sameProducts(_products, remote)) {
             _products = remote;
