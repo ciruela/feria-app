@@ -46,7 +46,7 @@ class DniScanMobileContent extends StatelessWidget {
     DniScanOptionData(
       code: 'DO',
       title: 'Dorso del DNI',
-      subtitle: 'Domicilio y localidad',
+      subtitle: 'Domicilio (arriba) y CUIL (centro)',
       side: DniScanSide.back,
       source: ImageSource.camera,
     ),
@@ -83,7 +83,7 @@ class DniScanMobileContent extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'El frente trae nombre y número; el dorso, domicilio y localidad.',
+            'El frente trae nombre y DNI; el dorso, domicilio arriba y CUIL al medio.',
             style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
           ),
           const SizedBox(height: 16),

@@ -140,7 +140,7 @@ class BudgetMobileChrome extends StatelessWidget {
           hasCustomerData
               ? 'Datos del cliente cargados desde el DNI. Revisalos antes de generar.'
               : 'El DNI argentino tiene dos caras: escaneá el frente (nombre y DNI) '
-                  'y el dorso (domicilio y localidad). Revisá siempre los datos antes de generar.',
+                  'y el dorso (domicilio arriba y CUIL al medio). Revisá siempre los datos antes de generar.',
           style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
         ),
         const SizedBox(height: 16),

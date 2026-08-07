@@ -10,6 +10,7 @@ class DniScanResult {
   const DniScanResult({
     this.fullName,
     this.dni,
+    this.cuil,
     this.address,
     this.city,
     this.rawText = '',
@@ -18,15 +19,18 @@ class DniScanResult {
 
   final String? fullName;
   final String? dni;
+  final String? cuil;
   final String? address;
   final String? city;
   final String rawText;
   final DniScanSide side;
 
-  bool get hasData => hasIdentity || hasAddress;
+  bool get hasData => hasIdentity || hasAddress || hasCuil;
 
   bool get hasIdentity =>
       (fullName?.isNotEmpty ?? false) || (dni?.isNotEmpty ?? false);
+
+  bool get hasCuil => cuil?.isNotEmpty ?? false;
 
   bool get hasAddress =>
       (address?.isNotEmpty ?? false) || (city?.isNotEmpty ?? false);
@@ -43,16 +47,21 @@ class DniScanResult {
           back = result;
         case DniScanSide.unknown:
           if (result.hasIdentity && front == null) front = result;
-          if (result.hasAddress && back == null) back = result;
+          if ((result.hasAddress || result.hasCuil) && back == null) {
+            back = result;
+          }
       }
     }
 
     front ??= hasIdentity ? this : (other.hasIdentity ? other : null);
-    back ??= hasAddress ? this : (other.hasAddress ? other : null);
+    back ??= (hasAddress || hasCuil)
+        ? this
+        : (other.hasAddress || other.hasCuil ? other : null);
 
     return DniScanResult(
       fullName: front?.fullName ?? fullName ?? other.fullName,
       dni: front?.dni ?? dni ?? other.dni,
+      cuil: back?.cuil ?? cuil ?? other.cuil,
       address: back?.address ?? address ?? other.address,
       city: back?.city ?? city ?? other.city,
       side: DniScanSide.unknown,
@@ -101,9 +110,47 @@ class DniOcrService {
     'EXPIRY',
     'CUIL',
     'CUIT',
+    'LUGAR',
+    'PLACE',
+    'MINISTERIO',
+    'INTERIOR',
+    'REPUBLICA',
+    'ARGENTINA',
+    'ELECTRONICO',
+    'ELECTRÓNICO',
   };
 
+  static const _backSectionStopTokens = {
+    'LUGAR',
+    'NACIMIENTO',
+    'BIRTH',
+    'CUIL',
+    'CUIT',
+    'TRAMITE',
+    'FIRMA',
+    'SIGNATURE',
+    'MINISTERIO',
+    'IDARG',
+    'EMISION',
+    'VENCIMIENTO',
+    'EJEMPLAR',
+    'QR',
+  };
+
+  static final _cuilPattern = RegExp(
+    r'\b(20|23|24|27|30|33|34)[-\s]?(\d{8})[-\s]?(\d)\b',
+    caseSensitive: false,
+  );
+
   final _picker = ImagePicker();
+
+  @visibleForTesting
+  DniScanResult parseRecognizedText(
+    String raw, {
+    DniScanSide hint = DniScanSide.unknown,
+  }) {
+    return _parse(raw, hint: hint);
+  }
 
   Future<DniScanResult?> pickAndScan({
     required ImageSource source,
@@ -131,7 +178,7 @@ class DniOcrService {
     final front = await pickAndScan(source: source, hint: DniScanSide.front);
     if (front == null) return null;
 
-    onStep?.call('Paso 2/2: ahora el DORSO (domicilio y localidad)');
+    onStep?.call('Paso 2/2: ahora el DORSO (domicilio arriba y CUIL)');
 
     final back = await pickAndScan(source: source, hint: DniScanSide.back);
     if (back == null) {
@@ -167,35 +214,33 @@ class DniOcrService {
 
     final side = hint != DniScanSide.unknown ? hint : _detectSide(upper);
 
-    final dni = _extractDni(raw);
-    final fullName = side == DniScanSide.back ? null : _extractName(lines);
-    final addressInfo = side == DniScanSide.front
-        ? (null, null)
-        : _extractAddress(lines, aggressive: side == DniScanSide.back);
-
     if (side == DniScanSide.front) {
       return DniScanResult(
-        fullName: fullName,
-        dni: dni,
+        fullName: _extractName(lines),
+        dni: _extractDocumentNumber(raw),
         rawText: raw,
         side: DniScanSide.front,
       );
     }
 
     if (side == DniScanSide.back) {
+      final back = _extractBackFields(lines, raw);
       return DniScanResult(
-        address: addressInfo.$1,
-        city: addressInfo.$2,
+        address: back.$1,
+        city: back.$2,
+        cuil: back.$3,
         rawText: raw,
         side: DniScanSide.back,
       );
     }
 
+    final back = _extractBackFields(lines, raw);
     return DniScanResult(
-      fullName: fullName,
-      dni: dni,
-      address: addressInfo.$1,
-      city: addressInfo.$2,
+      fullName: _extractName(lines),
+      dni: _extractDocumentNumber(raw),
+      address: back.$1,
+      city: back.$2,
+      cuil: back.$3,
       rawText: raw,
       side: side,
     );
@@ -209,7 +254,8 @@ class DniOcrService {
         (upper.contains('DOCUMENTO') && upper.contains('N°'));
     final hasBack = _containsLabel(upper, 'DOMICILIO') ||
         _containsLabel(upper, 'ADDRESS') ||
-        _containsLabel(upper, 'DIRECCION');
+        _containsLabel(upper, 'DIRECCION') ||
+        _cuilPattern.hasMatch(upper);
 
     if (hasBack && !hasFront) return DniScanSide.back;
     if (hasFront && !hasBack) return DniScanSide.front;
@@ -226,7 +272,17 @@ class DniOcrService {
     return DniScanSide.unknown;
   }
 
-  String? _extractDni(String raw) {
+  String? _extractDocumentNumber(String raw) {
+    if (_cuilPattern.hasMatch(raw)) {
+      // Evita confundir el bloque central del CUIL con el número de documento.
+      final withoutCuil = raw.replaceAll(_cuilPattern, ' ');
+      final fromClean = _extractDocumentNumberFromText(withoutCuil);
+      if (fromClean != null) return fromClean;
+    }
+    return _extractDocumentNumberFromText(raw);
+  }
+
+  String? _extractDocumentNumberFromText(String raw) {
     final labeled = RegExp(
       r'(?:DOCUMENTO|DNI|DOC\.?)\s*(?:N[°º.]?\s*)?(\d{1,2}\.?\d{3}\.?\d{3})',
       caseSensitive: false,
@@ -243,9 +299,105 @@ class DniOcrService {
     final plain = RegExp(r'\b(\d{7,8})\b').allMatches(raw);
     for (final match in plain) {
       final value = match.group(1)!;
-      if (value.length >= 7) return value;
+      if (value.length >= 7 && value.length <= 8) return value;
     }
     return null;
+  }
+
+  String? _extractCuil(String raw) {
+    final match = _cuilPattern.firstMatch(raw);
+    if (match == null) return null;
+    return '${match.group(1)}-${match.group(2)}-${match.group(3)}';
+  }
+
+  (String?, String?, String?) _extractBackFields(
+    List<String> lines,
+    String raw,
+  ) {
+    final cuil = _extractCuil(raw) ?? _extractCuilAfterLabel(lines);
+    final domicilio = _extractDomicilioBlock(lines);
+    if (domicilio.$1 != null) {
+      return (domicilio.$1, domicilio.$2, cuil);
+    }
+
+    final fallback = _extractAddressFallback(lines);
+    return (fallback.$1, fallback.$2, cuil);
+  }
+
+  String? _extractCuilAfterLabel(List<String> lines) {
+    for (var i = 0; i < lines.length; i++) {
+      final upper = lines[i].toUpperCase();
+      if (!_containsLabel(upper, 'CUIL') && !_containsLabel(upper, 'CUIT')) {
+        continue;
+      }
+
+      final inline = _extractCuil(lines[i]);
+      if (inline != null) return inline;
+
+      for (var j = i + 1; j < lines.length && j < i + 3; j++) {
+        final candidate = _extractCuil(lines[j]);
+        if (candidate != null) return candidate;
+      }
+    }
+    return null;
+  }
+
+  (String?, String?) _extractDomicilioBlock(List<String> lines) {
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      if (!_isFieldLabel(line, 'DOMICILIO') &&
+          !_isFieldLabel(line, 'ADDRESS') &&
+          !_isFieldLabel(line, 'DIRECCION')) {
+        continue;
+      }
+
+      final collected = <String>[];
+      final inline = _valueOnSameLine(line);
+      if (inline.isNotEmpty) {
+        collected.add(inline);
+      }
+
+      for (var j = i + 1; j < lines.length && j < i + 4; j++) {
+        final candidate = lines[j].trim();
+        if (candidate.isEmpty) continue;
+        if (_isBackSectionStop(candidate)) break;
+        if (_isBilingualLabelOnly(candidate) || _looksLikeLabel(candidate)) {
+          continue;
+        }
+        if (_isNoiseLine(candidate)) continue;
+        if (_extractCuil(candidate) != null) continue;
+        collected.add(candidate);
+        if (collected.length >= 2) break;
+      }
+
+      if (collected.isEmpty) {
+        final next = _readNextMeaningfulLine(lines, i + 1);
+        if (next.isNotEmpty) collected.add(next);
+      }
+
+      if (collected.isEmpty) continue;
+
+      return _splitDomicilioLines(collected);
+    }
+
+    return (null, null);
+  }
+
+  (String?, String?) _splitDomicilioLines(List<String> lines) {
+    final joined = lines.join(', ').trim();
+    if (joined.isEmpty) return (null, null);
+
+    if (joined.contains(',')) {
+      final parts = joined.split(',').map((part) => part.trim()).toList();
+      final street = parts.first;
+      final locality = parts.sublist(1).join(', ').trim();
+      return (
+        street.isEmpty ? null : street,
+        locality.isEmpty ? null : locality,
+      );
+    }
+
+    return _splitAddressAndCity(joined, null);
   }
 
   String? _extractName(List<String> lines) {
@@ -358,6 +510,14 @@ class DniOcrService {
     return false;
   }
 
+  bool _isBackSectionStop(String line) {
+    final upper = line.toUpperCase();
+    for (final token in _backSectionStopTokens) {
+      if (_containsLabel(upper, token)) return true;
+    }
+    return false;
+  }
+
   bool _isBoilerplate(String line) {
     final upper = line.toUpperCase();
     return upper.contains('REPUBLICA') ||
@@ -386,70 +546,16 @@ class DniOcrService {
   bool _looksLikeAddressLine(String line) {
     if (_isNoiseLine(line)) return false;
     if (_looksLikeLabel(line)) return false;
+    if (_extractCuil(line) != null) return false;
+
+    if (line.contains(',')) {
+      return RegExp(r'[A-Za-zÁÉÍÓÚÑ]').hasMatch(line);
+    }
 
     return RegExp(
-      r'\b(CALLE|AV\.?|AVENIDA|PASAJE|BV\.?|BO\.?|B°|BARRIO|\d{1,5})\b',
+      r'\b(CALLE|AV\.?|AVENIDA|PASAJE|BV\.?|BO\.?|B°|BARRIO|RUTA|KM|\d{1,5})\b',
       caseSensitive: false,
     ).hasMatch(line);
-  }
-
-  (String?, String?) _extractAddress(
-    List<String> lines, {
-    bool aggressive = false,
-  }) {
-    for (var i = 0; i < lines.length; i++) {
-      final line = lines[i];
-      if (_isFieldLabel(line, 'DOMICILIO') ||
-          _isFieldLabel(line, 'ADDRESS') ||
-          _isFieldLabel(line, 'DIRECCION')) {
-        var address = _readAddressAfterLabel(lines, i);
-        var city = '';
-
-        final start = address.isEmpty ? i + 1 : i + 2;
-        for (var j = start; j < lines.length && j < start + 3; j++) {
-          final candidate = lines[j].trim();
-          if (candidate.isEmpty) continue;
-          if (_looksLikeLabel(candidate) || _isNoiseLine(candidate)) continue;
-
-          if (address.isEmpty && _looksLikeAddressLine(candidate)) {
-            address = candidate;
-            continue;
-          }
-
-          if (city.isEmpty && _looksLikeCityLine(candidate)) {
-            city = candidate;
-            break;
-          }
-        }
-
-        final parsed = _splitAddressAndCity(address, city);
-        if (parsed.$1 != null) return parsed;
-      }
-    }
-
-    for (final line in lines) {
-      if (_looksLikeAddressLine(line)) {
-        return _splitAddressAndCity(line.trim(), null);
-      }
-    }
-
-    if (aggressive) {
-      return _extractAddressFallback(lines);
-    }
-
-    return (null, null);
-  }
-
-  String _readAddressAfterLabel(List<String> lines, int labelIndex) {
-    final labelLine = lines[labelIndex];
-    if (_isBilingualLabelOnly(labelLine)) {
-      return _readNextMeaningfulLine(lines, labelIndex + 1);
-    }
-
-    final sameLine = _valueOnSameLine(labelLine);
-    if (sameLine.isNotEmpty) return sameLine;
-
-    return _readNextMeaningfulLine(lines, labelIndex + 1);
   }
 
   (String?, String?) _extractAddressFallback(List<String> lines) {
@@ -460,6 +566,7 @@ class DniOcrService {
       if (_isBilingualLabelOnly(line)) continue;
       if (_looksLikeLabel(line)) continue;
       if (_isBoilerplate(line)) continue;
+      if (_extractCuil(line) != null) continue;
       if (_looksLikePersonName(line) && !line.contains(RegExp(r'\d'))) continue;
 
       if (_looksLikeAddressLine(line) || _looksLikeCityLine(line)) {
@@ -493,9 +600,10 @@ class DniOcrService {
     if (_isNoiseLine(line)) return false;
     return RegExp(r'\b\d{4}\b').hasMatch(line) ||
         RegExp(
-          r'\b(CABA|CAP\.?\s*FED|CAPITAL|BUENOS AIRES|PROV\.?|PROVINCIA)\b',
+          r'\b(CABA|CAP\.?\s*FED|CAPITAL|BUENOS AIRES|PROV\.?|PROVINCIA|CORDOBA|SANTA FE|MENDOZA|TUCUMAN)\b',
           caseSensitive: false,
-        ).hasMatch(line);
+        ).hasMatch(line) ||
+        (line.contains(',') && line.length > 8);
   }
 
   (String?, String?) _splitAddressAndCity(String address, String? city) {

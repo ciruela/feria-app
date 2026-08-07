@@ -32,14 +32,20 @@ class BudgetCustomerControllers {
   void applyScan({
     String? fullName,
     String? dni,
+    String? cuil,
     String? address,
     String? city,
+    bool useCuilAsTaxId = false,
   }) {
     if (fullName != null && fullName.isNotEmpty) {
       this.fullName.text = fullName;
     }
-    if (dni != null && dni.isNotEmpty) {
+    if (useCuilAsTaxId && cuil != null && cuil.isNotEmpty) {
+      this.dni.text = cuil;
+    } else if (dni != null && dni.isNotEmpty) {
       this.dni.text = dni;
+    } else if (cuil != null && cuil.isNotEmpty) {
+      this.dni.text = cuil;
     }
     if (address != null && address.isNotEmpty) {
       this.address.text = address;

@@ -93,6 +93,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
       return;
     }
 
+    final session = context.read<TenantSessionService>();
+    final isUrban =
+        PresupuestoBranding.forTenant(slug: session.activeTenantSlug).isUrban;
+
     setState(() {
       if (merge) {
         final merged = DniScanResult(
@@ -112,15 +116,19 @@ class _BudgetScreenState extends State<BudgetScreen> {
         _controllers.applyScan(
           fullName: merged.fullName,
           dni: merged.dni,
+          cuil: merged.cuil,
           address: merged.address,
           city: merged.city,
+          useCuilAsTaxId: isUrban,
         );
       } else {
         _controllers.applyScan(
           fullName: result.fullName,
           dni: result.dni,
+          cuil: result.cuil,
           address: result.address,
           city: result.city,
+          useCuilAsTaxId: isUrban,
         );
       }
       _customerReady = _controllers.fullName.text.trim().length >= 3;
@@ -131,8 +139,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
         _controllers.fullName.text.trim().isEmpty) {
       missing.add('nombre');
     }
-    if ((result.dni?.isEmpty ?? true) && _controllers.dni.text.trim().isEmpty) {
-      missing.add('DNI');
+    if ((result.dni?.isEmpty ?? true) &&
+        (result.cuil?.isEmpty ?? true) &&
+        _controllers.dni.text.trim().isEmpty) {
+      missing.add(isUrban ? 'CUIT/CUIL' : 'DNI');
     }
     if ((result.address?.isEmpty ?? true) &&
         _controllers.address.text.trim().isEmpty) {
@@ -140,20 +150,17 @@ class _BudgetScreenState extends State<BudgetScreen> {
     }
 
     if (missing.isEmpty) {
-      final session = context.read<TenantSessionService>();
-      final isUrban =
-          PresupuestoBranding.forTenant(slug: session.activeTenantSlug).isUrban;
       _showMessage(
         isUrban
-            ? 'DNI cargado (cliente, CUIT/DNI y domicilio). Revisá antes de generar.'
+            ? 'DNI cargado (cliente, CUIT/CUIL y domicilio). Revisá antes de generar.'
             : 'Datos del DNI cargados. Revisá antes de generar.',
       );
     } else if (result.side == DniScanSide.front) {
       _showMessage(
-        'Frente leído. Escaneá el dorso para domicilio y localidad.',
+        'Frente leído. Escaneá el dorso para domicilio y CUIL.',
       );
     } else if (result.side == DniScanSide.back) {
-      _showMessage('Dorso leído. Revisá domicilio y localidad.');
+      _showMessage('Dorso leído. Revisá domicilio, localidad y CUIT/CUIL.');
     } else {
       _showMessage(
         'Datos parciales cargados. Faltan: ${missing.join(', ')}.',
