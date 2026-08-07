@@ -135,7 +135,7 @@ class CatalogMobileLayout extends StatelessWidget {
                 focusNode: searchFocus,
                 onChanged: onSearchChanged,
                 decoration: InputDecoration(
-                  hintText: 'Código, modelo o calibre',
+                  hintText: 'Buscá por nombre, código, marca o calibre',
                   prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted),
                   filled: true,
                   fillColor: AppColors.surfaceRaised,

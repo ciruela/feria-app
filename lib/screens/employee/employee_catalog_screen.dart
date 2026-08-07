@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../config/stock_config.dart';
 import '../../models/product.dart';
+import '../../models/product_search_index.dart';
 import '../../services/auth_service.dart';
 import '../../services/cart_service.dart';
 import '../../services/catalog_service.dart';
@@ -118,32 +119,18 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
   }
 
   List<Product> _products(CatalogService catalog) {
-    final query = _searchQuery.trim().toUpperCase();
-
-    final results = _typeSource(catalog).where((product) {
+    // Filtros de marca/calibre primero; el ordenamiento y la búsqueda por
+    // texto los resuelve searchCatalog (que ya cae al orden actual a igual
+    // puntaje y devuelve todo ordenado con consulta vacía).
+    final source = _typeSource(catalog).where((product) {
       if (_marcaFilter != null && product.marca != _marcaFilter) return false;
       if (_calibreFilter != null && product.calibre != _calibreFilter) {
         return false;
       }
-      if (query.isEmpty) return true;
-      if (product.codigo.toUpperCase().contains(query)) return true;
-      if (product.modeloDisplay.toUpperCase().contains(query)) return true;
-      if (product.calibre.toUpperCase().contains(query)) return true;
-      if (product.marca.toUpperCase().contains(query)) return true;
-      if (product.descripcion.toUpperCase().contains(query)) return true;
-      return false;
-    }).toList();
-
-    results.sort((a, b) {
-      final byMarca = a.marca.toLowerCase().compareTo(b.marca.toLowerCase());
-      if (byMarca != 0) return byMarca;
-      if (a.isArma) {
-        return a.modeloDisplay.toLowerCase().compareTo(b.modeloDisplay.toLowerCase());
-      }
-      return a.codigo.compareTo(b.codigo);
+      return true;
     });
 
-    return results;
+    return searchCatalog(source, _searchQuery, catalog.searchIndexFor);
   }
 
   int _lowStockCount(List<Product> products) =>

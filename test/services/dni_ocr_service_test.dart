@@ -78,6 +78,48 @@ CUIL
       expect(result.cuil, '27-30123456-7');
     });
 
+    test('no mete MRZ/trámite/boilerplate en el domicilio', () {
+      const raw = '''
+DOMICILIO / ADDRESS
+CALLE FALSA 500
+GONZALEZ<<JUAN<CARLOS<<<<<<<<<<<
+REGISTRO NACIONAL DE LAS PERSONAS
+CUIL
+20-12345678-9
+TRAMITE N°
+01234567890
+IDARG1234567<8<<<<<<<<<<<<<<<<
+7503023M2503025ARG<<<<<<<<<<<8
+''';
+
+      final result = ocr.parseRecognizedText(raw, hint: DniScanSide.back);
+
+      expect(result.address, 'CALLE FALSA 500');
+      expect(result.cuil, '20-12345678-9');
+      // El domicilio no debe arrastrar el MRZ ni el trámite.
+      expect(result.address, isNot(contains('<')));
+      expect(result.address, isNot(contains('GONZALEZ')));
+      expect(result.city ?? '', isNot(contains('01234567890')));
+      expect(result.city ?? '', isNot(contains('REGISTRO')));
+    });
+
+    test('domicilio de dos líneas con localidad de nombre simple', () {
+      const raw = '''
+DOMICILIO / ADDRESS
+CALLE FALSA 500
+VILLA MARIA
+LUGAR DE NACIMIENTO / PLACE OF BIRTH
+CORDOBA
+CUIL
+20-12345678-9
+''';
+
+      final result = ocr.parseRecognizedText(raw, hint: DniScanSide.back);
+
+      expect(result.address, 'CALLE FALSA 500');
+      expect(result.city, contains('VILLA MARIA'));
+    });
+
     test('CUIL sin guiones', () {
       const raw = '''
 DOMICILIO / ADDRESS

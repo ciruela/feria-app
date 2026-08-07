@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/app_config.dart';
 import '../models/audit_entry.dart';
 import '../models/product.dart';
+import '../models/product_search_index.dart';
 import '../models/stock_movimiento.dart';
 import '../utils/app_logger.dart';
 import '../utils/ids.dart';
@@ -38,6 +39,11 @@ class CatalogService extends ChangeNotifier {
   RealtimeChannel? _realtimeChannel;
   String? _tenantScope;
 
+  /// Índices de búsqueda cacheados por id de producto. Se invalidan (limpian)
+  /// ante cualquier cambio del catálogo vía [notifyListeners], de modo que el
+  /// buscador no recalcule las normalizaciones en cada tecla.
+  final Map<String, ProductSearchIndex> _searchIndexCache = {};
+
   List<Product> get products => List.unmodifiable(_products);
   DateTime? get lastSync => _lastSync;
   bool get isSyncing => _isSyncing;
@@ -58,6 +64,7 @@ class CatalogService extends ChangeNotifier {
     _products = [];
     _lastSync = null;
     _lastError = null;
+    _searchIndexCache.clear();
     _realtimeChannel?.unsubscribe();
     _realtimeChannel = null;
   }
@@ -545,6 +552,15 @@ class CatalogService extends ChangeNotifier {
       if (product.id == id) return product;
     }
     return null;
+  }
+
+  /// Índice de búsqueda del producto, computado una vez y cacheado por id.
+  /// La caché se limpia en [notifyListeners] cuando cambia el catálogo.
+  ProductSearchIndex searchIndexFor(Product product) {
+    return _searchIndexCache.putIfAbsent(
+      product.id,
+      () => ProductSearchIndex.fromProduct(product),
+    );
   }
 
   String _productStockLabel(Product product) {
@@ -1264,6 +1280,14 @@ class CatalogService extends ChangeNotifier {
     _lastSync = DateTime.now();
     _persistCache();
     notifyListeners();
+  }
+
+  @override
+  void notifyListeners() {
+    // Cualquier cambio del catálogo invalida los índices de búsqueda; se
+    // reconstruyen perezosamente en la próxima búsqueda.
+    _searchIndexCache.clear();
+    super.notifyListeners();
   }
 
   @override

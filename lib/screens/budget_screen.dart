@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -85,10 +86,13 @@ class _BudgetScreenState extends State<BudgetScreen> {
           result.side == DniScanSide.back
               ? 'No pudimos leer el dorso. Mejorá la luz, apoyá el DNI plano e intentá de nuevo.'
               : 'No pudimos leer esa cara. Completá los datos a mano.',
+          rawText: result.rawText,
         );
       } else {
         _showMessage(
-            'No pudimos leer el documento. Completá los datos a mano.');
+          'No pudimos leer el documento. Completá los datos a mano.',
+          rawText: result.rawText,
+        );
       }
       return;
     }
@@ -154,16 +158,22 @@ class _BudgetScreenState extends State<BudgetScreen> {
         isUrban
             ? 'DNI cargado (cliente, CUIT/CUIL y domicilio). Revisá antes de generar.'
             : 'Datos del DNI cargados. Revisá antes de generar.',
+        rawText: result.rawText,
       );
     } else if (result.side == DniScanSide.front) {
       _showMessage(
         'Frente leído. Escaneá el dorso para domicilio y CUIL.',
+        rawText: result.rawText,
       );
     } else if (result.side == DniScanSide.back) {
-      _showMessage('Dorso leído. Revisá domicilio, localidad y CUIT/CUIL.');
+      _showMessage(
+        'Dorso leído. Revisá domicilio, localidad y CUIT/CUIL.',
+        rawText: result.rawText,
+      );
     } else {
       _showMessage(
         'Datos parciales cargados. Faltan: ${missing.join(', ')}.',
+        rawText: result.rawText,
       );
     }
   }
@@ -352,10 +362,36 @@ class _BudgetScreenState extends State<BudgetScreen> {
     }
   }
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+  void _showMessage(String message, {String? rawText}) {
+    final hasRaw = rawText != null && rawText.trim().isNotEmpty;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: hasRaw ? const Duration(seconds: 8) : const Duration(seconds: 4),
+        // Ayuda de depuración de campo: permite copiar el texto crudo del OCR
+        // para reproducir casos de lectura del DNI (dorso/MRZ) en un test.
+        action: hasRaw
+            ? SnackBarAction(
+                label: 'Copiar OCR',
+                onPressed: () => _copyOcrText(rawText),
+              )
+            : null,
+      ),
     );
+  }
+
+  Future<void> _copyOcrText(String rawText) async {
+    await Clipboard.setData(ClipboardData(text: rawText));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Texto OCR copiado. Pegámelo para depurar la lectura.'),
+        ),
+      );
   }
 
   void _onCustomerFieldChanged() {

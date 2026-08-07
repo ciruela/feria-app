@@ -364,7 +364,7 @@ class DniOcrService {
         if (_isBilingualLabelOnly(candidate) || _looksLikeLabel(candidate)) {
           continue;
         }
-        if (_isNoiseLine(candidate)) continue;
+        if (_isNoiseLine(candidate) || _isBoilerplate(candidate)) continue;
         if (_extractCuil(candidate) != null) continue;
         collected.add(candidate);
         if (collected.length >= 2) break;
@@ -528,7 +528,10 @@ class DniOcrService {
 
   bool _isNoiseLine(String line) {
     final upper = line.toUpperCase();
-    if (upper.startsWith('IDARG')) return true;
+    // Zona MRZ del dorso: cabecera "IDARG..." (en cualquier posición) y las
+    // líneas de relleno con chevrones "<" (ej. "GONZALEZ<<JUAN<CARLOS<<<").
+    if (upper.contains('IDARG')) return true;
+    if (line.contains('<')) return true;
     if (RegExp(r'^[\d\s\-<>]{10,}$').hasMatch(line)) return true;
     if (RegExp(r'^[0-9OIL]{20,}$').hasMatch(line.replaceAll(' ', ''))) {
       return true;
