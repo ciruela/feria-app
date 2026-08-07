@@ -30,7 +30,29 @@ class CartScreen extends StatelessWidget {
             ? Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 520, maxHeight: 900),
-                  child: const EmployeeCartBody(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // AR-38: full-screen cart (reached from product detail /
+                      // "added to cart") had no back control on desktop.
+                      if (Navigator.of(context).canPop())
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                            child: TextButton.icon(
+                              onPressed: () => Navigator.of(context).maybePop(),
+                              icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                              label: const Text('Volver al catálogo'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      const Expanded(child: EmployeeCartBody()),
+                    ],
+                  ),
                 ),
               )
             : const CartMobileLayout(),

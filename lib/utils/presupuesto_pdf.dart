@@ -632,30 +632,37 @@ class PresupuestoPdf {
             );
           }
 
+          // AR-52: el detalle de un arma ocupa dos líneas (detalle + "SERIE:").
+          // Sin altura extra, la segunda línea desbordaba la celda de alto fijo
+          // y pisaba la fila de abajo. Le damos aire como en la tabla simple.
+          final height = row.isArma && row.serialNumber.trim().isNotEmpty
+              ? (rowHeight + 12).clamp(rowHeight, 44.0)
+              : rowHeight;
+
           return pw.TableRow(
             children: [
               pw.SizedBox(
-                height: rowHeight,
+                height: height,
                 child: _bodyCell(row.code, align: pw.TextAlign.center),
               ),
               pw.SizedBox(
-                height: rowHeight,
+                height: height,
                 child: _bodyCell('${row.quantity}', align: pw.TextAlign.center),
               ),
               pw.SizedBox(
-                height: rowHeight,
+                height: height,
                 child: _bodyCell(row.detailWithSerial),
               ),
               pw.SizedBox(
-                height: rowHeight,
+                height: height,
                 child: _bodyCell(row.tc, align: pw.TextAlign.center),
               ),
               pw.SizedBox(
-                height: rowHeight,
+                height: height,
                 child: _bodyCell(row.unitPrice, align: pw.TextAlign.right),
               ),
               pw.SizedBox(
-                height: rowHeight,
+                height: height,
                 child: _bodyCell(row.lineTotal, align: pw.TextAlign.right),
               ),
             ],
