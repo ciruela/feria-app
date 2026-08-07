@@ -19,6 +19,8 @@ Uso:
 """
 import sys
 import re
+import shutil
+import zipfile
 
 import openpyxl
 
@@ -244,6 +246,48 @@ def rows_accesorios(wb):
     return out
 
 
+def _xlsx_cell(v):
+    """Normaliza un valor para openpyxl: string vacío/espacios -> None."""
+    if v is None:
+        return None
+    if isinstance(v, str) and v.strip() == "":
+        return None
+    return v
+
+
+def make_dart_excel_compatible(path):
+    """Reescribe los rels con Target absoluto (openpyxl escribe "/xl/...") a
+    rutas relativas ("worksheets/sheet1.xml").
+
+    El paquete Dart `excel` (^4.0.6) resuelve el worksheet como
+    findFile('xl/' + Target); si Target es "/xl/worksheets/sheet1.xml" arma
+    "xl//xl/..." → no lo encuentra y revienta con
+    "Null check operator used on a null value". Los xlsx hechos con Excel usan
+    Targets relativos, por eso esos sí importan; los de openpyxl no.
+    """
+    rels_name = "xl/_rels/workbook.xml.rels"
+    with zipfile.ZipFile(path, "r") as zin:
+        names = zin.namelist()
+        if rels_name not in names:
+            return
+        data = {n: zin.read(n) for n in names}
+
+    rels = data[rels_name].decode("utf-8")
+    # Target="/xl/worksheets/sheet1.xml" -> "worksheets/sheet1.xml"
+    fixed = re.sub(r'Target="/xl/', 'Target="', rels)
+    # Cualquier otro Target absoluto "/algo" -> "algo"
+    fixed = re.sub(r'Target="/', 'Target="', fixed)
+    if fixed == rels:
+        return
+    data[rels_name] = fixed.encode("utf-8")
+
+    tmp = path + ".tmp"
+    with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
+        for n, content in data.items():
+            zout.writestr(n, content)
+    shutil.move(tmp, path)
+
+
 def main():
     src = sys.argv[1] if len(sys.argv) > 1 else \
         "/Users/abritos/Downloads/Catalogo_Armas_Nuevas_Urban_con_Cantidad.xlsx"
@@ -265,8 +309,13 @@ def main():
     ws.title = "Catalogo"
     ws.append(headers)
     for p in products:
-        ws.append([p.get(h) for h in headers])
+        # Celda vacía -> None (openpyxl la omite). Un string "" se escribiría
+        # como <c t="inlineStr"/> autocerrado y el paquete Dart `excel` revienta
+        # al buscar <t> ("Bad state: No element").
+        ws.append([_xlsx_cell(p.get(h)) for h in headers])
     out.save(dst)
+    # Deja el xlsx legible por el paquete Dart `excel` del importador.
+    make_dart_excel_compatible(dst)
 
     # Resumen
     from collections import Counter
