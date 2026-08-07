@@ -24,7 +24,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.armeria.feria.app_feria"
+        applicationId = "armenext.com"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

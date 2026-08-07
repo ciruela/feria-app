@@ -67,7 +67,7 @@ echo
 echo "=== Listo ==="
 echo
 echo "Play Console (manual, una sola vez):"
-echo "  - Crear app 'Armenext' con package com.armeria.feria.app_feria"
+echo "  - Crear app 'Armenext' con package armenext.com"
 echo "  - Completar ficha mínima + clasificación de contenido"
 echo
 echo "Deploy:"

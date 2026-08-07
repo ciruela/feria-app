@@ -12,7 +12,7 @@
 #
 # Cargar secrets locales: ./scripts/load_android_secrets_to_github.sh
 #
-# Play Console (una sola vez): crear app con package com.armeria.feria.app_feria
+# Play Console (una sola vez): crear app con package armenext.com
 # y dar permisos a la service account (Release to testing tracks).
 
 name: Android Play Store
@@ -163,7 +163,7 @@ jobs:
         uses: r0adkll/upload-google-play@v1.1.3
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.armeria.feria.app_feria
+          packageName: armenext.com
           releaseFiles: build/app/outputs/bundle/release/app-release.aab
           track: ${{ inputs.track }}
           status: completed
