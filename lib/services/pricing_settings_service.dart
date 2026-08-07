@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../config/pricing_limits.dart';
 import '../utils/tenant_cache.dart';
 import 'supabase_config_repository.dart';
 import 'supabase_service.dart';
@@ -62,14 +63,14 @@ class PricingSettingsService extends ChangeNotifier {
     required double tarjeta12Pct,
     required double tarjeta18Pct,
   }) async {
-    descuentoEfectivoPct = efectivoPct;
-    recargoDebitoPct = debitoPct;
-    recargoTarjeta1Pct = tarjeta1Pct;
-    recargoTarjeta3Pct = tarjeta3Pct;
-    recargoTarjeta6Pct = tarjeta6Pct;
-    recargoTarjeta9Pct = tarjeta9Pct;
-    recargoTarjeta12Pct = tarjeta12Pct;
-    recargoTarjeta18Pct = tarjeta18Pct;
+    descuentoEfectivoPct = PricingLimits.clamp('efectivo', efectivoPct);
+    recargoDebitoPct = PricingLimits.clamp('debito', debitoPct);
+    recargoTarjeta1Pct = PricingLimits.clamp('tarjeta1', tarjeta1Pct);
+    recargoTarjeta3Pct = PricingLimits.clamp('tarjeta3', tarjeta3Pct);
+    recargoTarjeta6Pct = PricingLimits.clamp('tarjeta6', tarjeta6Pct);
+    recargoTarjeta9Pct = PricingLimits.clamp('tarjeta9', tarjeta9Pct);
+    recargoTarjeta12Pct = PricingLimits.clamp('tarjeta12', tarjeta12Pct);
+    recargoTarjeta18Pct = PricingLimits.clamp('tarjeta18', tarjeta18Pct);
 
     await _persistCache();
 
@@ -103,14 +104,30 @@ class PricingSettingsService extends ChangeNotifier {
   }
 
   void _applyMap(Map<String, double> map) {
-    descuentoEfectivoPct = map['efectivo'] ?? descuentoEfectivoPct;
-    recargoDebitoPct = map['debito'] ?? recargoDebitoPct;
-    recargoTarjeta1Pct = map['tarjeta1'] ?? recargoTarjeta1Pct;
-    recargoTarjeta3Pct = map['tarjeta3'] ?? recargoTarjeta3Pct;
-    recargoTarjeta6Pct = map['tarjeta6'] ?? recargoTarjeta6Pct;
-    recargoTarjeta9Pct = map['tarjeta9'] ?? recargoTarjeta9Pct;
-    recargoTarjeta12Pct = map['tarjeta12'] ?? recargoTarjeta12Pct;
-    recargoTarjeta18Pct = map['tarjeta18'] ?? recargoTarjeta18Pct;
+    if (map.containsKey('efectivo')) {
+      descuentoEfectivoPct = PricingLimits.clamp('efectivo', map['efectivo']!);
+    }
+    if (map.containsKey('debito')) {
+      recargoDebitoPct = PricingLimits.clamp('debito', map['debito']!);
+    }
+    if (map.containsKey('tarjeta1')) {
+      recargoTarjeta1Pct = PricingLimits.clamp('tarjeta1', map['tarjeta1']!);
+    }
+    if (map.containsKey('tarjeta3')) {
+      recargoTarjeta3Pct = PricingLimits.clamp('tarjeta3', map['tarjeta3']!);
+    }
+    if (map.containsKey('tarjeta6')) {
+      recargoTarjeta6Pct = PricingLimits.clamp('tarjeta6', map['tarjeta6']!);
+    }
+    if (map.containsKey('tarjeta9')) {
+      recargoTarjeta9Pct = PricingLimits.clamp('tarjeta9', map['tarjeta9']!);
+    }
+    if (map.containsKey('tarjeta12')) {
+      recargoTarjeta12Pct = PricingLimits.clamp('tarjeta12', map['tarjeta12']!);
+    }
+    if (map.containsKey('tarjeta18')) {
+      recargoTarjeta18Pct = PricingLimits.clamp('tarjeta18', map['tarjeta18']!);
+    }
   }
 
   String get _efectivoKey =>

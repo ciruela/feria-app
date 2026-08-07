@@ -14,6 +14,7 @@ import '../models/stock_movimiento.dart';
 import '../utils/app_logger.dart';
 import '../utils/ids.dart';
 import '../utils/jwt.dart';
+import '../utils/product_id_remap.dart';
 import '../utils/tenant_cache.dart';
 import 'audit_service.dart';
 import 'excel_catalog_service.dart';
@@ -390,8 +391,15 @@ class CatalogService extends ChangeNotifier {
       throw ArgumentError('Ya existe un producto igual en el catálogo');
     }
 
+    // AR-35: if a soft-deleted row owns this codigo, restore it (same id).
+    Product? inactive;
+    if (SupabaseService.isConfigured && trimmedCodigo.isNotEmpty) {
+      inactive = await _supabaseCatalog
+          .fetchByCodigoIncludingInactive(trimmedCodigo);
+    }
+
     final product = Product(
-      id: _nextProductId(type),
+      id: inactive?.id ?? _nextProductId(type),
       type: type,
       marca: trimmedMarca,
       calibre: trimmedCalibre,
@@ -400,30 +408,45 @@ class CatalogService extends ChangeNotifier {
       descripcion: trimmedDescripcion,
       precioUsd: precioUsd,
       stock: stock,
-      stockInicial: stock,
+      stockInicial: inactive?.stockInicial ?? stock,
       roundsPerBox: isMunicion ? roundsPerBox : null,
-      fotoUrls: fotoUrls
-          .map(ProductPhotoService.normalizeForStorage)
-          .where((path) => path.isNotEmpty)
-          .toList(),
+      fotoUrls: fotoUrls.isNotEmpty
+          ? fotoUrls
+              .map(ProductPhotoService.normalizeForStorage)
+              .where((path) => path.isNotEmpty)
+              .toList()
+          : (inactive?.fotoUrls ?? const []),
+      foto: fotoUrls.isEmpty ? (inactive?.foto ?? '') : '',
     );
 
     _products.add(product);
     await _persistCache();
-    await _pushToSupabase(product);
+    final persistedId = await _pushToSupabase(product) ?? product.id;
+    var saved = product;
+    if (persistedId != product.id) {
+      saved = product.copyWith(id: persistedId);
+      final index = _products.indexWhere((item) => item.id == persistedId);
+      if (index == -1) {
+        final stale = _products.indexWhere((item) => item.id == product.id);
+        if (stale != -1) _products[stale] = saved;
+      } else {
+        saved = _products[index];
+      }
+    }
 
     if (SupabaseService.isConfigured && stock != null) {
       try {
         final next = await _supabaseCatalog.setStock(
-          product.id,
+          saved.id,
           stock,
           motivo: StockMotivo.carga,
-          nota: 'Alta de producto',
-          label: _productStockLabel(product),
+          nota: inactive != null ? 'Reactivación de producto' : 'Alta de producto',
+          label: _productStockLabel(saved),
         );
-        final index = _products.indexWhere((item) => item.id == product.id);
+        final index = _products.indexWhere((item) => item.id == saved.id);
         if (index != -1) {
-          _products[index] = product.copyWith(stock: next);
+          saved = saved.copyWith(stock: next);
+          _products[index] = saved;
           await _persistCache();
         }
       } catch (error, stackTrace) {
@@ -436,17 +459,17 @@ class CatalogService extends ChangeNotifier {
       }
     }
 
-    final label = isArma ? product.modeloDisplay : product.codigo;
+    final label = isArma ? saved.modeloDisplay : saved.codigo;
     AuditService.instance.log(
-      accion: 'Creó producto',
+      accion: inactive != null ? 'Reactivó producto' : 'Creó producto',
       entidad: AuditEntidad.producto,
-      entidadId: product.id,
-      detalle: '${product.marca} $label · '
-          '${product.type.label} · stock ${stock ?? '—'}',
+      entidadId: saved.id,
+      detalle: '${saved.marca} $label · '
+          '${saved.type.label} · stock ${stock ?? '—'}',
     );
 
     notifyListeners();
-    return product;
+    return saved;
   }
 
   Future<void> deleteProduct(String productId) async {
@@ -666,20 +689,44 @@ class CatalogService extends ChangeNotifier {
     final stockTargetById = <String, int?>{};
     final matchedIds = <String>[];
 
-    // Pre-scan para leer stock del servidor (no de la caché local).
-    for (final raw in rows) {
-      try {
-        final row = ExcelProductRow.fromMap(raw);
-        final existing = _findMatchingRow(row);
-        if (existing != null) matchedIds.add(existing.id);
-      } catch (_) {
-        // Se contabiliza skipped en el loop principal.
+    // Pre-scan: active matches + soft-deleted by codigo (AR-35).
+    final inactiveByCodigo = <String, Product>{};
+    if (SupabaseService.isConfigured) {
+      await _ensureSupabaseWriteContext();
+      for (final raw in rows) {
+        try {
+          final row = ExcelProductRow.fromMap(raw);
+          final existing = _findMatchingRow(row);
+          if (existing != null) {
+            matchedIds.add(existing.id);
+            continue;
+          }
+          final codigo = row.codigo.trim();
+          if (codigo.isEmpty) continue;
+          final key = codigo.toLowerCase();
+          if (inactiveByCodigo.containsKey(key)) continue;
+          final inactive =
+              await _supabaseCatalog.fetchByCodigoIncludingInactive(codigo);
+          if (inactive != null) {
+            inactiveByCodigo[key] = inactive;
+            matchedIds.add(inactive.id);
+          }
+        } catch (_) {
+          // Se contabiliza skipped en el loop principal.
+        }
+      }
+    } else {
+      for (final raw in rows) {
+        try {
+          final row = ExcelProductRow.fromMap(raw);
+          final existing = _findMatchingRow(row);
+          if (existing != null) matchedIds.add(existing.id);
+        } catch (_) {}
       }
     }
 
     Map<String, int?> serverStocks = {};
     if (SupabaseService.isConfigured && matchedIds.isNotEmpty) {
-      await _ensureSupabaseWriteContext();
       serverStocks = await _supabaseCatalog.fetchStocksByIds(matchedIds);
     }
 
@@ -687,35 +734,45 @@ class CatalogService extends ChangeNotifier {
       try {
         final row = ExcelProductRow.fromMap(rows[i]);
         final existing = _findMatchingRow(row);
+        final inactive = existing == null
+            ? inactiveByCodigo[row.codigo.trim().toLowerCase()]
+            : null;
+        final base = existing ?? inactive;
 
-        if (existing != null) {
+        if (base != null) {
           final index =
-              _products.indexWhere((product) => product.id == existing.id);
-          final serverStock = serverStocks.containsKey(existing.id)
-              ? serverStocks[existing.id]
-              : existing.stock;
+              _products.indexWhere((product) => product.id == base.id);
+          final serverStock = serverStocks.containsKey(base.id)
+              ? serverStocks[base.id]
+              : base.stock;
           final newStock = row.stock ?? serverStock;
-          stockTargetById[existing.id] = newStock;
+          stockTargetById[base.id] = newStock;
           // Actualiza ficha/stock del Excel. Fotos se preservan (copyWith no
           // las toca) y el upsert a Supabase tampoco escribe columnas foto*.
-          final product = existing.copyWith(
-            marca: row.marca.isNotEmpty ? row.marca : existing.marca,
-            precioUsd: row.precioUsd > 0 ? row.precioUsd : existing.precioUsd,
-            fixedPrices: row.fixedPrices ?? existing.fixedPrices,
+          // Soft-deleted (AR-35): same id, upsert sets activo=true.
+          final product = base.copyWith(
+            marca: row.marca.isNotEmpty ? row.marca : base.marca,
+            precioUsd: row.precioUsd > 0 ? row.precioUsd : base.precioUsd,
+            fixedPrices: row.fixedPrices ?? base.fixedPrices,
             stock: newStock,
-            calibre: row.calibre.isNotEmpty ? row.calibre : existing.calibre,
-            modelo: row.modelo.isNotEmpty ? row.modelo : existing.modelo,
+            calibre: row.calibre.isNotEmpty ? row.calibre : base.calibre,
+            modelo: row.modelo.isNotEmpty ? row.modelo : base.modelo,
             descripcion: row.descripcion.isNotEmpty
                 ? row.descripcion
-                : existing.descripcion,
-            roundsPerBox: existing.isMunicion
-                ? (row.roundsPerBox ?? existing.roundsPerBox)
-                : existing.roundsPerBox,
-            stockInicial: existing.stockInicial ?? newStock,
+                : base.descripcion,
+            roundsPerBox: base.isMunicion
+                ? (row.roundsPerBox ?? base.roundsPerBox)
+                : base.roundsPerBox,
+            stockInicial: base.stockInicial ?? newStock,
           );
-          _products[index] = product;
+          if (index >= 0) {
+            _products[index] = product;
+            updated++;
+          } else {
+            _products.add(product);
+            added++;
+          }
           changedProducts.add(product);
-          updated++;
         } else if (_canCreateFromRow(row)) {
           final product = _productFromExcelRow(row);
           stockTargetById[product.id] = product.stock;
@@ -736,11 +793,18 @@ class CatalogService extends ChangeNotifier {
     if (SupabaseService.isConfigured && changedProducts.isNotEmpty) {
       await _ensureSupabaseWriteContext();
       // Import Excel: nunca pisar fotos en DB (aunque la caché local esté vacía).
-      await _supabaseCatalog.upsertAll(
+      final remapped = await _supabaseCatalog.upsertAll(
         changedProducts,
         updatePhotos: false,
         onProgress: (done, total) =>
             onProgress?.call(done, total, 'Guardando productos'),
+      );
+      applyProductIdRemaps(
+        remapped,
+        products: _products,
+        changedProducts: changedProducts,
+        stockTargetById: stockTargetById,
+        serverStocks: serverStocks,
       );
 
       // Solo los que realmente cambian de stock (para un total exacto en la barra).
@@ -911,12 +975,21 @@ class CatalogService extends ChangeNotifier {
     await prefs.setInt(_lastSyncKey, _lastSync!.millisecondsSinceEpoch);
   }
 
-  Future<void> _pushToSupabase(Product product) async {
-    if (!SupabaseService.isConfigured) return;
+  /// Pushes ficha to Supabase. Returns persisted id (may restore soft-delete).
+  Future<String?> _pushToSupabase(Product product) async {
+    if (!SupabaseService.isConfigured) return null;
 
     try {
       await _ensureSupabaseWriteContext();
-      await _supabaseCatalog.upsert(product);
+      final persistedId = await _supabaseCatalog.upsert(product);
+      if (persistedId != product.id) {
+        // AR-35 safety net: upsert restored a soft-deleted row.
+        final index = _products.indexWhere((item) => item.id == product.id);
+        if (index != -1) {
+          _products[index] = _products[index].copyWith(id: persistedId);
+        }
+      }
+      return persistedId;
     } catch (error) {
       _lastError = error.toString();
       AppLogger.error('No se pudo guardar producto en Supabase', error: error);

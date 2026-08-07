@@ -153,18 +153,6 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
     switch (item) {
       case EmployeeNavItem.catalog:
         setState(() => _nav = EmployeeNavItem.catalog);
-      case EmployeeNavItem.byCode:
-        setState(() => _nav = EmployeeNavItem.byCode);
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _searchFocus.requestFocus();
-        });
-      case EmployeeNavItem.adminProducts:
-      case EmployeeNavItem.adminExchange:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Disponible en modo Administración desde el selector de rol.'),
-          ),
-        );
       case EmployeeNavItem.cart:
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const CartScreen()),

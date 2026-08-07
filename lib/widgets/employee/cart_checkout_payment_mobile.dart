@@ -142,6 +142,13 @@ class _PaymentMethodListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final listaTotal = totalsService.cartTotalAtMethod(
+      cart: cart,
+      method: PaymentMethod.lista,
+      exchangeRate: exchangeRate,
+      pricingSettings: pricingSettings,
+    );
+
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.border),
@@ -160,6 +167,7 @@ class _PaymentMethodListCard extends StatelessWidget {
                 exchangeRate: exchangeRate,
                 pricingSettings: pricingSettings,
               ),
+              listaTotal: listaTotal,
               selected: selectedMethod == methods[i],
               onTap: () => onSelect(methods[i]),
             ),
@@ -175,12 +183,14 @@ class CartCheckoutPaymentMobileRow extends StatelessWidget {
     super.key,
     required this.method,
     required this.total,
+    required this.listaTotal,
     required this.selected,
     required this.onTap,
   });
 
   final PaymentMethod method;
   final CartLineTotal total;
+  final CartLineTotal listaTotal;
   final bool selected;
   final VoidCallback onTap;
 
@@ -188,6 +198,9 @@ class CartCheckoutPaymentMobileRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final amount =
         method.isUsdPayment ? formatUsd(total.usd) : formatArs(total.ars);
+    final deltaLabel = method.isUsdPayment
+        ? formatSignedUsdDelta(total.usd - listaTotal.usd)
+        : formatSignedArsDelta(total.ars - listaTotal.ars);
     final installments = _installmentCount(method);
     final fg = selected ? AppColors.canvas : AppColors.textPrimary;
     final labelStyle = AppText.bodyLarge.copyWith(
@@ -200,6 +213,22 @@ class CartCheckoutPaymentMobileRow extends StatelessWidget {
     );
     final middleStyle = AppText.bodySmall.copyWith(
       color: selected ? AppColors.canvas.withValues(alpha: 0.75) : AppColors.textMuted,
+    );
+    final deltaStyle = AppText.bodySmall.copyWith(
+      color: selected
+          ? AppColors.canvas.withValues(alpha: 0.75)
+          : AppColors.textMuted,
+    );
+
+    Widget amountColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(amount, style: amountStyle),
+        if (deltaLabel != null) ...[
+          const SizedBox(height: 2),
+          Text(deltaLabel, style: deltaStyle),
+        ],
+      ],
     );
 
     return Material(
@@ -222,7 +251,7 @@ class CartCheckoutPaymentMobileRow extends StatelessWidget {
                         style: middleStyle,
                       ),
                     ),
-                    Text(amount, style: amountStyle),
+                    amountColumn,
                   ],
                 )
               : Row(
@@ -230,7 +259,7 @@ class CartCheckoutPaymentMobileRow extends StatelessWidget {
                     Expanded(
                       child: Text(method.shortLabel, style: labelStyle),
                     ),
-                    Text(amount, style: amountStyle),
+                    amountColumn,
                   ],
                 ),
         ),

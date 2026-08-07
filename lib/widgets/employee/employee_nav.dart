@@ -4,19 +4,18 @@ import '../../screens/auth/tenant_app_shell.dart';
 import '../../theme/app_theme.dart';
 import '../armenext_brand.dart';
 
-enum EmployeeNavItem { catalog, byCode, adminProducts, adminExchange, cart, exit }
+/// Nav del flujo venta (empleado / portal). Admin vive en otro shell.
+enum EmployeeNavItem { catalog, cart, exit }
 
 class EmployeeSidebar extends StatelessWidget {
   const EmployeeSidebar({
     super.key,
     required this.selected,
     required this.onSelected,
-    this.showAdminSection = true,
   });
 
   final EmployeeNavItem selected;
   final ValueChanged<EmployeeNavItem> onSelected;
-  final bool showAdminSection;
 
   @override
   Widget build(BuildContext context) {
@@ -30,35 +29,12 @@ class EmployeeSidebar extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(20, 24, 20, 28),
             child: ArmenextMonogram(size: 32),
           ),
-          const _SectionLabel('OPERACIÓN'),
           _NavTile(
             label: 'Catálogo',
             icon: Icons.search_rounded,
             selected: selected == EmployeeNavItem.catalog,
             onTap: () => onSelected(EmployeeNavItem.catalog),
           ),
-          _NavTile(
-            label: 'Por código',
-            icon: Icons.qr_code_2_outlined,
-            selected: selected == EmployeeNavItem.byCode,
-            onTap: () => onSelected(EmployeeNavItem.byCode),
-          ),
-          if (showAdminSection) ...[
-            const SizedBox(height: 16),
-            const _SectionLabel('ADMINISTRACIÓN'),
-            _NavTile(
-              label: 'Productos',
-              icon: Icons.inventory_2_outlined,
-              selected: selected == EmployeeNavItem.adminProducts,
-              onTap: () => onSelected(EmployeeNavItem.adminProducts),
-            ),
-            _NavTile(
-              label: 'Tipo de cambio',
-              icon: Icons.currency_exchange_rounded,
-              selected: selected == EmployeeNavItem.adminExchange,
-              onTap: () => onSelected(EmployeeNavItem.adminExchange),
-            ),
-          ],
           const Spacer(),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
@@ -74,23 +50,6 @@ class EmployeeSidebar extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-      child: Text(
-        label,
-        style: AppText.label.copyWith(color: AppColors.textMuted, fontSize: 11),
       ),
     );
   }
@@ -182,8 +141,7 @@ class EmployeeBottomNav extends StatelessWidget {
                 child: _BottomItem(
                   icon: Icons.search_rounded,
                   label: 'Catálogo',
-                  selected: selected == EmployeeNavItem.catalog ||
-                      selected == EmployeeNavItem.byCode,
+                  selected: selected == EmployeeNavItem.catalog,
                   onTap: onCatalog,
                 ),
               ),

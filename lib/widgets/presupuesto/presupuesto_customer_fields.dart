@@ -55,13 +55,17 @@ class PresupuestoLabeledField extends StatelessWidget {
               inputFormatters:
                   inputFormatters ?? UpperCaseTextFormatter.formatters,
               onChanged: (_) => onChanged?.call(),
+              cursorColor: Colors.black,
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 height: 1.1,
+                color: Colors.black,
               ),
               decoration: const InputDecoration(
                 isDense: true,
+                filled: false,
+                fillColor: Colors.transparent,
                 contentPadding: EdgeInsets.only(bottom: 2),
                 border: UnderlineInputBorder(
                   borderSide: BorderSide(color: Colors.black, width: 1.2),

@@ -102,21 +102,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void _handleDesktopNav(BuildContext context, EmployeeNavItem item) {
     switch (item) {
       case EmployeeNavItem.catalog:
-      case EmployeeNavItem.byCode:
         Navigator.of(context).pop();
-      case EmployeeNavItem.adminProducts:
-      case EmployeeNavItem.adminExchange:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Disponible en modo Administración desde el selector de rol.'),
-          ),
-        );
       case EmployeeNavItem.cart:
+        final navigator = Navigator.of(context);
+        if (navigator.canPop()) navigator.pop();
+        navigator.push(
+          MaterialPageRoute(builder: (_) => const CartScreen()),
+        );
       case EmployeeNavItem.exit:
-        Navigator.of(context).pop();
-        if (item == EmployeeNavItem.exit) {
-          exitInTenantFlow(context);
-        }
+        _exit();
     }
   }
 
@@ -133,17 +127,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void _handleMobileNav(EmployeeNavItem item) {
     switch (item) {
       case EmployeeNavItem.catalog:
-      case EmployeeNavItem.byCode:
         Navigator.of(context).pop();
-      case EmployeeNavItem.adminProducts:
-      case EmployeeNavItem.adminExchange:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Disponible en modo Administración desde el selector de rol.'),
-          ),
-        );
       case EmployeeNavItem.cart:
-        Navigator.of(context).push(
+        final navigator = Navigator.of(context);
+        if (navigator.canPop()) navigator.pop();
+        navigator.push(
           MaterialPageRoute(builder: (_) => const CartScreen()),
         );
       case EmployeeNavItem.exit:

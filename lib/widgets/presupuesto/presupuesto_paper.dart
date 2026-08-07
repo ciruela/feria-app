@@ -9,6 +9,7 @@ import '../../utils/presupuesto_page_format.dart';
 import 'presupuesto_customer_fields.dart';
 import 'presupuesto_header.dart';
 import 'presupuesto_items_table.dart';
+import 'presupuesto_paper_theme.dart';
 import 'presupuesto_payment_section.dart';
 import 'presupuesto_urban_paper.dart';
 
@@ -45,30 +46,32 @@ class PresupuestoPaper extends StatelessWidget {
       height: PresupuestoPageFormat.sheetHeight,
       child: ColoredBox(
         color: Colors.white,
-        child: Padding(
-          padding: PresupuestoPageFormat.pageMargins,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.black, width: 2),
-            ),
-            child: Padding(
-              padding: PresupuestoPageFormat.borderPaddingInsets,
-              child: resolvedBranding.isUrban
-                  ? PresupuestoUrbanPaper(
-                      document: document,
-                      controllers: controllers,
-                      readOnly: readOnly,
-                      onSerialChanged: onSerialChanged,
-                      onChanged: onChanged,
-                    )
-                  : _StandardPresupuestoBody(
-                      document: document,
-                      controllers: controllers,
-                      readOnly: readOnly,
-                      onSerialChanged: onSerialChanged,
-                      onTcChanged: onTcChanged,
-                      onChanged: onChanged,
-                    ),
+        child: PresupuestoPaperTheme(
+          child: Padding(
+            padding: PresupuestoPageFormat.pageMargins,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.black, width: 2),
+              ),
+              child: Padding(
+                padding: PresupuestoPageFormat.borderPaddingInsets,
+                child: resolvedBranding.isUrban
+                    ? PresupuestoUrbanPaper(
+                        document: document,
+                        controllers: controllers,
+                        readOnly: readOnly,
+                        onSerialChanged: onSerialChanged,
+                        onChanged: onChanged,
+                      )
+                    : _StandardPresupuestoBody(
+                        document: document,
+                        controllers: controllers,
+                        readOnly: readOnly,
+                        onSerialChanged: onSerialChanged,
+                        onTcChanged: onTcChanged,
+                        onChanged: onChanged,
+                      ),
+              ),
             ),
           ),
         ),

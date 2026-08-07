@@ -80,10 +80,11 @@ void main() {
     final cart = CartService();
     final p = _prod(stock: 3);
     cart.addProduct(p);
-    cart.changeQuantity('municion_1', 10);
+    final lineKey = cart.items.single.lineKey;
+    cart.changeQuantity(lineKey, 10);
     expect(cart.quantityInCart('municion_1'), 3); // recorta a stock
 
-    cart.changeQuantity('municion_1', 0);
+    cart.changeQuantity(lineKey, 0);
     expect(cart.isEmpty, isTrue);
   });
 
@@ -99,7 +100,7 @@ void main() {
     final cart = CartService()..addProduct(arma);
     expect(cart.weaponsMissingSerial.length, 1);
 
-    cart.updateSerialNumber('arma_corta_1', '  ABC123 ');
+    cart.updateSerialNumber(cart.items.single.lineKey, '  ABC123 ');
     expect(cart.weaponsMissingSerial, isEmpty);
     expect(cart.items.single.serialNumber, 'ABC123');
   });
@@ -107,7 +108,7 @@ void main() {
   test('removeLine elimina la línea', () {
     final cart = CartService();
     cart.addProduct(_prod(stock: 5));
-    cart.removeLine('municion_1');
+    cart.removeLine(cart.items.single.lineKey);
     expect(cart.isEmpty, isTrue);
   });
 }

@@ -40,7 +40,7 @@ class CartScreen extends StatelessWidget {
           : EmployeeBottomNav(
               selected: EmployeeNavItem.cart,
               cartCount: cartCount,
-              onCatalog: () => Navigator.of(context).pop(),
+              onCatalog: () => Navigator.of(context).maybePop(),
               onCart: () {},
               onExit: () => _exit(context),
             ),

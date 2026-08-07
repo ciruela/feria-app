@@ -271,18 +271,36 @@ class _BudgetScreenState extends State<BudgetScreen> {
     }
 
     setState(() => _finalizing = true);
-    final snapshot = budget.copyWithCustomer(_customer);
     final sellerId = context.read<SellerService>().selected?.id;
     final catalog = context.read<CatalogService>();
 
     try {
+      late final Budget snapshot;
       if (AppConfig.useSupabase) {
         await context.read<TenantSessionService>().ensureSupabaseWriteContext();
         if (!mounted) return;
         await catalog.syncFromCloud(silent: true);
         if (!mounted) return;
+
+        // Sync first, refresh cart prices, then build the snapshot we will sell.
+        if (cart.refreshProducts(catalog)) {
+          _showMessage(
+            'Cambiaron precios del carrito. Revisá el total antes de confirmar.',
+          );
+          return;
+        }
+
+        snapshot = _buildBudget(cart);
+        if (snapshot.lines.any((line) => line.unitUsd <= 0)) {
+          _showMessage(
+            'Hay productos sin precio USD. Sacalos del carrito o pedí que los carguen.',
+          );
+          return;
+        }
+
         await SupabaseSalesRepository(catalog: catalog).insert(
           snapshot,
+          idempotencyKey: cart.ensureSaleIdempotencyKey(),
           sellerId: sellerId,
           pricingSettings: context.read<PricingSettingsService>(),
           branding: resolvePresupuestoBranding(
@@ -290,6 +308,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
           ),
         );
       } else {
+        snapshot = budget.copyWithCustomer(_customer);
         final quantities = <String, int>{};
         for (final line in snapshot.lines) {
           if (line.productId.isEmpty) continue;

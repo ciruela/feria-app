@@ -157,6 +157,35 @@ Apple exige compilar con el SDK más reciente (desde 2026: **iOS 26 SDK**). El C
 
 Los cambios de **catálogo / TC / vendedores** en Supabase **no** pasan por CI — se sincronizan solos en la app.
 
+## Ejecutar en Android (dispositivo)
+
+```bash
+chmod +x scripts/run_android_device.sh scripts/dart_defines.sh
+./scripts/run_android_device.sh
+```
+
+1. Activá **Opciones de desarrollador → Depuración USB** en el celular
+2. Conectá por USB y aceptá “Confiar en esta computadora”
+3. Con `.env` configurado, el script corre en **release** con Supabase embebido
+
+Package / applicationId: `armenext.com`
+
+### Build AAB local
+
+```bash
+chmod +x scripts/build_android_aab.sh scripts/setup_android_keystore.sh
+./scripts/setup_android_keystore.sh   # una sola vez
+./scripts/build_android_aab.sh
+```
+
+Salida: `build/app/outputs/bundle/release/app-release.aab`
+
+## CI — Google Play (GitHub Actions)
+
+Se dispara **manualmente** desde GitHub → Actions → **Android Play Store** (`workflow_dispatch`). Exige CI verde en el mismo commit. Track: `internal` | `alpha` | `beta` | `production`.
+
+Setup una sola vez: `./scripts/setup_android_play.sh` y `./scripts/load_android_secrets_to_github.sh`.
+
 ## Ejecutar (modo local, sin nube)
 
 Sin `.env` la app usa `assets/data/products.json` y `sellers.json` embebidos:

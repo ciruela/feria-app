@@ -41,25 +41,43 @@ class CartMobileLayout extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // AR-38: explicit back — bottom nav alone is easy to miss on mobile.
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-          child: Column(
+          padding: const EdgeInsets.fromLTRB(4, 4, 20, 8),
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Carrito',
-                style: AppText.heading.copyWith(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w600,
-                ),
+              IconButton(
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: const Icon(Icons.chevron_left_rounded, size: 24),
+                color: AppColors.textMuted,
+                tooltip: 'Volver',
               ),
-              const SizedBox(height: 4),
-              Text(
-                cart.isEmpty
-                    ? 'Todavía no cargaste nada'
-                    : '${cart.itemCount} item${cart.itemCount == 1 ? '' : 's'}'
-                        '${seller != null ? ' · ${formatSellerFirstName(seller.nombre)}' : ''}',
-                style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Carrito',
+                        style: AppText.heading.copyWith(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        cart.isEmpty
+                            ? 'Todavía no cargaste nada'
+                            : '${cart.itemCount} item${cart.itemCount == 1 ? '' : 's'}'
+                                '${seller != null ? ' · ${formatSellerFirstName(seller.nombre)}' : ''}',
+                        style: AppText.bodySmall
+                            .copyWith(color: AppColors.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -180,10 +198,20 @@ class _CartMobileContent extends StatelessWidget {
                     lineUsd: _lineUsd(cart.items[i]),
                     lineArs: hasRate ? _lineArs(cart.items[i]) : 0,
                     showArs: hasRate,
-                    canIncrease: _canIncrease(cart, cart.items[i]),
-                    onDecrease: () =>
-                        cart.changeQuantity(cart.items[i].lineKey, cart.items[i].quantity - 1),
-                    onIncrease: () => _increase(context, cart, cart.items[i]),
+                    canIncrease: !cart.items[i].product.isArma &&
+                        _canIncrease(cart, cart.items[i]),
+                    // AR-33: − at qty 1 must not remove the line; use trash instead.
+                    onDecrease: cart.items[i].product.isArma ||
+                            cart.items[i].quantity <= 1
+                        ? null
+                        : () => cart.changeQuantity(
+                              cart.items[i].lineKey,
+                              cart.items[i].quantity - 1,
+                            ),
+                    onIncrease: cart.items[i].product.isArma
+                        ? null
+                        : () => _increase(context, cart, cart.items[i]),
+                    onRemove: () => cart.removeLine(cart.items[i].lineKey),
                   ),
                 ),
               ],
@@ -245,6 +273,7 @@ class _CartMobileContent extends StatelessWidget {
   }
 
   void _increase(BuildContext context, CartService cart, CartItem item) {
+    if (item.product.isArma) return;
     final max = cart.maxQuantityForLine(item);
     if (max != null && item.quantity >= max) {
       showStockLimitMessage(context, item.product);
@@ -279,8 +308,9 @@ class _CartMobileLine extends StatelessWidget {
     required this.lineUsd,
     required this.lineArs,
     required this.canIncrease,
-    required this.onDecrease,
-    required this.onIncrease,
+    this.onDecrease,
+    this.onIncrease,
+    this.onRemove,
     this.showArs = true,
   });
 
@@ -288,8 +318,9 @@ class _CartMobileLine extends StatelessWidget {
   final double lineUsd;
   final double lineArs;
   final bool canIncrease;
-  final VoidCallback onDecrease;
-  final VoidCallback onIncrease;
+  final VoidCallback? onDecrease;
+  final VoidCallback? onIncrease;
+  final VoidCallback? onRemove;
   final bool showArs;
 
   @override
@@ -302,6 +333,7 @@ class _CartMobileLine extends StatelessWidget {
       canIncrease: canIncrease,
       onDecrease: onDecrease,
       onIncrease: onIncrease,
+      onRemove: onRemove,
     );
   }
 }

@@ -152,24 +152,32 @@ class EmployeeCartBody extends StatelessWidget {
                   ? pricingMethod.totalArsFor(prices) * item.quantity
                   : 0.0;
 
+              final isArma = item.product.isArma;
               return EmployeeCartLine(
                 item: item,
                 lineUsd: lineUsd,
                 lineArs: lineArs,
                 showArs: hasRate,
-                canIncrease: () {
-                  final max = cart.maxQuantityForLine(item);
-                  return max == null || item.quantity < max;
-                }(),
-                onDecrease: () => cart.changeQuantity(item.lineKey, item.quantity - 1),
-                onIncrease: () {
-                  final max = cart.maxQuantityForLine(item);
-                  if (max != null && item.quantity >= max) {
-                    showStockLimitMessage(context, item.product);
-                    return;
-                  }
-                  cart.changeQuantity(item.lineKey, item.quantity + 1);
-                },
+                canIncrease: !isArma &&
+                    () {
+                      final max = cart.maxQuantityForLine(item);
+                      return max == null || item.quantity < max;
+                    }(),
+                // AR-33: − at qty 1 must not remove the line; use trash instead.
+                onDecrease: isArma || item.quantity <= 1
+                    ? null
+                    : () => cart.changeQuantity(item.lineKey, item.quantity - 1),
+                onIncrease: isArma
+                    ? null
+                    : () {
+                        final max = cart.maxQuantityForLine(item);
+                        if (max != null && item.quantity >= max) {
+                          showStockLimitMessage(context, item.product);
+                          return;
+                        }
+                        cart.changeQuantity(item.lineKey, item.quantity + 1);
+                      },
+                onRemove: () => cart.removeLine(item.lineKey),
               );
             },
           ),
@@ -203,8 +211,9 @@ class EmployeeCartLine extends StatelessWidget {
     required this.lineUsd,
     required this.lineArs,
     required this.canIncrease,
-    required this.onDecrease,
-    required this.onIncrease,
+    this.onDecrease,
+    this.onIncrease,
+    this.onRemove,
     this.showArs = true,
   });
 
@@ -212,8 +221,9 @@ class EmployeeCartLine extends StatelessWidget {
   final double lineUsd;
   final double lineArs;
   final bool canIncrease;
-  final VoidCallback onDecrease;
-  final VoidCallback onIncrease;
+  final VoidCallback? onDecrease;
+  final VoidCallback? onIncrease;
+  final VoidCallback? onRemove;
   final bool showArs;
 
   @override
@@ -222,6 +232,7 @@ class EmployeeCartLine extends StatelessWidget {
     final title = catalogProductTitle(product);
     final code = product.codigo.isNotEmpty ? product.codigo : product.modeloDisplay;
     final unitUsd = lineUsd / item.quantity;
+    final isArma = product.isArma;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -256,19 +267,33 @@ class EmployeeCartLine extends StatelessWidget {
                   style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
                 ),
               ),
-              _QtyButton(icon: Icons.remove, onTap: onDecrease),
-              SizedBox(
-                width: 28,
-                child: Text(
-                  '${item.quantity}',
-                  textAlign: TextAlign.center,
-                  style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w700),
+              if (isArma) ...[
+                SizedBox(
+                  width: 28,
+                  child: Text(
+                    '${item.quantity}',
+                    textAlign: TextAlign.center,
+                    style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w700),
+                  ),
                 ),
-              ),
-              _QtyButton(
-                icon: Icons.add,
-                onTap: canIncrease ? onIncrease : null,
-              ),
+                _QtyButton(icon: Icons.delete_outline, onTap: onRemove),
+              ] else ...[
+                _QtyButton(icon: Icons.remove, onTap: onDecrease),
+                SizedBox(
+                  width: 28,
+                  child: Text(
+                    '${item.quantity}',
+                    textAlign: TextAlign.center,
+                    style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                _QtyButton(
+                  icon: Icons.add,
+                  onTap: canIncrease ? onIncrease : null,
+                ),
+                const SizedBox(width: 4),
+                _QtyButton(icon: Icons.delete_outline, onTap: onRemove),
+              ],
             ],
           ),
         ],
@@ -442,6 +467,27 @@ class EmployeeCartTotalsBlock extends StatelessWidget {
               ),
             );
           }),
+          // AR-39: delta of priced total (single or dual sum) vs lista.
+          if (hasServerRate && allocations.any((a) => !a.paysInUsd)) ...[
+            Builder(
+              builder: (_) {
+                final pricedArs = allocations.fold<double>(
+                  0,
+                  (sum, a) => sum + a.amountArs,
+                );
+                final deltaLabel = formatSignedArsDelta(pricedArs - listaArs);
+                if (deltaLabel == null) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: _FooterTotalRow(
+                    label: 'vs lista',
+                    value: deltaLabel,
+                    valueMuted: true,
+                  ),
+                );
+              },
+            ),
+          ],
         ],
         if (showExchangeNote && exchangeRate != null && updatedAt != null) ...[
           const SizedBox(height: 6),

@@ -312,6 +312,12 @@ class _CartCheckoutPaymentDialogState extends State<_CartCheckoutPaymentDialog> 
                       exchangeRate: exchangeRate,
                       pricingSettings: pricingSettings,
                     ),
+                    listaTotal: totalsService.cartTotalAtMethod(
+                      cart: cart,
+                      method: PaymentMethod.lista,
+                      exchangeRate: exchangeRate,
+                      pricingSettings: pricingSettings,
+                    ),
                     selected: _selectedMethod == method,
                     onTap: () => _selectSingle(method),
                   ),
@@ -358,12 +364,14 @@ class _PaymentMethodRow extends StatelessWidget {
   const _PaymentMethodRow({
     required this.method,
     required this.total,
+    required this.listaTotal,
     required this.selected,
     required this.onTap,
   });
 
   final PaymentMethod method;
   final CartLineTotal total;
+  final CartLineTotal listaTotal;
   final bool selected;
   final VoidCallback onTap;
 
@@ -371,6 +379,9 @@ class _PaymentMethodRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final amount =
         method.isUsdPayment ? formatUsd(total.usd) : formatArs(total.ars);
+    final deltaLabel = method.isUsdPayment
+        ? formatSignedUsdDelta(total.usd - listaTotal.usd)
+        : formatSignedArsDelta(total.ars - listaTotal.ars);
     final installments = _installmentCount(method);
     final labelStyle = AppText.bodyLarge.copyWith(
       fontWeight: FontWeight.w600,
@@ -379,6 +390,11 @@ class _PaymentMethodRow extends StatelessWidget {
     final amountStyle = AppText.bodyLarge.copyWith(
       fontWeight: FontWeight.w700,
       color: selected ? AppColors.canvas : AppColors.textPrimary,
+    );
+    final deltaStyle = AppText.bodySmall.copyWith(
+      color: selected
+          ? AppColors.canvas.withValues(alpha: 0.75)
+          : AppColors.textMuted,
     );
 
     Widget label;
@@ -409,7 +425,16 @@ class _PaymentMethodRow extends StatelessWidget {
           child: Row(
             children: [
               Expanded(child: label),
-              Text(amount, style: amountStyle),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(amount, style: amountStyle),
+                  if (deltaLabel != null) ...[
+                    const SizedBox(height: 2),
+                    Text(deltaLabel, style: deltaStyle),
+                  ],
+                ],
+              ),
             ],
           ),
         ),
@@ -695,6 +720,12 @@ class _MethodPicker extends StatelessWidget {
     final methods = (mobileHandoff ? selectablePaymentMethods : checkoutDialogPaymentMethods)
         .where((method) => !exclude.contains(method))
         .toList();
+    final listaTotal = totalsService.cartTotalAtMethod(
+      cart: cart,
+      method: PaymentMethod.lista,
+      exchangeRate: exchangeRate,
+      pricingSettings: pricingSettings,
+    );
 
     if (mobileHandoff) {
       return Container(
@@ -715,6 +746,7 @@ class _MethodPicker extends StatelessWidget {
                   exchangeRate: exchangeRate,
                   pricingSettings: pricingSettings,
                 ),
+                listaTotal: listaTotal,
                 selected: selected == methods[i],
                 onTap: () => onSelected(methods[i]),
               ),
@@ -735,6 +767,7 @@ class _MethodPicker extends StatelessWidget {
               exchangeRate: exchangeRate,
               pricingSettings: pricingSettings,
             ),
+            listaTotal: listaTotal,
             selected: selected == method,
             onTap: () => onSelected(method),
           ),

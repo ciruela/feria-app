@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import '../models/cart_checkout_payment.dart';
 import '../config/app_config.dart';
 import '../models/product.dart';
+import '../utils/ids.dart';
+import 'catalog_service.dart';
 
 class CartItem {
   CartItem({
@@ -10,14 +12,16 @@ class CartItem {
     this.quantity = 1,
     this.serialNumber = '',
     this.tarjetaConsumo = '',
-  });
+    String? lineId,
+  }) : lineId = lineId ?? newId('line');
 
-  final Product product;
+  Product product;
+  final String lineId;
   int quantity;
   String serialNumber;
   String tarjetaConsumo;
 
-  String get lineKey => product.id;
+  String get lineKey => lineId;
 }
 
 enum CartAddResult {
@@ -29,12 +33,32 @@ enum CartAddResult {
 class CartService extends ChangeNotifier {
   final List<CartItem> _items = [];
   CartCheckoutPayment? _checkoutPayment;
+  String? _saleIdempotencyKey;
 
   List<CartItem> get items => List.unmodifiable(_items);
   int get itemCount => _items.fold(0, (sum, item) => sum + item.quantity);
   bool get isEmpty => _items.isEmpty;
   CartCheckoutPayment? get checkoutPayment => _checkoutPayment;
   bool get hasCheckoutPayment => _checkoutPayment != null;
+
+  /// Stable for the whole checkout attempt so retries reuse the same sale key.
+  String ensureSaleIdempotencyKey() =>
+      _saleIdempotencyKey ??= newId('sale');
+
+  /// Replaces cart products whose `precioUsd` changed in [catalog].
+  /// Returns true if any line was updated.
+  bool refreshProducts(CatalogService catalog) {
+    var changed = false;
+    for (final item in _items) {
+      final fresh = catalog.productById(item.product.id);
+      if (fresh != null && fresh.precioUsd != item.product.precioUsd) {
+        item.product = fresh;
+        changed = true;
+      }
+    }
+    if (changed) notifyListeners();
+    return changed;
+  }
 
   List<CartItem> get weaponsMissingSerial => _items
       .where(
@@ -108,8 +132,18 @@ class CartService extends ChangeNotifier {
       return CartAddResult.stockLimitReached;
     }
 
-    final existing =
-        _items.where((item) => item.product.id == product.id).firstOrNull;
+    if (product.isArma) {
+      // One weapon = one line = one serial number.
+      for (var i = 0; i < quantity; i++) {
+        _items.add(CartItem(product: product, quantity: 1));
+      }
+      notifyListeners();
+      return CartAddResult.added;
+    }
+
+    final existing = _items
+        .where((item) => !item.product.isArma && item.product.id == product.id)
+        .firstOrNull;
 
     if (existing != null) {
       final max = maxQuantityForLine(existing);
@@ -167,6 +201,7 @@ class CartService extends ChangeNotifier {
   void clear() {
     _items.clear();
     _checkoutPayment = null;
+    _saleIdempotencyKey = null;
     notifyListeners();
   }
 }

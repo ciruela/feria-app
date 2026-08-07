@@ -1,9 +1,10 @@
+import 'package:flutter/foundation.dart';
+
 import '../models/audit_entry.dart';
 import '../models/budget.dart';
 import '../models/sale_record.dart';
 import '../models/presupuesto_branding.dart';
 import '../utils/app_logger.dart';
-import '../utils/ids.dart';
 import '../utils/jwt.dart';
 import '../utils/retry.dart';
 import 'audit_service.dart';
@@ -11,6 +12,20 @@ import 'catalog_service.dart';
 import 'pricing_settings_service.dart';
 import 'supabase_service.dart';
 import 'comprobante_pdf_service.dart';
+
+/// AR-31: server vs client totals. Both currencies are required — dollar-cash
+/// sales have total_ars = 0 on both sides, so only USD catches a drift.
+@visibleForTesting
+bool saleTotalsDiverge({
+  required double serverArs,
+  required double serverUsd,
+  required double clientArs,
+  required double clientUsd,
+}) {
+  final arsGap = (serverArs - clientArs).abs();
+  final usdGap = (serverUsd - clientUsd).abs();
+  return arsGap > 1.0 || usdGap > 0.01;
+}
 
 class SupabaseSalesRepository {
   SupabaseSalesRepository({CatalogService? catalog}) : _catalog = catalog;
@@ -53,6 +68,7 @@ class SupabaseSalesRepository {
 
   Future<void> insert(
     Budget budget, {
+    required String idempotencyKey,
     String? sellerId,
     PricingSettingsService? pricingSettings,
     required PresupuestoBranding branding,
@@ -67,8 +83,7 @@ class SupabaseSalesRepository {
         budget.paymentMethods.map((method) => method.key).join(', ');
 
     final items = _itemsPayload(budget);
-    // Una sola clave por intento de confirmación (reintento reutiliza la misma).
-    final idempotencyKey = newId('sale');
+    // Clave del carrito (checkout attempt): reintentos del usuario reutilizan la misma.
     final pricing = _pricingPayload(pricingSettings);
     final rpcParams = {
       'p_items': items,
@@ -96,6 +111,28 @@ class SupabaseSalesRepository {
     final idempotent = result['idempotent'] == true;
     if (_catalog != null && !idempotent) {
       await _catalog.applyLocalSaleStockDecrement(quantities);
+    }
+
+    final serverArs = (result['total_ars'] as num?)?.toDouble() ?? 0;
+    final serverUsd = (result['total_usd'] as num?)?.toDouble() ?? 0;
+    if (saleTotalsDiverge(
+      serverArs: serverArs,
+      serverUsd: serverUsd,
+      clientArs: budget.totalArsLines,
+      clientUsd: budget.totalUsdLines,
+    )) {
+      await _rollbackSale(
+        saleId: saleId,
+        quantities: quantities,
+        error: StateError(
+          'total divergente: ARS $serverArs vs ${budget.totalArsLines}, '
+          'USD $serverUsd vs ${budget.totalUsdLines}',
+        ),
+      );
+      throw StateError(
+        'El precio cambió mientras se confirmaba la venta. '
+        'Se anuló el registro; volvé a generar el comprobante.',
+      );
     }
 
     final tenantId = _currentTenantId();

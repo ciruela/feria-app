@@ -33,6 +33,23 @@ class SupabaseCatalogRepository {
         .toList();
   }
 
+  /// AR-35: soft-deleted rows still own `(tenant_id, codigo)`. Look them up
+  /// so import/alta can restore the same id instead of inserting a conflict.
+  Future<Product?> fetchByCodigoIncludingInactive(String codigo) async {
+    final trimmed = codigo.trim();
+    if (trimmed.isEmpty) return null;
+
+    final rows = await SupabaseService.client
+        .from(_table)
+        .select()
+        .ilike('codigo', trimmed)
+        .limit(1);
+
+    final list = rows as List<dynamic>;
+    if (list.isEmpty) return null;
+    return _fromRow(list.first as Map<String, dynamic>);
+  }
+
   /// Stock actual en servidor para los ids dados (AR-6: no usar caché local).
   Future<Map<String, int?>> fetchStocksByIds(Iterable<String> ids) async {
     final unique = ids.where((id) => id.isNotEmpty).toSet().toList();
@@ -62,35 +79,61 @@ class SupabaseCatalogRepository {
   /// No usamos `.upsert()` de PostgREST: con grants por columna (036), el
   /// ON CONFLICT intenta UPDATE de `tenant_id`/`id` y revienta con 42501
   /// ("permission denied for table productos") — típico al subir fotos.
-  Future<void> upsert(
+  ///
+  /// Returns the id actually written. If [product.id] is unknown but an
+  /// inactive row shares the same `codigo`, that row is restored (AR-35).
+  Future<String> upsert(
     Product product, {
     bool updatePhotos = true,
   }) async {
+    final payload = _toUpdateRow(product, includePhotos: updatePhotos);
+
     final updated = await SupabaseService.client
         .from(_table)
-        .update(_toUpdateRow(product, includePhotos: updatePhotos))
+        .update(payload)
         .eq('id', product.id)
         .select('id');
 
-    if ((updated as List).isEmpty) {
-      // Alta: las fotos van (vacías al venir de Excel; con paths si es create UI).
-      await SupabaseService.client.from(_table).insert(_toInsertRow(product));
+    if ((updated as List).isNotEmpty) {
+      return product.id;
     }
+
+    // Soft-deleted product still holds the unique codigo — reactivate it.
+    final existing = await fetchByCodigoIncludingInactive(product.codigo);
+    if (existing != null) {
+      await SupabaseService.client
+          .from(_table)
+          .update(payload)
+          .eq('id', existing.id)
+          .select('id');
+      return existing.id;
+    }
+
+    // Alta real: las fotos van (vacías al venir de Excel; con paths si es create UI).
+    await SupabaseService.client.from(_table).insert(_toInsertRow(product));
+    return product.id;
   }
 
-  Future<void> upsertAll(
+  /// Upserts all products. Returns a map of requested id → persisted id when
+  /// a soft-deleted row was restored under a different id (AR-35).
+  Future<Map<String, String>> upsertAll(
     List<Product> products, {
     bool updatePhotos = true,
     void Function(int done, int total)? onProgress,
   }) async {
-    if (products.isEmpty) return;
+    final remapped = <String, String>{};
+    if (products.isEmpty) return remapped;
     var done = 0;
     onProgress?.call(0, products.length);
     for (final product in products) {
-      await upsert(product, updatePhotos: updatePhotos);
+      final persistedId = await upsert(product, updatePhotos: updatePhotos);
+      if (persistedId != product.id) {
+        remapped[product.id] = persistedId;
+      }
       done++;
       onProgress?.call(done, products.length);
     }
+    return remapped;
   }
 
   /// Borrado lógico (AR-23): un producto con historial de stock no se puede

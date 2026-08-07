@@ -348,13 +348,17 @@ class _UrbanField extends StatelessWidget {
               minLines: minLines,
               maxLines: minLines,
               onChanged: (_) => onChanged?.call(),
+              cursorColor: Colors.black,
               style: const TextStyle(
                 fontSize: 9,
                 fontWeight: FontWeight.w700,
                 height: 1.1,
+                color: Colors.black,
               ),
               decoration: const InputDecoration(
                 isDense: true,
+                filled: false,
+                fillColor: Colors.transparent,
                 contentPadding: EdgeInsets.only(bottom: 1),
                 border: UnderlineInputBorder(
                   borderSide: BorderSide(color: Colors.black, width: 0.9),
@@ -461,8 +465,12 @@ class _UrbanFiscalConditionField extends StatelessWidget {
                   ? value
                   : UrbanReceiptOptions.defaultFiscalCondition,
               isExpanded: true,
+              dropdownColor: Colors.white,
+              iconEnabledColor: Colors.black,
               decoration: const InputDecoration(
                 isDense: true,
+                filled: false,
+                fillColor: Colors.transparent,
                 contentPadding: EdgeInsets.only(bottom: 1),
                 border: UnderlineInputBorder(
                   borderSide: BorderSide(color: Colors.black, width: 0.9),

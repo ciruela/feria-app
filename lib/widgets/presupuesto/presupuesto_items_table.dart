@@ -391,12 +391,27 @@ class _TcInlineFieldState extends State<_TcInlineField> {
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       textAlign: TextAlign.center,
       onChanged: (value) => widget.onChanged(widget.lineKey, value),
-      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+      cursorColor: Colors.black,
+      style: const TextStyle(
+        fontSize: 10,
+        fontWeight: FontWeight.w700,
+        color: Colors.black,
+      ),
       decoration: const InputDecoration(
         isDense: true,
+        filled: false,
+        fillColor: Colors.transparent,
         counterText: '',
         contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-        border: OutlineInputBorder(),
+        border: OutlineInputBorder(
+          borderSide: BorderSide(color: Colors.black),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: Colors.black),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: Colors.black, width: 1.2),
+        ),
       ),
     );
   }
@@ -459,12 +474,28 @@ class _SerialInlineFieldState extends State<_SerialInlineField> {
             textCapitalization: TextCapitalization.characters,
             inputFormatters: UpperCaseTextFormatter.formatters,
             onChanged: (value) => widget.onChanged(widget.lineKey, value),
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+            cursorColor: Colors.black,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: Colors.black,
+            ),
             decoration: const InputDecoration(
               isDense: true,
+              filled: false,
+              fillColor: Colors.transparent,
               hintText: 'N° serie',
+              hintStyle: TextStyle(color: Colors.black54, fontSize: 10),
               contentPadding: EdgeInsets.only(bottom: 1),
-              border: UnderlineInputBorder(),
+              border: UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.black),
+              ),
+              enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.black),
+              ),
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.black, width: 1.2),
+              ),
             ),
           ),
         ),

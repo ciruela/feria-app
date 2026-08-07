@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/cart_checkout_payment.dart';
+import '../models/product_prices.dart';
 import '../services/cart_service.dart';
 import '../services/cart_totals_service.dart';
 import '../services/exchange_rate_service.dart';
@@ -112,10 +113,19 @@ class _CheckoutSummary extends StatelessWidget {
       exchangeRate: exchangeRate,
       pricingSettings: pricingSettings,
     );
+    final listaTotal = totalsService.cartTotalAtMethod(
+      cart: cart,
+      method: PaymentMethod.lista,
+      exchangeRate: exchangeRate,
+      pricingSettings: pricingSettings,
+    );
     final allocations = totalsService.allocationsFor(
       checkout: checkout,
       total: total,
     );
+    final deltaLabel = checkout.pricingMethod.isUsdPayment
+        ? formatSignedUsdDelta(total.usd - listaTotal.usd)
+        : formatSignedArsDelta(total.ars - listaTotal.ars);
 
     if (allocations.length == 1) {
       final allocation = allocations.first;
@@ -132,9 +142,19 @@ class _CheckoutSummary extends StatelessWidget {
                 style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
-            Text(
-              amount,
-              style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w700),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  amount,
+                  style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w700),
+                ),
+                if (deltaLabel != null)
+                  Text(
+                    deltaLabel,
+                    style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+                  ),
+              ],
             ),
           ],
         );
@@ -155,31 +175,48 @@ class _CheckoutSummary extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
+          if (deltaLabel != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              deltaLabel,
+              style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+            ),
+          ],
         ],
       );
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: allocations.map((allocation) {
-        final amount = allocation.paysInUsd
-            ? formatUsd(allocation.amountUsd)
-            : formatArs(allocation.amountArs);
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  allocation.method.shortLabel,
-                  style: AppText.bodySmall,
+      children: [
+        ...allocations.map((allocation) {
+          final amount = allocation.paysInUsd
+              ? formatUsd(allocation.amountUsd)
+              : formatArs(allocation.amountArs);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    allocation.method.shortLabel,
+                    style: AppText.bodySmall,
+                  ),
                 ),
-              ),
-              Text(amount, style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w600)),
-            ],
+                Text(
+                  amount,
+                  style: AppText.bodyLarge.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          );
+        }),
+        if (deltaLabel != null)
+          Text(
+            'vs lista $deltaLabel',
+            style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
           ),
-        );
-      }).toList(),
+      ],
     );
   }
 }

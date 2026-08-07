@@ -21,4 +21,16 @@ void main() {
   test('formatDateTime incluye hora', () {
     expect(formatDateTime(DateTime(2026, 3, 9, 14, 5)), '09/03/2026 - 14:05');
   });
+
+  test('formatSignedArsDelta shows surcharge and discount', () {
+    expect(formatSignedArsDelta(1200), '+ \$ 1.200');
+    expect(formatSignedArsDelta(-500), '- \$ 500');
+    expect(formatSignedArsDelta(0.1), isNull);
+  });
+
+  test('formatSignedUsdDelta shows surcharge and discount', () {
+    expect(formatSignedUsdDelta(10), '+ USD 10.00');
+    expect(formatSignedUsdDelta(-2.5), '- USD 2.50');
+    expect(formatSignedUsdDelta(0.001), isNull);
+  });
 }

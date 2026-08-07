@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../config/pricing_limits.dart';
 import '../../services/pricing_settings_service.dart';
 import '../../widgets/feria_shell.dart';
 
@@ -77,31 +78,23 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: () async {
-              final efectivo = double.tryParse(_efectivo.text);
-              final debito = double.tryParse(_debito.text);
-              final t1 = double.tryParse(_t1.text);
-              final t3 = double.tryParse(_t3.text);
-              final t6 = double.tryParse(_t6.text);
-              final t9 = double.tryParse(_t9.text);
-              final t12 = double.tryParse(_t12.text);
-              final t18 = double.tryParse(_t18.text);
-
-              if ([efectivo, debito, t1, t3, t6, t9, t12, t18].any((v) => v == null)) {
+              final error = _validateAndMessage();
+              if (error != null) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Valores inválidos')),
+                  SnackBar(content: Text(error)),
                 );
                 return;
               }
 
               await context.read<PricingSettingsService>().save(
-                    efectivoPct: efectivo!,
-                    debitoPct: debito!,
-                    tarjeta1Pct: t1!,
-                    tarjeta3Pct: t3!,
-                    tarjeta6Pct: t6!,
-                    tarjeta9Pct: t9!,
-                    tarjeta12Pct: t12!,
-                    tarjeta18Pct: t18!,
+                    efectivoPct: double.parse(_efectivo.text),
+                    debitoPct: double.parse(_debito.text),
+                    tarjeta1Pct: double.parse(_t1.text),
+                    tarjeta3Pct: double.parse(_t3.text),
+                    tarjeta6Pct: double.parse(_t6.text),
+                    tarjeta9Pct: double.parse(_t9.text),
+                    tarjeta12Pct: double.parse(_t12.text),
+                    tarjeta18Pct: double.parse(_t18.text),
                   );
 
               if (!context.mounted) return;
@@ -114,6 +107,32 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
         ],
       ),
     );
+  }
+
+  /// Returns an error message, or null if all fields are valid.
+  String? _validateAndMessage() {
+    final entries = <(String key, String label, String text)>[
+      ('efectivo', 'El descuento de efectivo', _efectivo.text),
+      ('debito', 'El recargo de débito', _debito.text),
+      ('tarjeta1', 'El recargo de 1 cuota', _t1.text),
+      ('tarjeta3', 'El recargo de 3 cuotas', _t3.text),
+      ('tarjeta6', 'El recargo de 6 cuotas', _t6.text),
+      ('tarjeta9', 'El recargo de 9 cuotas', _t9.text),
+      ('tarjeta12', 'El recargo de 12 cuotas', _t12.text),
+      ('tarjeta18', 'El recargo de 18 cuotas', _t18.text),
+    ];
+
+    for (final (key, label, text) in entries) {
+      final value = double.tryParse(text);
+      if (value == null) {
+        return 'Valores inválidos';
+      }
+      final (lo, hi) = PricingLimits.rangeFor(key);
+      if (value < lo || value > hi) {
+        return '$label debe estar entre ${lo.toInt()} y ${hi.toInt()}%';
+      }
+    }
+    return null;
   }
 
   Widget _field(String label, TextEditingController controller) {

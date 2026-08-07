@@ -90,17 +90,26 @@ Future<AddedToCartAction?> showAddedToCartSheet(
   );
 }
 
+/// Opens cart after "IR AL CARRITO". Only pops when [Navigator.canPop] so the
+/// catalog root is never removed (AR-46 black screen). Pushes via [NavigatorState]
+/// so it still works after the calling route is disposed.
 Future<void> handleAddedToCartNavigation(
   BuildContext context,
-  AddedToCartAction? action,
-) async {
+  AddedToCartAction? action, {
+  WidgetBuilder cartBuilder = _defaultCartBuilder,
+}) async {
   if (action != AddedToCartAction.goToCart || !context.mounted) return;
 
-  Navigator.of(context).pop();
-  await Navigator.of(context).push(
-    MaterialPageRoute(builder: (_) => const CartScreen()),
+  final navigator = Navigator.of(context);
+  if (navigator.canPop()) {
+    navigator.pop();
+  }
+  await navigator.push(
+    MaterialPageRoute<void>(builder: cartBuilder),
   );
 }
+
+Widget _defaultCartBuilder(BuildContext context) => const CartScreen();
 
 void showStockLimitMessage(BuildContext context, Product product) {
   final stock = product.stock;

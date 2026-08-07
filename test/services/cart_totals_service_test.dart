@@ -75,7 +75,10 @@ void main() {
 
     expect(cart.weaponsMissingSerial, hasLength(1));
 
-    cart.updateSerialNumber('arma', 'ABC123');
+    final weaponLineKey = cart.items
+        .firstWhere((item) => item.product.isArma)
+        .lineKey;
+    cart.updateSerialNumber(weaponLineKey, 'ABC123');
     expect(cart.weaponsMissingSerial, isEmpty);
   });
 

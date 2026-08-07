@@ -1,7 +1,10 @@
 import 'package:app_feria/models/cart_checkout_payment.dart';
+import 'package:app_feria/models/product.dart';
 import 'package:app_feria/models/product_prices.dart';
 import 'package:app_feria/services/cart_service.dart';
+import 'package:app_feria/services/catalog_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../helpers/test_product.dart';
 
@@ -9,16 +12,33 @@ void main() {
   late CartService cart;
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     cart = CartService();
   });
 
-  test('adds and merges products by id', () {
+  test('adds and merges munition by product id', () {
     final product = testProduct(id: 'p1', precioUsd: 100);
 
     expect(cart.addProduct(product), CartAddResult.added);
     expect(cart.addProduct(product), CartAddResult.added);
     expect(cart.items, hasLength(1));
     expect(cart.items.first.quantity, 2);
+  });
+
+  test('adds weapons as separate lines of quantity 1', () {
+    final weapon = testProduct(
+      id: 'arma1',
+      precioUsd: 500,
+      type: ProductType.armaCorta,
+      stock: 5,
+    );
+
+    expect(cart.addProductQuantity(weapon, 2), CartAddResult.added);
+    expect(cart.items, hasLength(2));
+    expect(cart.items.every((item) => item.quantity == 1), isTrue);
+    expect(cart.items[0].lineKey, isNot(cart.items[1].lineKey));
+    expect(cart.quantityInCart('arma1'), 2);
+    expect(cart.weaponsMissingSerial, hasLength(2));
   });
 
   test('addProductQuantity respects stock limit', () {
@@ -40,5 +60,37 @@ void main() {
 
     expect(cart.isEmpty, isTrue);
     expect(cart.hasCheckoutPayment, isFalse);
+  });
+
+  test('sale idempotency key is stable until cart clear', () {
+    final first = cart.ensureSaleIdempotencyKey();
+    final second = cart.ensureSaleIdempotencyKey();
+    expect(second, first);
+
+    cart.clear();
+    final afterClear = cart.ensureSaleIdempotencyKey();
+    expect(afterClear, isNot(first));
+  });
+
+  test('refreshProducts updates stale prices from catalog', () async {
+    final catalog = CatalogService();
+    await catalog.addProduct(
+      type: ProductType.municion,
+      marca: 'CCI',
+      calibre: '.22 LR',
+      codigo: 'R32',
+      precioUsd: 100,
+      stock: 5,
+      roundsPerBox: 50,
+    );
+    final original = catalog.products.single;
+    expect(cart.addProduct(original), CartAddResult.added);
+
+    await catalog.updateProduct(original.copyWith(precioUsd: 150));
+    expect(cart.items.single.product.precioUsd, 100);
+
+    expect(cart.refreshProducts(catalog), isTrue);
+    expect(cart.items.single.product.precioUsd, 150);
+    expect(cart.refreshProducts(catalog), isFalse);
   });
 }
