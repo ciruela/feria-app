@@ -48,8 +48,13 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
   }
 
   /// Catálogo vendible: solo productos con stock > 0 (null/"—" no se muestran).
-  List<Product> _availableProducts(CatalogService catalog) =>
-      catalog.products.where((p) => (p.stock ?? 0) > 0).toList();
+  ///
+  /// Excepción Urban Tactical: los productos con precios fijos se muestran
+  /// SIEMPRE (catálogo fiel al Excel), aunque tengan stock 0. La disponibilidad
+  /// real la aclara la propia ficha ("consultar disponibilidad").
+  List<Product> _availableProducts(CatalogService catalog) => catalog.products
+      .where((p) => (p.stock ?? 0) > 0 || p.hasFixedPrices)
+      .toList();
 
   /// Productos disponibles del tipo elegido (sin aplicar marca/calibre/búsqueda).
   List<Product> _typeSource(CatalogService catalog) {

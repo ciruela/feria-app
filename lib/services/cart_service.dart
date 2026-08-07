@@ -66,8 +66,13 @@ class CartService extends ChangeNotifier {
     return (stock - quantityInCart(product.id)).clamp(0, stock);
   }
 
+  /// Un producto se puede vender si tiene precio USD > 0 o precios fijos del
+  /// Excel (Urban Tactical, que cotiza en ARS y puede tener USD 0).
+  bool _hasSellablePrice(Product product) =>
+      product.precioUsd > 0 || product.hasFixedPrices;
+
   bool canAddMore(Product product) {
-    if (product.precioUsd <= 0) return false;
+    if (!_hasSellablePrice(product)) return false;
     if (AppConfig.useSupabase && product.stock == null) return false;
     if (!product.inStock) return false;
 
@@ -88,7 +93,7 @@ class CartService extends ChangeNotifier {
 
   CartAddResult addProductQuantity(Product product, int quantity) {
     if (quantity <= 0) return CartAddResult.stockLimitReached;
-    if (product.precioUsd <= 0) {
+    if (!_hasSellablePrice(product)) {
       return CartAddResult.missingPrice;
     }
     if (AppConfig.useSupabase && product.stock == null) {

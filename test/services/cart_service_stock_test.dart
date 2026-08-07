@@ -1,4 +1,5 @@
 import 'package:app_feria/models/product.dart';
+import 'package:app_feria/models/product_prices.dart';
 import 'package:app_feria/services/cart_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -13,6 +14,38 @@ Product _prod({int? stock}) => Product(
     );
 
 void main() {
+  test('Urban: producto con USD 0 pero precios fijos se puede agregar', () {
+    final cart = CartService();
+    const p = Product(
+      id: 'bersa_1',
+      type: ProductType.armaCorta,
+      marca: 'BERSA',
+      calibre: '9',
+      codigo: '0T9',
+      precioUsd: 0, // Urban cotiza en ARS: USD 0 no debe bloquear la venta.
+      stock: 5,
+      fixedPrices: FixedPrices(efectivoArs: 500000, tarjetaArs: 520000),
+    );
+    expect(cart.canAddMore(p), isTrue);
+    expect(cart.addProduct(p), CartAddResult.added);
+    expect(cart.itemCount, 1);
+  });
+
+  test('producto con USD 0 y sin precios fijos sigue bloqueado', () {
+    final cart = CartService();
+    const p = Product(
+      id: 'sinprecio_1',
+      type: ProductType.municion,
+      marca: 'X',
+      calibre: '9',
+      codigo: 'NP',
+      precioUsd: 0,
+      stock: 5,
+    );
+    expect(cart.canAddMore(p), isFalse);
+    expect(cart.addProduct(p), CartAddResult.missingPrice);
+  });
+
   test('respeta el límite de stock', () {
     final cart = CartService();
     final p = _prod(stock: 2);
