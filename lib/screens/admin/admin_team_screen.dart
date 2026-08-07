@@ -73,9 +73,9 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
     );
     if (result == null) return;
 
+    final session = context.read<TenantSessionService>();
     setState(() => _loading = true);
     try {
-      final session = context.read<TenantSessionService>();
       await session.ensureSupabaseWriteContext();
       final invited = await _service.invite(
         email: result.email,
@@ -136,9 +136,9 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
     );
     if (ok != true) return;
 
+    final session = context.read<TenantSessionService>();
     setState(() => _loading = true);
     try {
-      final session = context.read<TenantSessionService>();
       await session.ensureSupabaseWriteContext();
       await _service.removeMember(
         member.userId,

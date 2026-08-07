@@ -125,7 +125,7 @@ class TeamService {
   static Map<String, dynamic> _functionErrorMap(FunctionException error) {
     final fromDetails = _asStringKeyedMap(error.details);
     if (fromDetails.isNotEmpty) return fromDetails;
-    return _asStringKeyedMap(error.reason);
+    return const {};
   }
 
   Future<void> _deactivateViaRpc(String userId) async {
