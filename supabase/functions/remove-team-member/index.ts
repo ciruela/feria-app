@@ -84,9 +84,13 @@ Deno.serve(async (req) => {
         .eq("user_id", callerId)
         .eq("tenant_id", tenantId)
         .maybeSingle();
-      if (!callerMembership?.activo || callerMembership.rol !== "owner") {
+      if (!callerMembership?.activo) {
+        return json({ error: "Sin acceso al equipo de esta armería" }, 403);
+      }
+      const callerRol = callerMembership.rol;
+      if (callerRol !== "owner" && callerRol !== "admin") {
         return json(
-          { error: "Solo el dueño de la armería puede quitar personas" },
+          { error: "Solo dueño o administrador pueden quitar personas del equipo" },
           403,
         );
       }
@@ -107,6 +111,21 @@ Deno.serve(async (req) => {
     }
 
     if (targetMembership.rol === "owner") {
+      if (!isPlatformAdmin) {
+        const { data: callerMembership } = await admin
+          .from("memberships")
+          .select("rol,activo")
+          .eq("user_id", callerId)
+          .eq("tenant_id", tenantId)
+          .maybeSingle();
+        if (callerMembership?.rol !== "owner") {
+          return json(
+            { error: "Solo el dueño puede quitar a otro dueño" },
+            403,
+          );
+        }
+      }
+
       const { count, error: countErr } = await admin
         .from("memberships")
         .select("user_id", { count: "exact", head: true })

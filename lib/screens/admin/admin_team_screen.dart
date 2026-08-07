@@ -23,10 +23,25 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
   final _service = TeamService();
   List<TeamMember> _members = const [];
   bool _loading = false;
+  String? _removingUserId;
   String? _error;
   bool _needsMigration = false;
 
-  bool get _canManage {
+  bool get _canInvite {
+    final session = context.read<TenantSessionService>();
+    return session.appRole == 'owner' || session.isPlatformAdmin;
+  }
+
+  bool get _canManageTeam {
+    final session = context.read<TenantSessionService>();
+    return session.appRole == 'owner' ||
+        session.appRole == 'admin' ||
+        session.isPlatformAdmin;
+  }
+
+  bool _canRemoveMember(TeamMember member) {
+    if (!_canManageTeam || member.userId == _currentUserId) return false;
+    if (!member.isOwner) return true;
     final session = context.read<TenantSessionService>();
     return session.appRole == 'owner' || session.isPlatformAdmin;
   }
@@ -65,7 +80,7 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
   }
 
   Future<void> _invite() async {
-    if (!_canManage) return;
+    if (!_canInvite) return;
     final session = context.read<TenantSessionService>();
 
     final result = await showDialog<_InviteForm>(
@@ -111,7 +126,7 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
   }
 
   Future<void> _removeMember(TeamMember member) async {
-    if (!_canManage || member.userId == _currentUserId) return;
+    if (!_canRemoveMember(member)) return;
     final session = context.read<TenantSessionService>();
 
     final ok = await showDialog<bool>(
@@ -137,7 +152,7 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
     );
     if (ok != true || !mounted) return;
 
-    setState(() => _loading = true);
+    setState(() => _removingUserId = member.userId);
     try {
       await session.ensureSupabaseWriteContext();
       await _service.removeMember(
@@ -145,16 +160,22 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
         tenantId: session.effectiveTenantId,
       );
       if (!mounted) return;
+      setState(() {
+        _members = _members
+            .where((m) => m.userId != member.userId)
+            .toList(growable: false);
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${member.displayName} fue eliminado del equipo')),
       );
       await _load();
     } catch (error) {
       if (!mounted) return;
-      setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_formatInviteError(error))),
       );
+    } finally {
+      if (mounted) setState(() => _removingUserId = null);
     }
   }
 
@@ -171,7 +192,7 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
           ),
         ],
       ),
-      floatingActionButton: _canManage
+      floatingActionButton: _canInvite
           ? FloatingActionButton.extended(
               onPressed: _loading ? null : _invite,
               icon: const Icon(Icons.person_add_alt_1_rounded),
@@ -204,9 +225,8 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
                       ),
                     ),
                     child: Text(
-                      _canManage
-                          ? 'Invitá por email a quienes administran la armería. '
-                              'Tocá Eliminar en cada persona para sacarla del equipo. '
+                      _canManageTeam
+                          ? 'Invitá por email (solo el dueño) o eliminá administradores del equipo. '
                               'Si todavía no tienen cuenta, les llega un mail '
                               'para crearla. Los vendedores del mostrador '
                               'entran con “Entrar como vendedor”.'
@@ -281,9 +301,12 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
                         child: _MemberTile(
                           member: member,
                           isSelf: member.userId == _currentUserId,
-                          canManage: _canManage,
-                          onRemove:
-                              member.isOwner ? null : () => _removeMember(member),
+                          isRemoving: _removingUserId == member.userId,
+                          canRemove: _canRemoveMember(member),
+                          onRemove: _canRemoveMember(member) &&
+                                  _removingUserId == null
+                              ? () => _removeMember(member)
+                              : null,
                         ),
                       ),
                     ),
@@ -315,13 +338,15 @@ class _MemberTile extends StatelessWidget {
   const _MemberTile({
     required this.member,
     required this.isSelf,
-    required this.canManage,
+    required this.isRemoving,
+    required this.canRemove,
     this.onRemove,
   });
 
   final TeamMember member;
   final bool isSelf;
-  final bool canManage;
+  final bool isRemoving;
+  final bool canRemove;
   final VoidCallback? onRemove;
 
   @override
@@ -376,7 +401,13 @@ class _MemberTile extends StatelessWidget {
           '${member.isOwner ? 'Dueño' : 'Admin'}',
           style: const TextStyle(fontSize: 12),
         ),
-        trailing: canManage && onRemove != null
+        trailing: isRemoving
+            ? const SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : canRemove && onRemove != null
             ? TextButton.icon(
                 onPressed: onRemove,
                 icon: const Icon(Icons.person_remove_outlined, size: 18),

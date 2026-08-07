@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/team_member.dart';
+import 'active_tenant.dart';
 import 'supabase_service.dart';
 
 class TeamFetchResult {
@@ -49,10 +51,16 @@ class TeamService {
 
   /// Sin migración 011: lista miembros sin email ajeno (solo el tuyo).
   Future<List<TeamMember>> _fetchMembersFallback() async {
-    final rows = await SupabaseService.client
+    // Filtro por tenant activo (no solo RLS): un platform admin pasa el RLS de
+    // todas las armerías y sin esto vería miembros de otras.
+    final tenantId = activeTenantIdFromJwt();
+    var query = SupabaseService.client
         .from('memberships')
-        .select('user_id, nombre, rol, activo, created_at')
-        .order('created_at');
+        .select('user_id, nombre, rol, activo, created_at');
+    if (tenantId != null) {
+      query = query.eq('tenant_id', tenantId);
+    }
+    final rows = await query.order('created_at');
 
     final currentUser = SupabaseService.client.auth.currentUser;
     final currentId = currentUser?.id ?? '';
@@ -128,6 +136,22 @@ class TeamService {
     return const {};
   }
 
+  static const _removeTimeout = Duration(seconds: 20);
+
+  static bool _isMissingRpc(PostgrestException error) {
+    if (error.code == 'PGRST202') return true;
+    final msg = error.message.toLowerCase();
+    return msg.contains('could not find the function') ||
+        msg.contains('function') && msg.contains('does not exist');
+  }
+
+  static Never _throwRpcError(PostgrestException error) {
+    final message = error.message.trim();
+    throw StateError(
+      message.isNotEmpty ? message : 'No se pudo quitar del equipo',
+    );
+  }
+
   Future<void> _deactivateViaRpc(String userId) async {
     await SupabaseService.client.rpc(
       'deactivate_tenant_member',
@@ -135,28 +159,53 @@ class TeamService {
     );
   }
 
-  Future<void> removeMember(String userId, {String? tenantId}) async {
-    final body = <String, dynamic>{'user_id': userId};
-    final scopedTenant = tenantId?.trim();
-    if (scopedTenant != null && scopedTenant.isNotEmpty) {
-      body['tenant_id'] = scopedTenant;
-    }
+  Future<void> _removeViaRpc(String userId) async {
+    await SupabaseService.client.rpc(
+      'remove_tenant_member',
+      params: {'p_user_id': userId},
+    );
+  }
 
-    try {
+  Future<void> removeMember(String userId, {String? tenantId}) async {
+    await _withTimeout(() async {
+      // 1) RPC directo (sin Edge Function) — el más confiable en web.
+      try {
+        await _deactivateViaRpc(userId);
+        return;
+      } on PostgrestException catch (error) {
+        if (!_isMissingRpc(error)) _throwRpcError(error);
+      }
+
+      // 2) Borrado duro si existe la migración 043.
+      try {
+        await _removeViaRpc(userId);
+        return;
+      } on PostgrestException catch (error) {
+        if (!_isMissingRpc(error)) _throwRpcError(error);
+      }
+
+      // 3) Edge Function (limpia active_tenant en Auth).
+      final body = <String, dynamic>{'user_id': userId};
+      final scopedTenant = tenantId?.trim();
+      if (scopedTenant != null && scopedTenant.isNotEmpty) {
+        body['tenant_id'] = scopedTenant;
+      }
+
       await _invokeFunction(
         'remove-team-member',
         body,
         fallbackMessage: 'No se pudo eliminar del equipo',
       );
-    } on StateError catch (error) {
-      final message = error.message.toLowerCase();
-      if (message.contains('not found') ||
-          message.contains('404') ||
-          message.contains('function')) {
-        await _deactivateViaRpc(userId);
-        return;
-      }
-      rethrow;
+    });
+  }
+
+  Future<void> _withTimeout(Future<void> Function() action) async {
+    try {
+      await action().timeout(_removeTimeout);
+    } on TimeoutException {
+      throw StateError(
+        'La operación tardó demasiado. Revisá la conexión e intentá de nuevo.',
+      );
     }
   }
 
