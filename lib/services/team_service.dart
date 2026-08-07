@@ -139,10 +139,38 @@ class TeamService {
   static const _removeTimeout = Duration(seconds: 20);
 
   static bool _isMissingRpc(PostgrestException error) {
-    if (error.code == 'PGRST202') return true;
+    if (error.code == 'PGRST202' || error.code == 'PGRST203') return true;
     final msg = error.message.toLowerCase();
     return msg.contains('could not find the function') ||
+        msg.contains('could not choose the best candidate function') ||
         msg.contains('function') && msg.contains('does not exist');
+  }
+
+  Map<String, dynamic> _rpcParams(String userId, {String? tenantId}) {
+    final scoped = tenantId?.trim();
+    if (scoped == null || scoped.isEmpty) {
+      throw StateError(
+        'No hay armería activa. Volvé al selector e ingresá de nuevo.',
+      );
+    }
+    return {
+      'p_user_id': userId,
+      'p_tenant_id': scoped,
+    };
+  }
+
+  Future<void> _deactivateViaRpc(String userId, {String? tenantId}) async {
+    await SupabaseService.client.rpc(
+      'deactivate_tenant_member',
+      params: _rpcParams(userId, tenantId: tenantId),
+    );
+  }
+
+  Future<void> _removeViaRpc(String userId, {String? tenantId}) async {
+    await SupabaseService.client.rpc(
+      'remove_tenant_member',
+      params: _rpcParams(userId, tenantId: tenantId),
+    );
   }
 
   static Never _throwRpcError(PostgrestException error) {
@@ -150,24 +178,6 @@ class TeamService {
     throw StateError(
       message.isNotEmpty ? message : 'No se pudo quitar del equipo',
     );
-  }
-
-  Future<void> _deactivateViaRpc(String userId, {String? tenantId}) async {
-    final params = <String, dynamic>{'p_user_id': userId};
-    final scoped = tenantId?.trim();
-    if (scoped != null && scoped.isNotEmpty) {
-      params['p_tenant_id'] = scoped;
-    }
-    await SupabaseService.client.rpc('deactivate_tenant_member', params: params);
-  }
-
-  Future<void> _removeViaRpc(String userId, {String? tenantId}) async {
-    final params = <String, dynamic>{'p_user_id': userId};
-    final scoped = tenantId?.trim();
-    if (scoped != null && scoped.isNotEmpty) {
-      params['p_tenant_id'] = scoped;
-    }
-    await SupabaseService.client.rpc('remove_tenant_member', params: params);
   }
 
   static bool _isRecoverableRemoveError(PostgrestException error) {

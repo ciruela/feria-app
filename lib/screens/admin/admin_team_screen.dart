@@ -187,7 +187,19 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
       await _load();
     } catch (error) {
       if (!mounted) return;
-      _showMessage(_formatInviteError(error), isError: true);
+      await showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('No se pudo eliminar'),
+          content: Text(_formatInviteError(error)),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Entendido'),
+            ),
+          ],
+        ),
+      );
     } finally {
       if (mounted) setState(() => _removingUserId = null);
     }
