@@ -91,7 +91,7 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
 
     setState(() => _loading = true);
     try {
-      await session.ensureSupabaseWriteContext();
+      await _ensureTenantForWrite(session);
       final invited = await _service.invite(
         email: result.email,
         nombre: result.nombre,
@@ -102,16 +102,34 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
           ? 'Invitación enviada a ${invited.email}. '
               'Va a recibir un mail para crear su contraseña y entrar.'
           : '${invited.email} ya tenía cuenta: quedó agregada al equipo.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      _showMessage(message);
       await _load();
     } catch (error) {
       if (!mounted) return;
       setState(() => _loading = false);
+      _showMessage(_formatInviteError(error), isError: true);
+    }
+  }
+
+  void _showMessage(String message, {bool isError = false}) {
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_formatInviteError(error))),
+        SnackBar(
+          content: Text(message),
+          backgroundColor: isError ? AppColors.danger : null,
+        ),
       );
+    });
+  }
+
+  Future<void> _ensureTenantForWrite(TenantSessionService session) async {
+    await session.ensureSupabaseWriteContext();
+    final tenantId = session.effectiveTenantId?.trim();
+    if (tenantId == null || tenantId.isEmpty) return;
+    if (session.tenantId != tenantId) {
+      await session.enterTenant(tenantId);
     }
   }
 
@@ -154,7 +172,7 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
 
     setState(() => _removingUserId = member.userId);
     try {
-      await session.ensureSupabaseWriteContext();
+      await _ensureTenantForWrite(session);
       await _service.removeMember(
         member.userId,
         tenantId: session.effectiveTenantId,
@@ -165,15 +183,11 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
             .where((m) => m.userId != member.userId)
             .toList(growable: false);
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${member.displayName} fue eliminado del equipo')),
-      );
+      _showMessage('${member.displayName} fue eliminado del equipo');
       await _load();
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_formatInviteError(error))),
-      );
+      _showMessage(_formatInviteError(error), isError: true);
     } finally {
       if (mounted) setState(() => _removingUserId = null);
     }
@@ -402,10 +416,13 @@ class _MemberTile extends StatelessWidget {
           style: const TextStyle(fontSize: 12),
         ),
         trailing: isRemoving
-            ? const SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(strokeWidth: 2),
+            ? const Padding(
+                padding: EdgeInsets.only(right: 8),
+                child: SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
               )
             : canRemove && onRemove != null
             ? TextButton.icon(

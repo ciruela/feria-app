@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       migration_file:
-        description: 'Archivo en supabase/migrations/ (vacío = 043_remove_tenant_member.sql)'
+        description: 'Archivo en supabase/migrations/ (vacío = 044_tenant_member_tenant_param.sql)'
         required: false
-        default: '043_remove_tenant_member.sql'
+        default: '044_tenant_member_tenant_param.sql'
   push:
     branches: [main]
     paths:
@@ -32,7 +32,7 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           PROJECT_REF: ihotjvimurztbhrsiabs
-          MIGRATION_FILE: ${{ github.event.inputs.migration_file || '043_remove_tenant_member.sql' }}
+          MIGRATION_FILE: ${{ github.event.inputs.migration_file || '044_tenant_member_tenant_param.sql' }}
         run: |
           set -euo pipefail
           chmod +x scripts/apply_supabase_migration.sh

@@ -152,33 +152,47 @@ class TeamService {
     );
   }
 
-  Future<void> _deactivateViaRpc(String userId) async {
-    await SupabaseService.client.rpc(
-      'deactivate_tenant_member',
-      params: {'p_user_id': userId},
-    );
+  Future<void> _deactivateViaRpc(String userId, {String? tenantId}) async {
+    final params = <String, dynamic>{'p_user_id': userId};
+    final scoped = tenantId?.trim();
+    if (scoped != null && scoped.isNotEmpty) {
+      params['p_tenant_id'] = scoped;
+    }
+    await SupabaseService.client.rpc('deactivate_tenant_member', params: params);
   }
 
-  Future<void> _removeViaRpc(String userId) async {
-    await SupabaseService.client.rpc(
-      'remove_tenant_member',
-      params: {'p_user_id': userId},
-    );
+  Future<void> _removeViaRpc(String userId, {String? tenantId}) async {
+    final params = <String, dynamic>{'p_user_id': userId};
+    final scoped = tenantId?.trim();
+    if (scoped != null && scoped.isNotEmpty) {
+      params['p_tenant_id'] = scoped;
+    }
+    await SupabaseService.client.rpc('remove_tenant_member', params: params);
+  }
+
+  static bool _isRecoverableRemoveError(PostgrestException error) {
+    final msg = error.message.toLowerCase();
+    return msg.contains('no está en el equipo') ||
+        msg.contains('not in the team');
   }
 
   Future<void> removeMember(String userId, {String? tenantId}) async {
     await _withTimeout(() async {
-      // 1) RPC directo (sin Edge Function) — el más confiable en web.
+      final scopedTenant = tenantId?.trim();
+
+      // 1) Borrado duro (elimina la fila de membership).
       try {
-        await _deactivateViaRpc(userId);
+        await _removeViaRpc(userId, tenantId: scopedTenant);
         return;
       } on PostgrestException catch (error) {
-        if (!_isMissingRpc(error)) _throwRpcError(error);
+        if (!_isMissingRpc(error) && !_isRecoverableRemoveError(error)) {
+          _throwRpcError(error);
+        }
       }
 
-      // 2) Borrado duro si existe la migración 043.
+      // 2) Soft delete (desactivar membership).
       try {
-        await _removeViaRpc(userId);
+        await _deactivateViaRpc(userId, tenantId: scopedTenant);
         return;
       } on PostgrestException catch (error) {
         if (!_isMissingRpc(error)) _throwRpcError(error);
@@ -186,7 +200,6 @@ class TeamService {
 
       // 3) Edge Function (limpia active_tenant en Auth).
       final body = <String, dynamic>{'user_id': userId};
-      final scopedTenant = tenantId?.trim();
       if (scopedTenant != null && scopedTenant.isNotEmpty) {
         body['tenant_id'] = scopedTenant;
       }
@@ -210,12 +223,12 @@ class TeamService {
   }
 
   /// @deprecated Usar [removeMember]. Mantenido por compatibilidad con RPC.
-  Future<void> deactivate(String userId) async {
+  Future<void> deactivate(String userId, {String? tenantId}) async {
     try {
-      await _deactivateViaRpc(userId);
+      await _deactivateViaRpc(userId, tenantId: tenantId);
     } on PostgrestException catch (error) {
       if (error.code == 'PGRST202') {
-        await removeMember(userId);
+        await removeMember(userId, tenantId: tenantId);
         return;
       }
       rethrow;
