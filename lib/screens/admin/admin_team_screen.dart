@@ -75,6 +75,8 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
 
     setState(() => _loading = true);
     try {
+      final session = context.read<TenantSessionService>();
+      await session.ensureSupabaseWriteContext();
       final invited = await _service.invite(
         email: result.email,
         nombre: result.nombre,
@@ -136,7 +138,12 @@ class _AdminTeamScreenState extends State<AdminTeamScreen> {
 
     setState(() => _loading = true);
     try {
-      await _service.removeMember(member.userId);
+      final session = context.read<TenantSessionService>();
+      await session.ensureSupabaseWriteContext();
+      await _service.removeMember(
+        member.userId,
+        tenantId: session.effectiveTenantId,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${member.displayName} fue eliminado del equipo')),

@@ -52,7 +52,12 @@ Deno.serve(async (req) => {
     const callerId = userData.user.id;
 
     const payload = decodeJwtPayload(jwt);
-    const tenantId = String(payload.tenant_id ?? "").trim();
+    const bodyTenant = String(body.tenant_id ?? "").trim();
+    const metaTenant = String(
+      (userData.user.app_metadata as Record<string, unknown> | undefined)
+        ?.active_tenant ?? "",
+    ).trim();
+    let tenantId = String(payload.tenant_id ?? bodyTenant ?? metaTenant).trim();
     const isPlatformAdmin =
       payload.is_platform_admin === true ||
       payload.is_platform_admin === "true";
