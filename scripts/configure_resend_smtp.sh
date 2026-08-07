@@ -41,7 +41,7 @@ payload="$(jq -n \
   --arg from "$FROM_EMAIL" \
   --arg name "$SENDER_NAME" \
   --arg host "$SMTP_HOST" \
-  --argjson port "$SMTP_PORT" \
+  --arg port "$SMTP_PORT" \
   --arg user "$SMTP_USER" \
   --arg pass "$RESEND_API_KEY" \
   '{
