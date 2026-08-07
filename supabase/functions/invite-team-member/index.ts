@@ -112,6 +112,8 @@ Deno.serve(async (req) => {
           full_name: displayName,
           invited_tenant_id: tenantId,
           invited_role: rol,
+          // La app muestra "Definí tu contraseña" cuando ve este flag.
+          needs_password: true,
         },
       });
 

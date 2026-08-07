@@ -132,5 +132,27 @@ void main() {
         AuthShellRoute.bootstrapping,
       );
     });
+
+    test('needsPasswordSetup manda a definir contraseña', () {
+      expect(
+        resolveAuthShellRoute(
+          isConfigured: true,
+          awaitingEmailConfirmation: false,
+          isSignedIn: true,
+          isEmailConfirmed: true,
+          isAnonymous: false,
+          isSellerPortalSession: false,
+          sessionReady: true,
+          bootstrapping: false,
+          provisioning: false,
+          hasNoOrganizationAccess: false,
+          view: WorkspaceView.tenant,
+          effectiveTenantId: 'tenant-a',
+          destinationCount: 1,
+          needsPasswordSetup: true,
+        ),
+        AuthShellRoute.setPassword,
+      );
+    });
   });
 }

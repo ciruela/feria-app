@@ -11,6 +11,7 @@ import 'auth_landing_screen.dart';
 import 'email_confirmation_screen.dart';
 import 'no_organization_screen.dart';
 import 'seller_portal_scope_loader.dart';
+import 'set_password_screen.dart';
 import 'tenant_app_shell.dart';
 import 'tenant_scope_loader.dart';
 import 'workspace_selector_screen.dart';
@@ -62,11 +63,13 @@ class _AuthGateState extends State<AuthGate> {
       view: session.view,
       effectiveTenantId: session.effectiveTenantId,
       destinationCount: session.destinationCount,
+      needsPasswordSetup: session.needsPasswordSetup,
     );
 
     return switch (route) {
       AuthShellRoute.offlineRoleGate => const TenantAppShell(),
       AuthShellRoute.authLanding => const AuthLandingScreen(),
+      AuthShellRoute.setPassword => const SetPasswordScreen(),
       AuthShellRoute.emailPending => const EmailConfirmationScreen(),
       AuthShellRoute.bootstrapping => const _BootLoading(),
       AuthShellRoute.noOrganization => const NoOrganizationScreen(),

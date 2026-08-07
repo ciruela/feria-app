@@ -4,6 +4,7 @@ import '../services/tenant_session_service.dart';
 enum AuthShellRoute {
   offlineRoleGate,
   authLanding,
+  setPassword,
   emailPending,
   bootstrapping,
   noOrganization,
@@ -28,11 +29,14 @@ AuthShellRoute resolveAuthShellRoute({
   required WorkspaceView view,
   required String? effectiveTenantId,
   required int destinationCount,
+  bool needsPasswordSetup = false,
 }) {
   if (!isConfigured) return AuthShellRoute.offlineRoleGate;
   if (awaitingEmailConfirmation) return AuthShellRoute.emailPending;
   if (isSellerPortalSession) return AuthShellRoute.sellerPortal;
   if (!isSignedIn) return AuthShellRoute.authLanding;
+  // Invitación por email o link de recuperación: primero define su clave.
+  if (needsPasswordSetup) return AuthShellRoute.setPassword;
   if (!isEmailConfirmed && !isAnonymous) return AuthShellRoute.emailPending;
   if (!sessionReady || bootstrapping || provisioning) {
     return AuthShellRoute.bootstrapping;

@@ -57,6 +57,7 @@ class TenantSessionService extends ChangeNotifier {
   bool _sessionReady = false;
   bool _bootstrapping = false;
   bool _preferWorkspaceSelector = false;
+  bool _passwordRecoveryActive = false;
   String? _sellerId;
   String _sellerNombre = '';
   String _activeTenantNombre = '';
@@ -195,9 +196,14 @@ class TenantSessionService extends ChangeNotifier {
     unawaited(_loadAwaitingOrgFlag().then((_) => notifyListeners()));
     _sub = SupabaseService.client.auth.onAuthStateChange.listen((state) {
       _readClaims();
+      if (state.event == AuthChangeEvent.passwordRecovery) {
+        // Entró por link de recuperación: hay que pedirle una clave nueva.
+        _passwordRecoveryActive = true;
+      }
       if (state.event == AuthChangeEvent.signedOut) {
         _resetWorkspaceState();
         _awaitingOrgRegistrationLocal = false;
+        _passwordRecoveryActive = false;
         _clearAwaitingOrgFlag();
       }
       notifyListeners();
@@ -387,6 +393,82 @@ class TenantSessionService extends ChangeNotifier {
 
   bool get _hasSupabaseWriteContext =>
       _isPlatformAdmin || (_tenantId != null && _tenantId!.isNotEmpty);
+
+  /// Clave para marcar en user_metadata que la persona todavía no definió
+  /// su contraseña (viene de una invitación por email).
+  static const _needsPasswordKey = 'needs_password';
+
+  /// La sesión requiere que la persona defina/actualice su contraseña:
+  /// - invitada por email (metadata `needs_password`), o
+  /// - entró por un link de recuperación (evento `passwordRecovery`).
+  bool get needsPasswordSetup {
+    if (!isSignedIn) return false;
+    if (isAnonymous || isSellerPortalSession) return false;
+    if (_passwordRecoveryActive) return true;
+    return _userMetadata()?[_needsPasswordKey] == true;
+  }
+
+  /// Define/actualiza la contraseña del usuario autenticado y limpia el flag
+  /// de invitación. Se usa desde [SetPasswordScreen] (invite + recovery).
+  Future<bool> setPassword(String password) async {
+    if (!isConfigured) return false;
+    _busy = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final meta = Map<String, dynamic>.from(_userMetadata() ?? const {});
+      meta[_needsPasswordKey] = false;
+      await SupabaseService.client.auth.updateUser(
+        UserAttributes(password: password, data: meta),
+      );
+      await SupabaseService.client.auth.refreshSession();
+      _passwordRecoveryActive = false;
+      _view = WorkspaceView.none;
+      _selectedTenantId = null;
+      _membershipsLoaded = false;
+      _sessionReady = false;
+      _preferWorkspaceSelector = !isTenantSubdomainEntry();
+      _readClaims();
+      await ensureSessionReady();
+      _busy = false;
+      notifyListeners();
+      return true;
+    } on AuthException catch (e) {
+      _error = e.message;
+      _busy = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      _busy = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Envía el mail de recuperación de contraseña (Resend SMTP).
+  Future<bool> sendPasswordReset(String email) async {
+    if (!isConfigured) return false;
+    _busy = true;
+    _error = null;
+    notifyListeners();
+    try {
+      await SupabaseService.client.auth.resetPasswordForEmail(email.trim());
+      _busy = false;
+      notifyListeners();
+      return true;
+    } on AuthException catch (e) {
+      _error = e.message;
+      _busy = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      _busy = false;
+      notifyListeners();
+      return false;
+    }
+  }
 
   /// Inicio de sesion con cuenta personal. Nunca crea una organizacion.
   Future<bool> signIn(String email, String password) async {
