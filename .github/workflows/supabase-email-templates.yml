@@ -1,0 +1,30 @@
+name: Supabase Email Templates
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/templates/**'
+      - 'scripts/apply_supabase_email_templates.sh'
+      - 'scripts/email_template_html.sh'
+      - '.github/workflows/supabase-email-templates.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: supabase-email-templates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply Armenext auth email templates
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ihotjvimurztbhrsiabs
+        run: |
+          chmod +x scripts/email_template_html.sh scripts/apply_supabase_email_templates.sh
+          ./scripts/apply_supabase_email_templates.sh
