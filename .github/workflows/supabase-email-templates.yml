@@ -6,6 +6,7 @@ on:
     paths:
       - 'supabase/templates/**'
       - 'scripts/apply_supabase_email_templates.sh'
+      - 'scripts/configure_resend_smtp.sh'
       - 'scripts/email_template_html.sh'
       - '.github/workflows/supabase-email-templates.yml'
   workflow_dispatch:
@@ -24,7 +25,12 @@ jobs:
       - name: Apply Armenext auth email templates
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
+          RESEND_SENDER_NAME: Armenext
           PROJECT_REF: ihotjvimurztbhrsiabs
         run: |
-          chmod +x scripts/email_template_html.sh scripts/apply_supabase_email_templates.sh
+          chmod +x scripts/email_template_html.sh \
+            scripts/apply_supabase_email_templates.sh \
+            scripts/configure_resend_smtp.sh
           ./scripts/apply_supabase_email_templates.sh

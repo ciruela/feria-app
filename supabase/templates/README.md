@@ -10,7 +10,39 @@ El HTML referencia el logo público:
 
 Ese archivo vive en `web/email/` y se publica con el deploy de Cloudflare Pages.
 
-## Aplicar en producción (recomendado)
+## Resend (envío en producción)
+
+Los templates HTML de esta carpeta se envían por **Supabase Auth**. En producción usá **Resend** como SMTP:
+
+1. Verificá el dominio `armenext.com` en [Resend → Domains](https://resend.com/domains)
+2. Creá API key en [Resend → API Keys](https://resend.com/api-keys)
+3. Configurá (local o CI):
+
+```bash
+export SUPABASE_ACCESS_TOKEN=sbp_...
+export RESEND_API_KEY=re_...
+export RESEND_FROM_EMAIL=noreply@armenext.com   # debe ser del dominio verificado
+export RESEND_SENDER_NAME=Armenext
+
+./scripts/apply_supabase_email_templates.sh   # templates + SMTP
+# o solo SMTP:
+./scripts/configure_resend_smtp.sh
+```
+
+**Credenciales SMTP Resend:**
+
+| Campo | Valor |
+|-------|-------|
+| Host | `smtp.resend.com` |
+| Port | `465` |
+| User | `resend` |
+| Password | tu API key `re_...` |
+
+**GitHub Actions:** agregá secrets `RESEND_API_KEY` y opcionalmente `RESEND_FROM_EMAIL`.
+
+**Rate limits:** después de activar SMTP, subí el límite en Supabase → Authentication → Rate Limits (default post-SMTP: ~30/h; para feria conviene más).
+
+## Aplicar templates en producción (recomendado)
 
 1. Token de acceso: [Supabase Account → Tokens](https://supabase.com/dashboard/account/tokens)
 2. Ejecutar:

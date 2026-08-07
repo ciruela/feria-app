@@ -74,6 +74,21 @@ if [[ "$http_code" != "200" ]]; then
 fi
 
 echo "✓ Templates aplicados."
+
+if [[ -n "${RESEND_API_KEY:-}" ]]; then
+  echo
+  echo "Configurando Resend SMTP..."
+  RESEND_API_KEY="$RESEND_API_KEY" \
+  RESEND_FROM_EMAIL="${RESEND_FROM_EMAIL:-noreply@armenext.com}" \
+  RESEND_SENDER_NAME="${RESEND_SENDER_NAME:-Armenext}" \
+  SUPABASE_ACCESS_TOKEN="$SUPABASE_ACCESS_TOKEN" \
+  PROJECT_REF="$PROJECT_REF" \
+    bash "$ROOT_DIR/scripts/configure_resend_smtp.sh"
+else
+  echo
+  echo "Tip: agregá RESEND_API_KEY para enviar vía Resend (ver scripts/configure_resend_smtp.sh)"
+fi
+
 echo
 echo "Verificá en Dashboard → Authentication → Email Templates"
 echo "Probá registrando un usuario de prueba para ver el correo nuevo."

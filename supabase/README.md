@@ -25,7 +25,7 @@ Backend multi-tenant para armerías. Las migraciones viven en `migrations/` y se
    supabase functions deploy storefront-catalog storefront-order
    ```
 9. Copiar `SUPABASE_URL` y `SUPABASE_ANON_KEY` a `.env` en la raíz del repo.
-10. **Emails de auth (branding Armenext):** ver [`templates/README.md`](templates/README.md) y ejecutar `./scripts/apply_supabase_email_templates.sh` (o dejar que CI lo aplique al pushear `supabase/templates/`).
+10. **Emails de auth (branding Armenext + Resend):** ver [`templates/README.md`](templates/README.md). Configurá `RESEND_API_KEY` y ejecutá `./scripts/apply_supabase_email_templates.sh`.
 
 Verificar con `./scripts/verify_supabase.sh`.
 
