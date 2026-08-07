@@ -52,6 +52,9 @@ app.*.map.json
 # Android local config
 /android/local.properties
 
+# Android signing (contiene contraseñas del keystore — no commitear)
+/android/key.properties
+
 # Local env (Supabase credentials)
 .env
 

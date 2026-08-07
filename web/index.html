@@ -33,6 +33,26 @@
 
   <title>Armenext</title>
   <link rel="manifest" href="manifest.json">
+
+  <!--
+    Auto-actualización: desregistra cualquier service worker viejo de Flutter y
+    borra sus caches. Antes la web quedaba pegada a una versión anterior y había
+    que hacer hard refresh. Ahora no se usa SW (ver flutter_bootstrap.js).
+  -->
+  <script>
+    (function () {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations()
+          .then(function (regs) { regs.forEach(function (r) { r.unregister(); }); })
+          .catch(function () {});
+      }
+      if (window.caches && caches.keys) {
+        caches.keys()
+          .then(function (keys) { keys.forEach(function (k) { caches.delete(k); }); })
+          .catch(function () {});
+      }
+    })();
+  </script>
 </head>
 <body>
   <!--
