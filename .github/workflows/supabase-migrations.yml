@@ -1,20 +1,26 @@
 name: Supabase Migrations
 
-# Aplica migraciones pendientes al proyecto linkeado (db push).
+# Aplica migraciones pendientes vía Management API (evita supabase link).
 on:
   workflow_dispatch:
+    inputs:
+      migration_file:
+        description: 'Archivo en supabase/migrations/ (vacío = todas pendientes vía script)'
+        required: false
+        default: '042_register_sale_fixed_prices.sql'
   push:
     branches: [main]
     paths:
       - 'supabase/migrations/**'
       - '.github/workflows/supabase-migrations.yml'
+      - 'scripts/apply_supabase_migration.sh'
 
 concurrency:
   group: supabase-migrations-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  push:
+  apply:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -22,15 +28,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      - name: Link and push migrations
+      - name: Apply migration SQL
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ihotjvimurztbhrsiabs
+          MIGRATION_FILE: ${{ github.event.inputs.migration_file || '042_register_sale_fixed_prices.sql' }}
         run: |
           set -euo pipefail
-          supabase link --project-ref ihotjvimurztbhrsiabs
-          supabase db push --include-all
-          supabase migration list --linked
+          chmod +x scripts/apply_supabase_migration.sh
+          ./scripts/apply_supabase_migration.sh "supabase/migrations/${MIGRATION_FILE}"
