@@ -21,7 +21,10 @@ where n.nspname = 'public'
     'apply_product_stock_delta',
     'normalize_dni',
     '_sale_clamp_pct',
-    '_sale_unit_ars'
+    '_sale_unit_ars',
+    '_sale_has_fixed_prices',
+    '_sale_unit_ars_fixed',
+    '_sale_unit_usd_fixed'
   )
   and exists (
     select 1

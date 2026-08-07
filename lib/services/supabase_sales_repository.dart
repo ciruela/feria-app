@@ -129,8 +129,13 @@ class SupabaseSalesRepository {
           'USD $serverUsd vs ${budget.totalUsdLines}',
         ),
       );
+      AppLogger.warn(
+        'Totales divergentes al registrar venta: '
+        'server ARS=$serverArs USD=$serverUsd · '
+        'client ARS=${budget.totalArsLines} USD=${budget.totalUsdLines}',
+      );
       throw StateError(
-        'El precio cambió mientras se confirmaba la venta. '
+        'El total del servidor no coincide con el del comprobante. '
         'Se anuló el registro; volvé a generar el comprobante.',
       );
     }
