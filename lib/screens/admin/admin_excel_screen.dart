@@ -16,6 +16,9 @@ class AdminExcelScreen extends StatefulWidget {
 
 class _AdminExcelScreenState extends State<AdminExcelScreen> {
   bool _busy = false;
+  int _progressDone = 0;
+  int _progressTotal = 0;
+  String _progressPhase = '';
 
   Future<void> _exportExcel() async {
     setState(() => _busy = true);
@@ -47,7 +50,12 @@ class _AdminExcelScreenState extends State<AdminExcelScreen> {
   }
 
   Future<void> _importExcel() async {
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _progressDone = 0;
+      _progressTotal = 0;
+      _progressPhase = '';
+    });
     try {
       final catalog = context.read<CatalogService>();
       final session = context.read<TenantSessionService>();
@@ -69,7 +77,17 @@ class _AdminExcelScreenState extends State<AdminExcelScreen> {
 
       await session.ensureSupabaseWriteContext();
       if (!mounted) return;
-      final result = await catalog.importFromExcel(bytes);
+      final result = await catalog.importFromExcel(
+        bytes,
+        onProgress: (done, total, phase) {
+          if (!mounted) return;
+          setState(() {
+            _progressDone = done;
+            _progressTotal = total;
+            _progressPhase = phase;
+          });
+        },
+      );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -143,10 +161,74 @@ class _AdminExcelScreenState extends State<AdminExcelScreen> {
           const Text('municion · arma_corta · arma_larga'),
           if (_busy) ...[
             const SizedBox(height: 24),
-            const Center(child: CircularProgressIndicator()),
+            _ImportProgress(
+              done: _progressDone,
+              total: _progressTotal,
+              phase: _progressPhase,
+            ),
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Barra de progreso de la importación. Muestra la fase y el avance real
+/// (determinado) cuando hay total; indeterminada mientras se prepara.
+class _ImportProgress extends StatelessWidget {
+  const _ImportProgress({
+    required this.done,
+    required this.total,
+    required this.phase,
+  });
+
+  final int done;
+  final int total;
+  final String phase;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasTotal = total > 0;
+    final value = hasTotal ? (done / total).clamp(0.0, 1.0) : null;
+    final label = phase.isEmpty ? 'Importando…' : phase;
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(
+              child: Text(
+                label,
+                style: theme.textTheme.bodyMedium,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (hasTotal)
+              Text(
+                '$done / $total  (${((value ?? 0) * 100).round()}%)',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: LinearProgressIndicator(
+            value: value,
+            minHeight: 10,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'No cierres esta pantalla hasta que termine.',
+          style: theme.textTheme.bodySmall,
+        ),
+      ],
     );
   }
 }

@@ -22,6 +22,10 @@ import 'product_photo_service.dart';
 import 'stock_errors.dart';
 import 'supabase_service.dart';
 
+/// Progreso de una importación de Excel: [done] de [total] en la fase [phase].
+/// [total] == 0 significa fase indeterminada (aún preparando).
+typedef ImportProgress = void Function(int done, int total, String phase);
+
 class CatalogService extends ChangeNotifier {
   static const _cacheKeyBase = 'catalog_cache_json';
   static const _lastSyncKeyBase = 'catalog_last_sync';
@@ -642,7 +646,11 @@ class CatalogService extends ChangeNotifier {
     return ExcelImportPreview(rows: rows, unreadable: unreadable);
   }
 
-  Future<ExcelImportResult> importFromExcel(Uint8List bytes) async {
+  Future<ExcelImportResult> importFromExcel(
+    Uint8List bytes, {
+    ImportProgress? onProgress,
+  }) async {
+    onProgress?.call(0, 0, 'Preparando…');
     // Catálogo fresco del servidor para no duplicar por caché vieja.
     if (SupabaseService.isConfigured) {
       await syncFromCloud(silent: true);
@@ -731,16 +739,27 @@ class CatalogService extends ChangeNotifier {
       await _supabaseCatalog.upsertAll(
         changedProducts,
         updatePhotos: false,
+        onProgress: (done, total) =>
+            onProgress?.call(done, total, 'Guardando productos'),
       );
 
-      for (final product in changedProducts) {
+      // Solo los que realmente cambian de stock (para un total exacto en la barra).
+      final stockUpdates = changedProducts.where((product) {
         final newStock = stockTargetById[product.id];
-        if (newStock == null) continue;
-
+        if (newStock == null) return false;
         final before = serverStocks.containsKey(product.id)
             ? serverStocks[product.id]
             : null;
-        if (before == newStock) continue;
+        return before != newStock;
+      }).toList();
+
+      var stockDone = 0;
+      onProgress?.call(0, stockUpdates.length, 'Actualizando stock');
+      for (final product in stockUpdates) {
+        final newStock = stockTargetById[product.id]!;
+        final before = serverStocks.containsKey(product.id)
+            ? serverStocks[product.id]
+            : null;
 
         try {
           final next = await _supabaseCatalog.setStock(
@@ -764,6 +783,8 @@ class CatalogService extends ChangeNotifier {
           );
           rethrow;
         }
+        stockDone++;
+        onProgress?.call(stockDone, stockUpdates.length, 'Actualizando stock');
       }
       await _persistCache();
     }

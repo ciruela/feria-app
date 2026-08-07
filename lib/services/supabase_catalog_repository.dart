@@ -76,10 +76,15 @@ class SupabaseCatalogRepository {
   Future<void> upsertAll(
     List<Product> products, {
     bool updatePhotos = true,
+    void Function(int done, int total)? onProgress,
   }) async {
     if (products.isEmpty) return;
+    var done = 0;
+    onProgress?.call(0, products.length);
     for (final product in products) {
       await upsert(product, updatePhotos: updatePhotos);
+      done++;
+      onProgress?.call(done, products.length);
     }
   }
 
