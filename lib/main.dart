@@ -102,7 +102,7 @@ class FeriaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Catálogo Feria',
+      title: 'Armenext',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       home: const AuthGate(),

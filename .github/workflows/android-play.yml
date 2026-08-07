@@ -1,0 +1,185 @@
+# DEPLOY: compila y sube AAB a Google Play (workflow_dispatch).
+# Requiere CI verde en el mismo commit antes de compilar.
+#
+# Secrets en GitHub → Settings → Secrets and variables → Actions:
+#   SUPABASE_URL
+#   SUPABASE_ANON_KEY
+#   ANDROID_KEYSTORE_BASE64
+#   ANDROID_KEYSTORE_PASSWORD
+#   ANDROID_KEY_ALIAS
+#   ANDROID_KEY_PASSWORD
+#   GOOGLE_PLAY_SERVICE_ACCOUNT_JSON   (contenido del JSON de Play Console → API access)
+#
+# Cargar secrets locales: ./scripts/load_android_secrets_to_github.sh
+#
+# Play Console (una sola vez): crear app con package com.armeria.feria.app_feria
+# y dar permisos a la service account (Release to testing tracks).
+
+name: Android Play Store
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Track de Play Store'
+        required: true
+        default: internal
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+
+concurrency:
+  group: android-play-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Require green CI on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          conclusion="$(gh run list \
+            --repo "$REPO" \
+            --commit "$SHA" \
+            --workflow CI \
+            --json conclusion \
+            -q '.[0].conclusion // empty')"
+          if [[ "$conclusion" != "success" ]]; then
+            echo "::error::CI no pasó en ${GITHUB_SHA} (estado: ${conclusion:-sin run}). Abortando deploy Android."
+            exit 1
+          fi
+          echo "CI OK en este commit."
+
+  build-and-upload:
+    needs: ci-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      build_number: ${{ steps.version.outputs.build_number }}
+      track: ${{ inputs.track }}
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          missing=0
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS \
+                      ANDROID_KEY_PASSWORD GOOGLE_PLAY_SERVICE_ACCOUNT_JSON; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Falta el secret $name en GitHub Actions"
+              missing=1
+            fi
+          done
+          if [[ -z "${SUPABASE_URL:-}" || -z "${SUPABASE_ANON_KEY:-}" ]]; then
+            echo "::warning::SUPABASE_URL / SUPABASE_ANON_KEY vacíos — el build usará modo local"
+          fi
+          exit "$missing"
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build number
+        id: version
+        run: |
+          BUILD=$(( ${{ github.run_number }} + 10 ))
+          perl -pi -e "s/^version: .*/version: 1.0.0+${BUILD}/" pubspec.yaml
+          echo "Build number: ${BUILD}"
+          grep '^version:' pubspec.yaml
+          echo "build_number=${BUILD}" >> "$GITHUB_OUTPUT"
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Decode keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
+          test -s android/app/upload-keystore.jks
+
+      - name: Create key.properties
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          cat > android/key.properties <<EOF
+          storePassword=${ANDROID_KEYSTORE_PASSWORD}
+          keyPassword=${ANDROID_KEY_PASSWORD}
+          keyAlias=${ANDROID_KEY_ALIAS}
+          storeFile=upload-keystore.jks
+          EOF
+
+      - name: Build AAB
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          DART_DEFINES="--dart-define=GIT_SHA=${GITHUB_SHA} --dart-define=APP_VERSION=1.0.0"
+          if [[ -n "${SUPABASE_URL:-}" && -n "${SUPABASE_ANON_KEY:-}" ]]; then
+            DART_DEFINES="$DART_DEFINES --dart-define=SUPABASE_URL=${SUPABASE_URL} --dart-define=SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}"
+          fi
+          if [[ -n "${SENTRY_DSN:-}" ]]; then
+            DART_DEFINES="$DART_DEFINES --dart-define=SENTRY_DSN=${SENTRY_DSN}"
+          fi
+          # shellcheck disable=SC2086
+          flutter build appbundle --release $DART_DEFINES
+          ls -lh build/app/outputs/bundle/release/
+
+      - name: Upload to Google Play
+        uses: r0adkll/upload-google-play@v1.1.3
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.armeria.feria.app_feria
+          releaseFiles: build/app/outputs/bundle/release/app-release.aab
+          track: ${{ inputs.track }}
+          status: completed
+
+  pipeline-status:
+    needs: build-and-upload
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resumen del pipeline
+        run: |
+          echo "## Pipeline Android Play Store" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Track: **${{ needs.build-and-upload.outputs.track }}**" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Build: **${{ needs.build-and-upload.result }}** — versionCode +${{ needs.build-and-upload.outputs.build_number }}" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "${{ needs.build-and-upload.result }}" != "success" ]]; then
+            echo "::error::El deploy Android falló."
+            exit 1
+          fi
+          echo "AAB subido a Google Play OK."

@@ -1,0 +1,7 @@
+# Copiá a android/key.properties (no commitear).
+# Generá keystore + este archivo con: ./scripts/setup_android_keystore.sh
+
+storePassword=TU_STORE_PASSWORD
+keyPassword=TU_KEY_PASSWORD
+keyAlias=upload
+storeFile=/ruta/absoluta/a/.secrets/android-upload-keystore.jks
