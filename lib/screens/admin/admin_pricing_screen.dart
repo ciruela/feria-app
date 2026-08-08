@@ -27,6 +27,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
   late final TextEditingController _munT3;
   late bool _municionOverride;
   late bool _municionTransferEfectivo;
+  late bool _municionT3SoloLarga;
   bool _saving = false;
 
   bool get _isWorldGuns {
@@ -54,6 +55,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
     );
     _municionOverride = settings.municionOverrideEnabled;
     _municionTransferEfectivo = settings.municionTransferenciaComoEfectivo;
+    _municionT3SoloLarga = settings.municionTarjeta3SoloArmaLarga;
   }
 
   @override
@@ -95,6 +97,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
             municionEfectivoPct: double.tryParse(_munEfectivo.text),
             municionTarjeta3Pct: double.tryParse(_munT3.text),
             municionTransferenciaComoEfectivo: _municionTransferEfectivo,
+            municionTarjeta3SoloArmaLarga: _municionT3SoloLarga,
           );
 
       if (!mounted) return;
@@ -143,9 +146,10 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Aplica solo a productos tipo munición. Armas siguen los % '
-              'generales de abajo. Ej.: 10% efectivo/transferencia y 3 cuotas '
-              'sin interés (recargo 0%).',
+              '10% efectivo/transferencia aplica a toda la munición. '
+              '3 cuotas sin interés solo a munición de arma larga '
+              '(rifle/escopeta/.22). Munición de pistola/revólver '
+              '(9mm, .40, .45, .38, etc.) usa el recargo general de 3 cuotas.',
             ),
             const SizedBox(height: 12),
             SwitchListTile(
@@ -156,7 +160,16 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
             ),
             if (_municionOverride) ...[
               _field('Descuento efectivo munición (%)', _munEfectivo),
-              _field('Recargo 3 cuotas munición (%)', _munT3),
+              _field('Recargo 3 cuotas munición larga (%)', _munT3),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('3 cuotas SI solo en munición arma larga'),
+                subtitle: const Text(
+                  'Si está apagado, el recargo 3 cuotas de arriba aplica a toda la munición.',
+                ),
+                value: _municionT3SoloLarga,
+                onChanged: (v) => setState(() => _municionT3SoloLarga = v),
+              ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Transferencia = mismo descuento que efectivo'),

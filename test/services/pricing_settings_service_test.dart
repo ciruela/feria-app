@@ -68,6 +68,7 @@ void main() {
       municionEfectivoPct: 10,
       municionTarjeta3Pct: 0,
       municionTransferenciaComoEfectivo: true,
+      municionTarjeta3SoloArmaLarga: true,
     );
 
     final map = settings.toMap();
@@ -77,5 +78,6 @@ void main() {
     expect(mun['efectivo'], 10);
     expect(mun['tarjeta3'], 0);
     expect(mun['transferencia_como_efectivo'], isTrue);
+    expect(mun['tarjeta3_solo_arma_larga'], isTrue);
   });
 }

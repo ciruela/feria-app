@@ -82,13 +82,21 @@ void main() {
     exchange.dispose();
   });
 
-  test('override munición: 10% efectivo/transf y 3 cuotas SI', () {
-    const municion = Product(
-      id: 'm',
+  test('override munición: 10% efectivo/transf; 3 SI solo arma larga', () {
+    const munLarga = Product(
+      id: 'ml',
       type: ProductType.municion,
       marca: 'CCI',
-      calibre: '.22',
-      codigo: '960',
+      calibre: '.308',
+      codigo: '308',
+      precioUsd: 100,
+    );
+    const munCorta = Product(
+      id: 'mc',
+      type: ProductType.municion,
+      marca: 'CCI',
+      calibre: '.9',
+      codigo: '9mm',
       precioUsd: 100,
     );
     const arma = Product(
@@ -105,14 +113,20 @@ void main() {
       ..municionOverrideEnabled = true
       ..municionDescuentoEfectivoPct = 10
       ..municionRecargoTarjeta3Pct = 0
-      ..municionTransferenciaComoEfectivo = true;
+      ..municionTransferenciaComoEfectivo = true
+      ..municionTarjeta3SoloArmaLarga = true;
 
-    final munPrices = PricingService().pricesFor(municion, exchange, settings);
-    expect(munPrices.lista, 150000);
-    expect(munPrices.efectivo, closeTo(135000, 0.01)); // -10%
-    expect(munPrices.transferencia, closeTo(135000, 0.01));
-    expect(munPrices.tarjeta3, closeTo(150000, 0.01)); // 0% SI
-    expect(munPrices.tarjeta6, closeTo(180000, 0.01)); // global +20%
+    final larga = PricingService().pricesFor(munLarga, exchange, settings);
+    expect(larga.lista, 150000);
+    expect(larga.efectivo, closeTo(135000, 0.01)); // -10%
+    expect(larga.transferencia, closeTo(135000, 0.01));
+    expect(larga.tarjeta3, closeTo(150000, 0.01)); // 0% SI
+    expect(larga.tarjeta6, closeTo(180000, 0.01)); // global +20%
+
+    final corta = PricingService().pricesFor(munCorta, exchange, settings);
+    expect(corta.efectivo, closeTo(135000, 0.01)); // 10% igual
+    expect(corta.transferencia, closeTo(135000, 0.01));
+    expect(corta.tarjeta3, closeTo(172500, 0.01)); // global +15%, no SI
 
     final armaPrices = PricingService().pricesFor(arma, exchange, settings);
     expect(armaPrices.efectivo, closeTo(142500, 0.01)); // global -5%

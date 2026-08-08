@@ -17,7 +17,7 @@ class PricingService {
 
     final lista = exchangeRate.toArs(product.precioUsd);
     final efectivoPct = settings.descuentoEfectivoPctFor(product.type);
-    final tarjeta3Pct = settings.recargoTarjeta3PctFor(product.type);
+    final tarjeta3Pct = settings.recargoTarjeta3PctFor(product);
     final efectivo = lista * (1 - efectivoPct / 100);
     final transferencia = settings.transferenciaComoEfectivoFor(product.type)
         ? efectivo
