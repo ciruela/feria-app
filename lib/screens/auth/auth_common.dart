@@ -28,9 +28,18 @@ Future<void> reloadTenantData(BuildContext context) async {
     context.read<AuthService>().load(),
   ]);
   if (!context.mounted) return;
-  await context.read<CartService>().load(
-        catalog: context.read<CatalogService>(),
-      );
+  await loadCartForSeller(
+    context,
+    context.read<SellerService>().selected?.id,
+  );
+}
+
+/// AR-54: carga el carrito del vendedor (aislado por sellerId).
+Future<void> loadCartForSeller(BuildContext context, String? sellerId) async {
+  final cart = context.read<CartService>();
+  cart.bindSeller(sellerId);
+  if (!context.mounted) return;
+  await cart.load(catalog: context.read<CatalogService>());
 }
 
 /// Layout compartido de formularios de autenticación.

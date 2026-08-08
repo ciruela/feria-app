@@ -17,7 +17,6 @@ import '../../widgets/feria_shell.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/supabase_config_banner.dart';
 import '../../widgets/tenant_app_title.dart';
-import '../employee/employee_catalog_screen.dart';
 import '../exchange_rate_screen.dart';
 import '../auth/tenant_app_shell.dart';
 import '../role_gate_screen.dart';
@@ -27,7 +26,6 @@ import 'admin_change_pin_screen.dart';
 import 'admin_cierre_screen.dart';
 import 'admin_comprobantes_screen.dart';
 import 'admin_excel_screen.dart';
-import 'admin_export_screen.dart';
 import 'admin_metrics_screen.dart';
 import 'admin_pricing_screen.dart';
 import 'admin_products_screen.dart';
@@ -246,34 +244,6 @@ class AdminHomeScreen extends StatelessWidget {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => const AdminExcelScreen(),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 14),
-          BigActionButton(
-            label: 'Exportar catálogo JSON',
-            subtitle: 'Copiar JSON para respaldo',
-            icon: Icons.upload_file_outlined,
-            accentColor: AppColors.primaryLight,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const AdminExportScreen(),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 14),
-          BigActionButton(
-            label: 'Ver como empleado',
-            subtitle: 'Previsualizar la app del vendedor',
-            icon: Icons.visibility_outlined,
-            accentColor: AppColors.accent,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const EmployeeCatalogScreen(),
                 ),
               );
             },

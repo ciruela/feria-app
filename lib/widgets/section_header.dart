@@ -46,7 +46,7 @@ class SectionHeader extends StatelessWidget {
 class StatCard extends StatelessWidget {
   const StatCard({
     super.key,
-    required this.icon,
+    this.icon,
     required this.label,
     required this.value,
     this.subtitle,
@@ -54,7 +54,8 @@ class StatCard extends StatelessWidget {
     this.onTap,
   });
 
-  final IconData icon;
+  /// Si es null, solo se muestran título y monto (mejor en columnas angostas).
+  final IconData? icon;
   final String label;
   final String value;
   final String? subtitle;
@@ -81,30 +82,34 @@ class StatCard extends StatelessWidget {
             padding: const EdgeInsets.all(18),
             child: Row(
               children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        color.withValues(alpha: 0.18),
-                        color.withValues(alpha: 0.08),
-                      ],
+                if (icon != null) ...[
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          color.withValues(alpha: 0.18),
+                          color.withValues(alpha: 0.08),
+                        ],
+                      ),
+                      borderRadius: AppDecorations.radiusSm,
+                      border: Border.all(color: color.withValues(alpha: 0.25)),
                     ),
-                    borderRadius: AppDecorations.radiusSm,
-                    border: Border.all(color: color.withValues(alpha: 0.25)),
+                    child: Icon(icon, color: color, size: 28),
                   ),
-                  child: Icon(icon, color: color, size: 28),
-                ),
-                const SizedBox(width: 16),
+                  const SizedBox(width: 16),
+                ],
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         label.toUpperCase(),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
@@ -113,9 +118,14 @@ class StatCard extends StatelessWidget {
                             ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        value,
-                        style: Theme.of(context).textTheme.titleLarge,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          value,
+                          maxLines: 1,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
                       ),
                       if (subtitle != null) ...[
                         const SizedBox(height: 2),

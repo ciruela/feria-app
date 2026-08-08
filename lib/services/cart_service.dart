@@ -63,6 +63,7 @@ class CartService extends ChangeNotifier {
   CartCheckoutPayment? _checkoutPayment;
   String? _saleIdempotencyKey;
   String? _tenantScope;
+  String? _sellerScope;
   bool _restoring = false;
 
   List<CartItem> get items => List.unmodifiable(_items);
@@ -70,8 +71,15 @@ class CartService extends ChangeNotifier {
   bool get isEmpty => _items.isEmpty;
   CartCheckoutPayment? get checkoutPayment => _checkoutPayment;
   bool get hasCheckoutPayment => _checkoutPayment != null;
+  String? get sellerScope => _sellerScope;
 
-  String get _cacheKey => tenantCacheKey(_cacheKeyBase, _tenantScope);
+  /// Clave por armería + vendedor (AR-54). Sin vendedor = solo tenant.
+  String get _cacheKey {
+    final tenantKey = tenantCacheKey(_cacheKeyBase, _tenantScope);
+    final seller = _sellerScope?.trim();
+    if (seller == null || seller.isEmpty) return tenantKey;
+    return '${tenantKey}_s_$seller';
+  }
 
   /// Aísla el carrito por armería. Llamar al elegir tenant; luego [load].
   void bindTenant(String? tenantId) {
@@ -79,6 +87,19 @@ class CartService extends ChangeNotifier {
     final normalized = (next == null || next.isEmpty) ? null : next;
     if (_tenantScope == normalized) return;
     _tenantScope = normalized;
+    _sellerScope = null;
+    _items.clear();
+    _checkoutPayment = null;
+    _saleIdempotencyKey = null;
+    notifyListeners();
+  }
+
+  /// Aísla el carrito por vendedor dentro del tenant (AR-54). Luego [load].
+  void bindSeller(String? sellerId) {
+    final next = sellerId?.trim();
+    final normalized = (next == null || next.isEmpty) ? null : next;
+    if (_sellerScope == normalized) return;
+    _sellerScope = normalized;
     _items.clear();
     _checkoutPayment = null;
     _saleIdempotencyKey = null;
