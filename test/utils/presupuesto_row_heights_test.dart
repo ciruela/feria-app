@@ -28,6 +28,34 @@ PresupuestoItemRow _normal(String key) => PresupuestoItemRow(
 
 void main() {
   group('PresupuestoRowHeights', () {
+    test('uses preferred heights when bodyHeight is null', () {
+      final heights = PresupuestoRowHeights.resolve(
+        rows: [_arma('1'), _normal('2'), const PresupuestoItemRow.empty()],
+        bodyHeight: null,
+        headerHeight: 26,
+        armaPref: 54,
+        normalPref: 28,
+        fillerPref: 22,
+      );
+      expect(heights.arma, 54);
+      expect(heights.normal, 28);
+      expect(heights.filler, 22);
+    });
+
+    test('returns zeros when available body is exhausted by header', () {
+      final heights = PresupuestoRowHeights.resolve(
+        rows: [_arma('1')],
+        bodyHeight: 20,
+        headerHeight: 26,
+        armaPref: 54,
+        normalPref: 28,
+        fillerPref: 22,
+      );
+      expect(heights.arma, 0);
+      expect(heights.normal, 0);
+      expect(heights.filler, 0);
+    });
+
     test('fits real rows into body without exceeding available height', () {
       final rows = [
         _arma('1'),
@@ -54,6 +82,8 @@ void main() {
           header;
       expect(used, lessThanOrEqualTo(bodyHeight + 0.01));
       expect(heights.filler, greaterThanOrEqualTo(0));
+      expect(heights.forRow(_arma('x')), heights.arma);
+      expect(heights.forRow(_normal('y')), heights.normal);
     });
 
     test('scales down when preferred arma heights do not fit', () {
@@ -73,6 +103,20 @@ void main() {
       expect(heights.filler, 0);
       expect(heights.arma * 4, lessThanOrEqualTo(bodyHeight - header + 0.01));
       expect(heights.arma, lessThan(54));
+    });
+
+    test('grows real rows when there is leftover space and no fillers', () {
+      final heights = PresupuestoRowHeights.resolve(
+        rows: [_normal('1'), _normal('2')],
+        bodyHeight: 120,
+        headerHeight: 20,
+        armaPref: 54,
+        normalPref: 20,
+        fillerPref: 22,
+      );
+      expect(heights.filler, 0);
+      expect(heights.normal, greaterThan(20));
+      expect(heights.normal * 2, lessThanOrEqualTo(100.01));
     });
   });
 }
