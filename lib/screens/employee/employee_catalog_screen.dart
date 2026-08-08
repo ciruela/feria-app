@@ -66,27 +66,52 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
 
   /// Marcas disponibles para el tipo elegido.
   List<String> _marcaOptions(CatalogService catalog) =>
-      _distinct(_typeSource(catalog), (p) => p.marca);
+      _distinctMarcas(_typeSource(catalog));
 
   /// Calibres disponibles para el tipo (acotados por la marca elegida).
   List<String> _calibreOptions(CatalogService catalog) {
     final source = _typeSource(catalog).where(
-      (p) => _marcaFilter == null || p.marca == _marcaFilter,
+      (p) => _marcaFilter == null || sameMarca(p.marca, _marcaFilter!),
     );
-    return _distinct(source, (p) => p.calibre);
+    return _distinctCalibres(source);
   }
 
-  List<String> _distinct(
-    Iterable<Product> source,
-    String Function(Product) selector,
-  ) {
-    final set = <String>{};
+  List<String> _distinctMarcas(Iterable<Product> source) {
+    final byKey = <String, String>{};
     for (final product in source) {
-      final value = selector(product).trim();
-      if (value.isNotEmpty) set.add(value);
+      final raw = product.marca.trim();
+      if (raw.isEmpty) continue;
+      final key = marcaKey(raw);
+      final existing = byKey[key];
+      byKey[key] =
+          existing == null ? raw : preferMarcaLabel(existing, raw);
     }
-    final list = set.toList()
+    final list = byKey.values.toList()
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return list;
+  }
+
+  List<String> _distinctCalibres(Iterable<Product> source) {
+    final byKey = <String, String>{};
+    var hasEmpty = false;
+    for (final product in source) {
+      final raw = product.calibre.trim();
+      if (raw.isEmpty) {
+        hasEmpty = true;
+        continue;
+      }
+      final key = calibreKey(raw);
+      if (key.isEmpty) {
+        hasEmpty = true;
+        continue;
+      }
+      final existing = byKey[key];
+      byKey[key] =
+          existing == null ? raw : preferCalibreLabel(existing, raw);
+    }
+    final list = byKey.values.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    if (hasEmpty) list.add(kCalibreSinEtiqueta);
     return list;
   }
 
@@ -105,7 +130,7 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
       // Si el calibre elegido ya no aplica a la marca, se limpia.
       if (_calibreFilter != null &&
           !_calibreOptions(context.read<CatalogService>())
-              .contains(_calibreFilter)) {
+              .any((c) => sameCalibre(c, _calibreFilter!))) {
         _calibreFilter = null;
       }
     });
@@ -123,8 +148,11 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
     // texto los resuelve searchCatalog (que ya cae al orden actual a igual
     // puntaje y devuelve todo ordenado con consulta vacía).
     final source = _typeSource(catalog).where((product) {
-      if (_marcaFilter != null && product.marca != _marcaFilter) return false;
-      if (_calibreFilter != null && product.calibre != _calibreFilter) {
+      if (_marcaFilter != null && !sameMarca(product.marca, _marcaFilter!)) {
+        return false;
+      }
+      if (_calibreFilter != null &&
+          !sameCalibre(product.calibre, _calibreFilter!)) {
         return false;
       }
       return true;

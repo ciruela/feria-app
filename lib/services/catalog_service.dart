@@ -1138,8 +1138,17 @@ class CatalogService extends ChangeNotifier {
   }
 
   List<String> brandsFor(ProductType type) {
-    final brands = byType(type).map((product) => product.marca).toSet().toList();
-    brands.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    final byKey = <String, String>{};
+    for (final product in byType(type)) {
+      final raw = product.marca.trim();
+      if (raw.isEmpty) continue;
+      final key = marcaKey(raw);
+      final existing = byKey[key];
+      byKey[key] =
+          existing == null ? raw : preferMarcaLabel(existing, raw);
+    }
+    final brands = byKey.values.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
     return brands;
   }
 
@@ -1153,10 +1162,27 @@ class CatalogService extends ChangeNotifier {
   List<String> calibersFor(ProductType type, [String? marca]) {
     final source = marca == null
         ? byType(type)
-        : byType(type)
-            .where((product) => product.marca.toLowerCase() == marca.toLowerCase());
-    final calibers = source.map((product) => product.calibre).toSet().toList();
-    calibers.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+        : byType(type).where((product) => sameMarca(product.marca, marca));
+    final byKey = <String, String>{};
+    var hasEmpty = false;
+    for (final product in source) {
+      final raw = product.calibre.trim();
+      if (raw.isEmpty) {
+        hasEmpty = true;
+        continue;
+      }
+      final key = calibreKey(raw);
+      if (key.isEmpty) {
+        hasEmpty = true;
+        continue;
+      }
+      final existing = byKey[key];
+      byKey[key] =
+          existing == null ? raw : preferCalibreLabel(existing, raw);
+    }
+    final calibers = byKey.values.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    if (hasEmpty) calibers.add(kCalibreSinEtiqueta);
     return calibers;
   }
 
@@ -1184,10 +1210,8 @@ class CatalogService extends ChangeNotifier {
     final results = byType(type).where((product) {
       // Catálogo de venta: sin stock (null o 0) no se lista.
       if ((product.stock ?? 0) <= 0) return false;
-      final marcaOk = marca == null ||
-          product.marca.toLowerCase() == marca.toLowerCase();
-      final calibreOk = calibre == null ||
-          product.calibre.toLowerCase() == calibre.toLowerCase();
+      final marcaOk = marca == null || sameMarca(product.marca, marca);
+      final calibreOk = calibre == null || sameCalibre(product.calibre, calibre);
       final marcaLetterOk = marcaLetter == null ||
           product.marca.toUpperCase().startsWith(marcaLetter.toUpperCase());
       final codigoOk = query.isEmpty ||

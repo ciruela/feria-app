@@ -40,17 +40,97 @@ const Map<String, String> _acentos = {
   'Ñ': 'N',
 };
 
-/// Sinónimos de calibre para cruzar las distintas grafías del mercado.
+/// Etiqueta de filtro para productos sin calibre cargado.
+const kCalibreSinEtiqueta = 'Sin calibre';
+
+/// Grupos de grafías equivalentes (primer valor = clave canónica).
+///
+/// Importante: no mezclar `.30` (30) con `.308` (308).
+const List<List<String>> kCalibreGrupos = [
+  ['9', '9MM', '9X19', '9PARA', '9LUGER', 'C9'],
+  ['22', '22LR'],
+  ['22MAG', '22WMR', '22MAGNUM'],
+  ['380', '380ACP', '9CORTO'],
+  ['45', '45ACP', '45AUTO'],
+  ['40', '40SW', '40SANDW'],
+  ['38', '38SPECIAL', '38SPL'],
+  ['357', '357MAG', '357MAGNUM'],
+  ['44', '44MAG', '44SPECIAL', '44SPL'],
+  ['32', '32ACP', '32AUTO', '765'],
+  ['25', '25ACP', '635'],
+  ['308', '762X51'],
+  ['223', '556', '556X45'],
+  ['3006', '762X63', '3006SPRG'],
+];
+
+/// compacto → canónico (para filtros de chip).
+final Map<String, String> kCalibreCanonical = {
+  for (final group in kCalibreGrupos)
+    for (final form in group) form: group.first,
+};
+
+/// Sinónimos de calibre para cruzar grafías en la búsqueda por texto.
 ///
 /// Las claves y valores están ya en forma compacta (mayúsculas, sin símbolos).
-const Map<String, List<String>> kCalibreSinonimos = <String, List<String>>{
-  '9MM': ['9X19', '9PARA', '9LUGER'],
-  '9X19': ['9MM'],
-  '308': ['762X51'],
-  '223': ['556', '556X45'],
-  '3006': ['762X63'],
-  '38SPECIAL': ['38SPL'],
+final Map<String, List<String>> kCalibreSinonimos = {
+  for (final group in kCalibreGrupos)
+    for (final form in group)
+      form: group.where((other) => other != form).toList(growable: false),
 };
+
+/// Clave estable de marca para filtros (case/acentos).
+String marcaKey(String raw) => normalizar(raw.trim());
+
+/// True si dos marcas son la misma ignorando mayúsculas/acentos.
+bool sameMarca(String a, String b) {
+  final ka = marcaKey(a);
+  final kb = marcaKey(b);
+  if (ka.isEmpty || kb.isEmpty) return false;
+  return ka == kb;
+}
+
+/// Clave estable de calibre (compacta + sinónimos).
+String calibreKey(String raw) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty || trimmed == kCalibreSinEtiqueta) return '';
+  final c = compactar(trimmed);
+  if (c.isEmpty) return '';
+  return kCalibreCanonical[c] ?? c;
+}
+
+/// True si dos calibres son equivalentes (`.22` ≈ `.22 LR`, `.9` ≈ `9mm`).
+bool sameCalibre(String a, String b) {
+  final ka = calibreKey(a);
+  final kb = calibreKey(b);
+  if (ka.isEmpty && kb.isEmpty) {
+    return a.trim().isEmpty &&
+        (b.trim().isEmpty || b.trim() == kCalibreSinEtiqueta);
+  }
+  if (ka.isEmpty || kb.isEmpty) return false;
+  return ka == kb;
+}
+
+/// Elige la etiqueta de marca más legible entre dos equivalentes.
+String preferMarcaLabel(String a, String b) {
+  if (a.trim().isEmpty) return b;
+  if (b.trim().isEmpty) return a;
+  final aUpper = a == a.toUpperCase();
+  final bUpper = b == b.toUpperCase();
+  if (aUpper && !bUpper) return b;
+  if (bUpper && !aUpper) return a;
+  return a.length >= b.length ? a : b;
+}
+
+/// Elige la etiqueta de calibre más legible entre dos equivalentes.
+String preferCalibreLabel(String a, String b) {
+  if (a.trim().isEmpty) return b;
+  if (b.trim().isEmpty) return a;
+  if (a.startsWith('.') && !b.startsWith('.')) return a;
+  if (b.startsWith('.') && !a.startsWith('.')) return b;
+  if (a.contains(' ') && !b.contains(' ')) return a;
+  if (b.contains(' ') && !a.contains(' ')) return b;
+  return a.length >= b.length ? a : b;
+}
 
 /// Índice de búsqueda precalculado por producto.
 ///

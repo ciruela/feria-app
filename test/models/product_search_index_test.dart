@@ -66,6 +66,30 @@ void main() {
     });
   });
 
+  group('filtros marca / calibre', () {
+    test('sameMarca ignora mayúsculas y acentos', () {
+      expect(sameMarca('Hornady', 'HORNADY'), isTrue);
+      expect(sameMarca('Munición Sur', 'MUNICION SUR'), isTrue);
+      expect(sameMarca('CCI', 'FEDERAL'), isFalse);
+    });
+
+    test('sameCalibre unifica grafías frecuentes', () {
+      expect(sameCalibre('.22', '.22 LR'), isTrue);
+      expect(sameCalibre('.9', '9mm'), isTrue);
+      expect(sameCalibre('.9', 'C.9'), isTrue);
+      expect(sameCalibre('.308', '7.62x51'), isTrue);
+      expect(sameCalibre('.30', '.308'), isFalse);
+      expect(sameCalibre('', kCalibreSinEtiqueta), isTrue);
+    });
+
+    test('calibreKey no mezcla .30 con .308', () {
+      expect(calibreKey('.30'), '30');
+      expect(calibreKey('.308'), '308');
+      expect(calibreKey('.22 LR'), '22');
+      expect(calibreKey('.9'), '9');
+    });
+  });
+
   group('ProductSearchIndex.fromProduct', () {
     test('cruza campos: principal contiene marca + modelo juntos', () {
       final p = _arma(id: 'ac1', marca: 'Glock', modelo: 'Pistola Glock 19 gen 5 FS');
