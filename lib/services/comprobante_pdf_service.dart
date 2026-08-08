@@ -12,6 +12,7 @@ import '../utils/app_logger.dart';
 import '../utils/jwt.dart';
 import '../utils/presupuesto_pdf.dart';
 import '../utils/retry.dart';
+import '../utils/share_pdf.dart';
 import 'supabase_service.dart';
 
 class ComprobantePdfService {
@@ -54,10 +55,12 @@ class ComprobantePdfService {
     final year = date.year;
     final month = date.month.toString().padLeft(2, '0');
     final tenantPrefix = tenantId?.trim();
-    if (tenantPrefix != null && tenantPrefix.isNotEmpty) {
-      return '$tenantPrefix/$year/$month/$saleId.pdf';
+    if (tenantPrefix == null || tenantPrefix.isEmpty) {
+      throw StateError(
+        'Falta tenant_id para guardar el comprobante en Storage.',
+      );
     }
-    return '$year/$month/$saleId.pdf';
+    return '$tenantPrefix/$year/$month/$saleId.pdf';
   }
 
   Future<Uint8List> fetchPdfBytes(String pdfPath) async {
@@ -112,7 +115,7 @@ class ComprobantePdfService {
     final name = sale.hasPdf
         ? sale.pdfPath!.split('/').last
         : PresupuestoPdf.fileName(sale.toBudget(), branding: branding);
-    await Printing.sharePdf(bytes: bytes, filename: name);
+    await sharePdfBytes(bytes: bytes, filename: name);
   }
 
   /// Sube el PDF si falta y actualiza `ventas.pdf_path`.
@@ -158,7 +161,7 @@ class ComprobantePdfService {
 
   static Future<void> shareStoredPdf(String pdfPath) async {
     final bytes = await ComprobantePdfService().fetchPdfBytes(pdfPath);
-    await Printing.sharePdf(
+    await sharePdfBytes(
       bytes: Uint8List.fromList(bytes),
       filename: pdfPath.split('/').last,
     );

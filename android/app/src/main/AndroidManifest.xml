@@ -45,5 +45,10 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- AR-60: chooser de apps que aceptan PDF (WhatsApp, Drive, Mail). -->
+        <intent>
+            <action android:name="android.intent.action.SEND"/>
+            <data android:mimeType="application/pdf"/>
+        </intent>
     </queries>
 </manifest>
