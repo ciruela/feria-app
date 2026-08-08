@@ -53,7 +53,8 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
     _munT3 = TextEditingController(
       text: settings.municionRecargoTarjeta3Pct.toString(),
     );
-    _municionOverride = settings.municionOverrideEnabled;
+    _municionOverride =
+        settings.municionOverrideEnabled || _isWorldGuns;
     _municionTransferEfectivo = settings.municionTransferenciaComoEfectivo;
     _municionT3SoloLarga = settings.municionTarjeta3SoloArmaLarga;
   }
@@ -98,6 +99,8 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
             municionTarjeta3Pct: double.tryParse(_munT3.text),
             municionTransferenciaComoEfectivo: _municionTransferEfectivo,
             municionTarjeta3SoloArmaLarga: _municionT3SoloLarga,
+            // World Guns: transferencia siempre con el mismo descuento que efectivo.
+            transferenciaComoEfectivo: _isWorldGuns,
           );
 
       if (!mounted) return;

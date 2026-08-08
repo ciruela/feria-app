@@ -73,6 +73,7 @@ void main() {
 
     final map = settings.toMap();
     expect(map['efectivo'], 5);
+    expect(map['transferencia_como_efectivo'], isFalse);
     expect(map['municion'], isA<Map>());
     final mun = map['municion'] as Map;
     expect(mun['efectivo'], 10);

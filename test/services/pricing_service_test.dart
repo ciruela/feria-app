@@ -114,7 +114,8 @@ void main() {
       ..municionDescuentoEfectivoPct = 10
       ..municionRecargoTarjeta3Pct = 0
       ..municionTransferenciaComoEfectivo = true
-      ..municionTarjeta3SoloArmaLarga = true;
+      ..municionTarjeta3SoloArmaLarga = true
+      ..transferenciaComoEfectivo = true;
 
     final larga = PricingService().pricesFor(munLarga, exchange, settings);
     expect(larga.lista, 150000);
@@ -130,7 +131,7 @@ void main() {
 
     final armaPrices = PricingService().pricesFor(arma, exchange, settings);
     expect(armaPrices.efectivo, closeTo(142500, 0.01)); // global -5%
-    expect(armaPrices.transferencia, 150000); // lista
+    expect(armaPrices.transferencia, closeTo(142500, 0.01)); // WG: = efectivo
     expect(armaPrices.tarjeta3, closeTo(172500, 0.01)); // global +15%
 
     exchange.dispose();
