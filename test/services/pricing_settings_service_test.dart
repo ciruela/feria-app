@@ -52,4 +52,30 @@ void main() {
     expect(settings.recargoTarjeta12Pct, 35);
     expect(settings.recargoTarjeta18Pct, 45);
   });
+
+  test('toMap incluye override munición cuando está activo', () async {
+    final settings = PricingSettingsService();
+    await settings.save(
+      efectivoPct: 5,
+      debitoPct: 5,
+      tarjeta1Pct: 10,
+      tarjeta3Pct: 15,
+      tarjeta6Pct: 20,
+      tarjeta9Pct: 30,
+      tarjeta12Pct: 35,
+      tarjeta18Pct: 45,
+      municionOverrideEnabled: true,
+      municionEfectivoPct: 10,
+      municionTarjeta3Pct: 0,
+      municionTransferenciaComoEfectivo: true,
+    );
+
+    final map = settings.toMap();
+    expect(map['efectivo'], 5);
+    expect(map['municion'], isA<Map>());
+    final mun = map['municion'] as Map;
+    expect(mun['efectivo'], 10);
+    expect(mun['tarjeta3'], 0);
+    expect(mun['transferencia_como_efectivo'], isTrue);
+  });
 }

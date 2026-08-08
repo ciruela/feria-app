@@ -3,12 +3,14 @@ import 'package:provider/provider.dart';
 
 import '../../config/app_config.dart';
 import '../../models/app_role.dart';
+import '../../models/presupuesto_branding.dart';
 import '../../models/sales_metrics.dart';
 import '../../services/auth_service.dart';
 import '../../services/catalog_service.dart';
 import '../../services/sales_metrics_service.dart';
 import '../../services/seller_service.dart';
 import '../../services/stock_cierre_service.dart';
+import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/app_logger.dart';
 import '../../utils/formatters.dart';
@@ -111,7 +113,11 @@ class AdminHomeScreen extends StatelessWidget {
           const SizedBox(height: 14),
           BigActionButton(
             label: 'Precios y cuotas',
-            subtitle: 'Débito y cuotas 1/3/6/9/12/18',
+            subtitle: PresupuestoBranding.forTenant(
+                      slug: context.read<TenantSessionService>().activeTenantSlug,
+                    ).isWorldGuns
+                ? 'Promos munición · efectivo · cuotas'
+                : 'Débito y cuotas 1/3/6/9/12/18',
             icon: Icons.payments_rounded,
             accentColor: AppColors.accent,
             onTap: () {
