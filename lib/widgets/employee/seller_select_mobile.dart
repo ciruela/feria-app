@@ -33,107 +33,114 @@ class SellerSelectMobileLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.canvas,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: RefreshIndicator(
-              color: AppColors.accent,
-              onRefresh: onRefresh,
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          TextButton.icon(
-                            onPressed: onBack,
-                            icon: const Icon(Icons.chevron_left_rounded, size: 20),
-                            label: const Text('Empleado'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppColors.textMuted,
-                              padding: EdgeInsets.zero,
-                              alignment: Alignment.centerLeft,
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Elegí tu nombre',
-                            style: AppText.heading.copyWith(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            sellers.isEmpty
-                                ? 'Sin vendedores activos en esta armería'
-                                : '${sellers.length} vendedores activos',
-                            style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (isSyncing)
-                    const SliverToBoxAdapter(
+      // AR-56: el botón "Empleado" quedaba bajo el status bar / notch.
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: RefreshIndicator(
+                color: AppColors.accent,
+                onRefresh: onRefresh,
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverToBoxAdapter(
                       child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                        child: LinearProgressIndicator(
-                          color: AppColors.accent,
-                          backgroundColor: AppColors.surfaceTouch,
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            TextButton.icon(
+                              onPressed: onBack,
+                              icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                              label: const Text('Empleado'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.textMuted,
+                                padding: EdgeInsets.zero,
+                                alignment: Alignment.centerLeft,
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Elegí tu nombre',
+                              style: AppText.heading.copyWith(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              sellers.isEmpty
+                                  ? 'Sin vendedores activos en esta armería'
+                                  : '${sellers.length} vendedores activos',
+                              style: AppText.bodySmall
+                                  .copyWith(color: AppColors.textMuted),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  if (sellers.isEmpty)
-                    SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: _MobileEmptySellers(
-                        lastError: lastError,
-                        isSyncing: isSyncing,
-                        onBack: onBack,
-                        onRefresh: onRefresh,
-                      ),
-                    )
-                  else
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                      sliver: SliverGrid(
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                          childAspectRatio: 0.92,
-                        ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final seller = sellers[index];
-                            return SellerSelectMobileTile(
-                              seller: seller,
-                              selected: selected?.id == seller.id,
-                              onTap: () => onSelect(seller),
-                            );
-                          },
-                          childCount: sellers.length,
+                    if (isSyncing)
+                      const SliverToBoxAdapter(
+                        child: Padding(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                          child: LinearProgressIndicator(
+                            color: AppColors.accent,
+                            backgroundColor: AppColors.surfaceTouch,
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                    if (sellers.isEmpty)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _MobileEmptySellers(
+                          lastError: lastError,
+                          isSyncing: isSyncing,
+                          onBack: onBack,
+                          onRefresh: onRefresh,
+                        ),
+                      )
+                    else
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                        sliver: SliverGrid(
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 10,
+                            childAspectRatio: 0.92,
+                          ),
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final seller = sellers[index];
+                              return SellerSelectMobileTile(
+                                seller: seller,
+                                selected: selected?.id == seller.id,
+                                onTap: () => onSelect(seller),
+                              );
+                            },
+                            childCount: sellers.length,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
-          ),
-          if (sellers.isNotEmpty)
-            SellerSelectMobileContinueBar(
-              selected: selected,
-              confirming: confirming,
-              onContinue: onContinue,
-            ),
-        ],
+            if (sellers.isNotEmpty)
+              SellerSelectMobileContinueBar(
+                selected: selected,
+                confirming: confirming,
+                onContinue: onContinue,
+              ),
+          ],
+        ),
       ),
     );
   }

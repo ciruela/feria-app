@@ -111,6 +111,28 @@ void main() {
     expect(customer.domicilioLine, 'CALLE FALSA 123 · PILAR');
   });
 
+  test('AR-58 mergeDomicilioIntoAddress folds city into address', () {
+    const customer = BudgetCustomer(
+      address: 'CALLE FALSA 123',
+      city: 'PILAR',
+    );
+    final merged = customer.mergeDomicilioIntoAddress();
+    expect(merged.address, 'CALLE FALSA 123 · PILAR');
+    expect(merged.city, isEmpty);
+    expect(merged.domicilioLine, 'CALLE FALSA 123 · PILAR');
+  });
+
+  test('AR-58 mergeDomicilioIntoAddress is idempotent when city already in address',
+      () {
+    const customer = BudgetCustomer(
+      address: 'CALLE FALSA 123 · PILAR',
+      city: 'PILAR',
+    );
+    final merged = customer.mergeDomicilioIntoAddress();
+    expect(merged.address, 'CALLE FALSA 123 · PILAR');
+    expect(merged.city, isEmpty);
+  });
+
   test('urban branding phone includes both numbers', () {
     expect(
       PresupuestoBranding.urbanTactical.phoneLine,

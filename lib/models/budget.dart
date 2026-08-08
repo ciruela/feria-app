@@ -95,6 +95,19 @@ class BudgetCustomer {
     return parts.join(' · ');
   }
 
+  /// AR-58: une calle + localidad en un solo `address` (campo único Urban).
+  BudgetCustomer mergeDomicilioIntoAddress() {
+    final cityTrim = city.trim();
+    if (cityTrim.isEmpty) return this;
+    final addressTrim = address.trim();
+    final merged = addressTrim.isEmpty
+        ? cityTrim
+        : (addressTrim.toLowerCase().contains(cityTrim.toLowerCase())
+            ? addressTrim
+            : '$addressTrim · $cityTrim');
+    return copyWith(address: merged, city: '');
+  }
+
   BudgetCustomer copyWith({
     String? fullName,
     String? dni,

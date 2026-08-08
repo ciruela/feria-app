@@ -148,7 +148,9 @@ class _SimpleItemsTable extends StatelessWidget {
                             key: ValueKey('serial-${row.lineKey}'),
                             lineKey: row.lineKey,
                             initialValue: row.serialNumber,
-                            readOnly: readOnly,
+                            // AR-58: el A4 escalado no es usable en mobile;
+                            // la carga va por BudgetSerialPanel.
+                            readOnly: true,
                             onChanged: onSerialChanged,
                           ),
                         ],
@@ -273,7 +275,8 @@ class _DetailedItemsTable extends StatelessWidget {
                     key: ValueKey('serial-${row.lineKey}'),
                     lineKey: row.lineKey,
                     initialValue: row.serialNumber,
-                    readOnly: readOnly,
+                    // AR-58: editar serie solo en BudgetSerialPanel.
+                    readOnly: true,
                     onChanged: onSerialChanged,
                   ),
                 ],
