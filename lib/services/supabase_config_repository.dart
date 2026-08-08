@@ -107,6 +107,51 @@ class SupabaseConfigRepository {
     }
   }
 
+  Future<String?> fetchAdminMasterPinHash() async {
+    var query = SupabaseService.client
+        .from(_table)
+        .select('admin_master_pin_hash')
+        .eq('id', _globalId);
+
+    final tenantId = _tenantIdFromJwt();
+    if (tenantId != null) {
+      query = query.eq('tenant_id', tenantId);
+    }
+
+    final row = await query.maybeSingle();
+    if (row == null) return null;
+    final hash = (row['admin_master_pin_hash'] as String?)?.trim();
+    if (hash == null || hash.isEmpty) return null;
+    return hash;
+  }
+
+  Future<void> upsertAdminMasterPinHash(String pinHash) async {
+    final tenantId = _tenantIdFromJwt();
+    if (tenantId == null || tenantId.isEmpty) {
+      throw StateError(
+        'No hay armería activa en la sesión. '
+        'Elegí una organización antes de cambiar el PIN.',
+      );
+    }
+
+    final updated = await SupabaseService.client
+        .from(_table)
+        .update({
+          'admin_master_pin_hash': pinHash,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', _globalId)
+        .eq('tenant_id', tenantId)
+        .select('id');
+
+    if ((updated as List).isEmpty) {
+      throw StateError(
+        'No hay configuración de la armería. '
+        'Guardá el tipo de cambio primero y reintentá el PIN.',
+      );
+    }
+  }
+
   String? _tenantIdFromJwt() {
     final session = SupabaseService.client.auth.currentSession;
     if (session == null) return null;

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../config/app_config.dart';
 import '../../services/admin_service.dart';
+import '../../services/auth_service.dart';
 import '../../services/cart_service.dart';
 import '../../services/catalog_service.dart';
 import '../../services/exchange_rate_service.dart';
@@ -57,6 +58,7 @@ class _TenantScopeLoaderState extends State<TenantScopeLoader> {
     context.read<ExchangeRateService>().bindTenant(tenantId);
     context.read<PricingSettingsService>().bindTenant(tenantId);
     context.read<CartService>().bindTenant(tenantId);
+    context.read<AuthService>().bindTenant(tenantId);
 
     try {
       await Future.wait([
@@ -65,6 +67,7 @@ class _TenantScopeLoaderState extends State<TenantScopeLoader> {
         context.read<AdminService>().load(),
         context.read<ExchangeRateService>().load(),
         context.read<PricingSettingsService>().load(),
+        context.read<AuthService>().load(),
       ]);
       if (!mounted) return;
       await context.read<CartService>().load(

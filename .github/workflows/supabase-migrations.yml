@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       migration_file:
-        description: 'Archivo en supabase/migrations/ (vacío = 045_fix_tenant_member_rpc_overload.sql)'
+        description: 'Archivo en supabase/migrations/ (vacío = 046_admin_master_pin.sql)'
         required: false
-        default: '045_fix_tenant_member_rpc_overload.sql'
+        default: '046_admin_master_pin.sql'
   push:
     branches: [main]
     paths:
@@ -32,7 +32,7 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           PROJECT_REF: ihotjvimurztbhrsiabs
-          MIGRATION_FILE: ${{ github.event.inputs.migration_file || '045_fix_tenant_member_rpc_overload.sql' }}
+          MIGRATION_FILE: ${{ github.event.inputs.migration_file || '046_admin_master_pin.sql' }}
         run: |
           set -euo pipefail
           chmod +x scripts/apply_supabase_migration.sh

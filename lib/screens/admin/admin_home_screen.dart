@@ -282,8 +282,10 @@ class AdminHomeScreen extends StatelessWidget {
           BigActionButton(
             label: 'Cambiar PIN admin',
             subtitle: auth.isDefaultAdminPin
-                ? 'PIN por defecto: ${AuthService.defaultPin}'
-                : 'PIN actual: ${auth.adminPin}',
+                ? 'PIN por defecto: ${AuthService.defaultPin} (igual en web y phone)'
+                : auth.adminPin.isEmpty
+                    ? 'PIN sincronizado en la nube (mismo en todos los dispositivos)'
+                    : 'PIN actual: ${auth.adminPin}',
             icon: Icons.lock_outline,
             accentColor: AppColors.goldDark,
             onTap: () {
