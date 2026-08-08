@@ -318,7 +318,6 @@ class _CategoryCard extends StatelessWidget {
     required this.metrics,
     required this.color,
     required this.icon,
-    this.unitNoun = 'unidades',
     this.balas,
   });
 
@@ -327,11 +326,8 @@ class _CategoryCard extends StatelessWidget {
   final Color color;
   final IconData icon;
 
-  /// Sustantivo por defecto de la cantidad (armas: 'unidades').
-  final String unitNoun;
-
   /// Balas vendidas de munición. Solo cuando es > 0 (hay `roundsPerBox`) se
-  /// muestra "cajas · balas"; si no, se conserva [unitNoun] para no alterar la
+  /// muestra "cajas · balas"; si no, se usa "unidades" para no alterar la
   /// vista de tenants que no manejan munición con balas por caja (p. ej. Urban).
   final int? balas;
 
@@ -339,7 +335,7 @@ class _CategoryCard extends StatelessWidget {
     if (balas != null && balas! > 0) {
       return '${metrics.units} cajas · $balas balas';
     }
-    return '${metrics.units} $unitNoun';
+    return '${metrics.units} unidades';
   }
 
   @override
