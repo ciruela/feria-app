@@ -29,7 +29,7 @@ class PresupuestoUrbanPaper extends StatelessWidget {
     final branding = document.branding;
     final summary = document.summary;
 
-    // Clip evita franjas de overflow si el pie (checks/firma) aprieta el A4.
+    // AR-59: Clip evita franjas si el pie aprieta; la tabla ya hace fit-to-page.
     // Marca de agua a página completa (no solo detrás de la tabla).
     return ClipRect(
       child: UrbanTableWatermark(

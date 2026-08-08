@@ -9,6 +9,8 @@ import '../models/budget.dart';
 import '../models/presupuesto_document.dart';
 import '../models/presupuesto_summary.dart';
 import 'presupuesto_page_format.dart';
+import 'presupuesto_row_heights.dart';
+import 'share_pdf.dart';
 
 class PresupuestoPdf {
   static pw.MemoryImage? _urbanWatermarkImage;
@@ -80,7 +82,7 @@ class PresupuestoPdf {
     required PresupuestoBranding branding,
   }) async {
     final bytes = await generate(budget, branding: branding);
-    await Printing.sharePdf(
+    await sharePdfBytes(
       bytes: bytes,
       filename: fileName(budget, branding: branding),
     );
@@ -584,21 +586,19 @@ class PresupuestoPdf {
 
   static const _tableHeaderHeight = 22.0;
 
-  static double _pdfRowHeight({
-    required double? bodyHeight,
-    required int rowCount,
-  }) {
-    if (bodyHeight == null || rowCount <= 0) return 20;
-    return ((bodyHeight - _tableHeaderHeight) / rowCount).clamp(16, 42);
-  }
-
   static pw.Widget _detailedItemsTable(
     List<PresupuestoItemRow> rows,
     PresupuestoBranding branding, {
     double? bodyHeight,
   }) {
-    final rowHeight =
-        _pdfRowHeight(bodyHeight: bodyHeight, rowCount: rows.length);
+    final heights = PresupuestoRowHeights.resolve(
+      rows: rows,
+      bodyHeight: bodyHeight,
+      headerHeight: _tableHeaderHeight,
+      armaPref: 34,
+      normalPref: 20,
+      fillerPref: 20,
+    );
 
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.black, width: 0.8),
@@ -627,17 +627,13 @@ class PresupuestoPdf {
             return pw.TableRow(
               children: List.generate(
                 6,
-                (_) => pw.SizedBox(height: rowHeight, child: _bodyCell('')),
+                (_) =>
+                    pw.SizedBox(height: heights.filler, child: _bodyCell('')),
               ),
             );
           }
 
-          // AR-52: el detalle de un arma ocupa dos líneas (detalle + "SERIE:").
-          // Sin altura extra, la segunda línea desbordaba la celda de alto fijo
-          // y pisaba la fila de abajo. Le damos aire como en la tabla simple.
-          final height = row.isArma && row.serialNumber.trim().isNotEmpty
-              ? (rowHeight + 12).clamp(rowHeight, 44.0)
-              : rowHeight;
+          final height = heights.forRow(row);
 
           return pw.TableRow(
             children: [
@@ -676,8 +672,15 @@ class PresupuestoPdf {
     List<PresupuestoItemRow> rows, {
     double? bodyHeight,
   }) {
-    final rowHeight =
-        _pdfRowHeight(bodyHeight: bodyHeight, rowCount: rows.length);
+    // AR-59: reparte el alto para que checks/firma debajo del total no se corten.
+    final heights = PresupuestoRowHeights.resolve(
+      rows: rows,
+      bodyHeight: bodyHeight,
+      headerHeight: _tableHeaderHeight,
+      armaPref: 30,
+      normalPref: 20,
+      fillerPref: 20,
+    );
 
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.black, width: 0.8),
@@ -704,16 +707,14 @@ class PresupuestoPdf {
               children: List.generate(
                 3,
                 (_) => pw.SizedBox(
-                  height: rowHeight,
+                  height: heights.filler,
                   child: _bodyCell(''),
                 ),
               ),
             );
           }
 
-          final height = row.isArma && row.serialNumber.trim().isNotEmpty
-              ? (rowHeight + 10).clamp(rowHeight, 40.0)
-              : rowHeight;
+          final height = heights.forRow(row);
 
           return pw.TableRow(
             children: [

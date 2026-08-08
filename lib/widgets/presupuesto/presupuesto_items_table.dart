@@ -1,9 +1,8 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../models/presupuesto_document.dart';
+import '../../utils/presupuesto_row_heights.dart';
 import '../../utils/uppercase_input.dart';
 
 class PresupuestoItemsTable extends StatelessWidget {
@@ -74,16 +73,15 @@ class _SimpleItemsTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final baseHeight = bodyHeight == null
-        ? (branding.isUrban ? 28.0 : 22.0)
-        : PresupuestoItemsTable.rowHeightFor(
-            bodyHeight: bodyHeight!,
-            rowCount: rows.length,
-          );
-    // Armas necesitan espacio fijo para el campo SERIE (evita clip / no-tap).
-    const armaMinHeight = 54.0;
-    final emptyHeight =
-        math.min(baseHeight, branding.isUrban ? 22.0 : baseHeight);
+    // AR-59: alturas fit-to-page para no clippear checks/firma debajo del total.
+    final heights = PresupuestoRowHeights.resolve(
+      rows: rows,
+      bodyHeight: bodyHeight,
+      headerHeight: PresupuestoItemsTable._headerHeight,
+      armaPref: 54,
+      normalPref: branding.isUrban ? 28 : 22,
+      fillerPref: 22,
+    );
 
     // Marca de agua Urban: página completa en PresupuestoUrbanPaper.
     return Table(
@@ -111,50 +109,51 @@ class _SimpleItemsTable extends StatelessWidget {
               children: List.generate(
                 3,
                 (_) => SizedBox(
-                  height: emptyHeight,
+                  height: heights.filler,
                   child: const _BodyCell(''),
                 ),
               ),
             );
           }
 
-          final cellHeight =
-              row.isArma ? math.max(baseHeight, armaMinHeight) : baseHeight;
+          final cellHeight = heights.forRow(row);
 
           return TableRow(
             children: [
               SizedBox(
                 height: cellHeight,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 2,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        row.detail,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                          height: 1.15,
+                child: ClipRect(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          row.detail,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            height: 1.15,
+                          ),
                         ),
-                      ),
-                      if (row.isArma) ...[
-                        const SizedBox(height: 2),
-                        _SerialInlineField(
-                          key: ValueKey('serial-${row.lineKey}'),
-                          lineKey: row.lineKey,
-                          initialValue: row.serialNumber,
-                          readOnly: readOnly,
-                          onChanged: onSerialChanged,
-                        ),
+                        if (row.isArma) ...[
+                          const SizedBox(height: 2),
+                          _SerialInlineField(
+                            key: ValueKey('serial-${row.lineKey}'),
+                            lineKey: row.lineKey,
+                            initialValue: row.serialNumber,
+                            readOnly: readOnly,
+                            onChanged: onSerialChanged,
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -193,12 +192,14 @@ class _DetailedItemsTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rowHeight = bodyHeight == null
-        ? 22.0
-        : PresupuestoItemsTable.rowHeightFor(
-            bodyHeight: bodyHeight!,
-            rowCount: rows.length,
-          );
+    final heights = PresupuestoRowHeights.resolve(
+      rows: rows,
+      bodyHeight: bodyHeight,
+      headerHeight: PresupuestoItemsTable._headerHeight,
+      armaPref: 52,
+      normalPref: 22,
+      fillerPref: 22,
+    );
 
     return Table(
       border: TableBorder.all(color: Colors.black, width: 1.2),
@@ -222,27 +223,22 @@ class _DetailedItemsTable extends StatelessWidget {
               ),
           ],
         ),
-        ...rows.map((row) => _buildRow(row, rowHeight)),
+        ...rows.map((row) => _buildRow(row, heights)),
       ],
     );
   }
 
-  TableRow _buildRow(PresupuestoItemRow row, double rowHeight) {
-    // AR-52: un arma muestra detalle (hasta 2 líneas) + "SERIE:". Con varias
-    // armas, rowHeight se achica y la celda quedaba corta, pisando la fila de
-    // abajo. Garantizamos un mínimo fijo que contenga ambas líneas.
-    const armaMinHeight = 52.0;
-    final cellHeight = row.isArma ? math.max(rowHeight, armaMinHeight) : rowHeight;
-
+  TableRow _buildRow(PresupuestoItemRow row, PresupuestoRowHeights heights) {
     if (row.isEmpty) {
       return TableRow(
         children: List.generate(
           6,
-          (_) => SizedBox(height: rowHeight, child: const _BodyCell('')),
+          (_) => SizedBox(height: heights.filler, child: const _BodyCell('')),
         ),
       );
     }
 
+    final cellHeight = heights.forRow(row);
     return TableRow(
       children: [
         SizedBox(
