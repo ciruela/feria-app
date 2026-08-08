@@ -27,6 +27,7 @@ class PricingSettingsService extends ChangeNotifier {
   static const _munT3KeyBase = 'pricing_municion_tarjeta3_pct';
   static const _munTransferKeyBase = 'pricing_municion_transfer_efectivo';
   static const _munT3LargaKeyBase = 'pricing_municion_tarjeta3_solo_larga';
+  static const _transferEfectivoKeyBase = 'pricing_transfer_efectivo';
 
   final SupabaseConfigRepository _configRepo = SupabaseConfigRepository();
   String? _tenantScope;
@@ -46,12 +47,16 @@ class PricingSettingsService extends ChangeNotifier {
   double municionDescuentoEfectivoPct = 10;
   double municionRecargoTarjeta3Pct = 0;
 
-  /// Transferencia con el mismo monto que efectivo (promo WG).
+  /// Transferencia con el mismo monto que efectivo (promo munición).
   bool municionTransferenciaComoEfectivo = true;
 
   /// Si true, el recargo 3 cuotas de munición solo aplica a calibres de arma
   /// larga; munición de arma corta usa el % global de 3 cuotas.
   bool municionTarjeta3SoloArmaLarga = true;
+
+  /// Tenant-wide (World Guns): transferencia = mismo descuento que efectivo
+  /// en todo el catálogo.
+  bool transferenciaComoEfectivo = false;
 
   void bindTenant(String? tenantId) {
     final next = tenantId?.trim();
@@ -90,6 +95,7 @@ class PricingSettingsService extends ChangeNotifier {
     double? municionTarjeta3Pct,
     bool? municionTransferenciaComoEfectivo,
     bool? municionTarjeta3SoloArmaLarga,
+    bool? transferenciaComoEfectivo,
   }) async {
     descuentoEfectivoPct = PricingLimits.clamp('efectivo', efectivoPct);
     recargoDebitoPct = PricingLimits.clamp('debito', debitoPct);
@@ -117,6 +123,9 @@ class PricingSettingsService extends ChangeNotifier {
     }
     if (municionTarjeta3SoloArmaLarga != null) {
       this.municionTarjeta3SoloArmaLarga = municionTarjeta3SoloArmaLarga;
+    }
+    if (transferenciaComoEfectivo != null) {
+      this.transferenciaComoEfectivo = transferenciaComoEfectivo;
     }
 
     await _persistCache();
@@ -151,8 +160,9 @@ class PricingSettingsService extends ChangeNotifier {
     return municionRecargoTarjeta3Pct;
   }
 
-  /// Transferencia = efectivo solo en munición con override activo.
+  /// Transferencia = efectivo: flag tenant-wide o promo munición.
   bool transferenciaComoEfectivoFor(ProductType type) {
+    if (transferenciaComoEfectivo) return true;
     return type == ProductType.municion &&
         municionOverrideEnabled &&
         municionTransferenciaComoEfectivo;
@@ -168,6 +178,7 @@ class PricingSettingsService extends ChangeNotifier {
       'tarjeta9': recargoTarjeta9Pct,
       'tarjeta12': recargoTarjeta12Pct,
       'tarjeta18': recargoTarjeta18Pct,
+      'transferencia_como_efectivo': transferenciaComoEfectivo,
     };
     if (municionOverrideEnabled) {
       map['municion'] = <String, dynamic>{
@@ -194,12 +205,20 @@ class PricingSettingsService extends ChangeNotifier {
     municionRecargoTarjeta3Pct = 0;
     municionTransferenciaComoEfectivo = true;
     municionTarjeta3SoloArmaLarga = true;
+    transferenciaComoEfectivo = false;
   }
 
   void _applyMap(Map<String, dynamic> map) {
     double? asDouble(dynamic v) {
       if (v is num) return v.toDouble();
       if (v is String) return double.tryParse(v.trim());
+      return null;
+    }
+
+    bool? asBool(dynamic v) {
+      if (v is bool) return v;
+      if (v == 1 || v == '1' || v == 'true') return true;
+      if (v == 0 || v == '0' || v == 'false') return false;
       return null;
     }
 
@@ -217,6 +236,9 @@ class PricingSettingsService extends ChangeNotifier {
     applyPct('tarjeta12', (v) => recargoTarjeta12Pct = v);
     applyPct('tarjeta18', (v) => recargoTarjeta18Pct = v);
 
+    transferenciaComoEfectivo =
+        asBool(map['transferencia_como_efectivo']) ?? false;
+
     final mun = map['municion'];
     if (mun is Map) {
       municionOverrideEnabled = true;
@@ -229,25 +251,10 @@ class PricingSettingsService extends ChangeNotifier {
       if (t3 != null) {
         municionRecargoTarjeta3Pct = PricingLimits.clamp('tarjeta3', t3);
       }
-      final transfer = mun['transferencia_como_efectivo'];
-      if (transfer is bool) {
-        municionTransferenciaComoEfectivo = transfer;
-      } else if (transfer == 1 || transfer == '1' || transfer == 'true') {
-        municionTransferenciaComoEfectivo = true;
-      } else if (transfer == 0 || transfer == '0' || transfer == 'false') {
-        municionTransferenciaComoEfectivo = false;
-      }
-      final soloLarga = mun['tarjeta3_solo_arma_larga'];
-      if (soloLarga is bool) {
-        municionTarjeta3SoloArmaLarga = soloLarga;
-      } else if (soloLarga == 1 || soloLarga == '1' || soloLarga == 'true') {
-        municionTarjeta3SoloArmaLarga = true;
-      } else if (soloLarga == 0 || soloLarga == '0' || soloLarga == 'false') {
-        municionTarjeta3SoloArmaLarga = false;
-      } else {
-        // Default WG: 3 SI solo arma larga.
-        municionTarjeta3SoloArmaLarga = true;
-      }
+      municionTransferenciaComoEfectivo =
+          asBool(mun['transferencia_como_efectivo']) ?? true;
+      municionTarjeta3SoloArmaLarga =
+          asBool(mun['tarjeta3_solo_arma_larga']) ?? true;
     } else {
       municionOverrideEnabled = false;
     }
@@ -271,6 +278,8 @@ class PricingSettingsService extends ChangeNotifier {
       tenantCacheKey(_munTransferKeyBase, _tenantScope);
   String get _munT3LargaKey =>
       tenantCacheKey(_munT3LargaKeyBase, _tenantScope);
+  String get _transferEfectivoKey =>
+      tenantCacheKey(_transferEfectivoKeyBase, _tenantScope);
 
   Future<void> _loadFromCache() async {
     final prefs = await SharedPreferences.getInstance();
@@ -298,6 +307,8 @@ class PricingSettingsService extends ChangeNotifier {
         prefs.getBool(_munTransferKey) ?? true;
     municionTarjeta3SoloArmaLarga =
         prefs.getBool(_munT3LargaKey) ?? true;
+    transferenciaComoEfectivo =
+        prefs.getBool(_transferEfectivoKey) ?? false;
   }
 
   Future<void> _persistCache() async {
@@ -315,5 +326,6 @@ class PricingSettingsService extends ChangeNotifier {
     await prefs.setDouble(_munT3Key, municionRecargoTarjeta3Pct);
     await prefs.setBool(_munTransferKey, municionTransferenciaComoEfectivo);
     await prefs.setBool(_munT3LargaKey, municionTarjeta3SoloArmaLarga);
+    await prefs.setBool(_transferEfectivoKey, transferenciaComoEfectivo);
   }
 }
