@@ -46,13 +46,22 @@ class SaleRecord {
   final BudgetCustomer customerDetail;
   final DateTime? saleDate;
 
-  double get collectedArs => lines
-      .where((line) => !line.paysInUsd)
-      .fold(0.0, (sum, line) => sum + line.lineArs);
+  /// Los totales del servidor (`total_ars` / `total_usd`) son la fuente fiel:
+  /// consideran pagos divididos (allocations ARS+USD por `share`), donde las
+  /// líneas guardan ambos importes con un único método y sumarlas sobre-reporta.
+  bool get _hasServerTotals => totalArs > 0 || totalUsd > 0;
 
-  double get collectedUsd => lines
-      .where((line) => line.paysInUsd)
-      .fold(0.0, (sum, line) => sum + line.lineUsd);
+  double get collectedArs => _hasServerTotals
+      ? totalArs
+      : lines
+          .where((line) => !line.paysInUsd)
+          .fold(0.0, (sum, line) => sum + line.lineArs);
+
+  double get collectedUsd => _hasServerTotals
+      ? totalUsd
+      : lines
+          .where((line) => line.paysInUsd)
+          .fold(0.0, (sum, line) => sum + line.lineUsd);
 
   bool get hasPdf => pdfPath != null && pdfPath!.isNotEmpty;
 

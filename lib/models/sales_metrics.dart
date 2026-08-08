@@ -59,6 +59,7 @@ class DaySalesMetrics {
     this.armaCorta = const CategoryMetrics(),
     this.armaLarga = const CategoryMetrics(),
     this.municion = const CategoryMetrics(),
+    this.municionBalas = 0,
     this.payments = const [],
     this.sellers = const [],
     this.sales = const [],
@@ -71,6 +72,10 @@ class DaySalesMetrics {
   final CategoryMetrics armaCorta;
   final CategoryMetrics armaLarga;
   final CategoryMetrics municion;
+
+  /// Balas vendidas de munición (cajas × balas por caja). El conteo de cajas
+  /// vive en [municion.units]; esto lo deriva con el `roundsPerBox` del catálogo.
+  final int municionBalas;
   final List<PaymentMetrics> payments;
   final List<SellerMetrics> sellers;
   final List<SaleRecord> sales;
@@ -78,12 +83,19 @@ class DaySalesMetrics {
   int get totalUnits =>
       armaCorta.units + armaLarga.units + municion.units;
 
-  factory DaySalesMetrics.fromSales(DateTime date, List<SaleRecord> sales) {
+  /// [roundsPerBoxOf] resuelve balas por caja de munición (0 si desconocido);
+  /// sin él, [municionBalas] queda en 0 y solo se cuentan cajas.
+  factory DaySalesMetrics.fromSales(
+    DateTime date,
+    List<SaleRecord> sales, {
+    int Function(String productId)? roundsPerBoxOf,
+  }) {
     var totalArs = 0.0;
     var totalUsd = 0.0;
     var corta = const CategoryMetrics();
     var larga = const CategoryMetrics();
     var muni = const CategoryMetrics();
+    var muniBalas = 0;
     final paymentMap = <String, PaymentMetrics>{};
     final sellerMap = <String, SellerMetrics>{};
     var validSales = 0;
@@ -125,6 +137,8 @@ class DaySalesMetrics {
             larga = larga.merge(category);
           default:
             muni = muni.merge(category);
+            final rpb = roundsPerBoxOf?.call(line.productId) ?? 0;
+            if (rpb > 0) muniBalas += countUnits * rpb;
         }
 
         final paymentKey = line.paymentMethod;
@@ -154,6 +168,7 @@ class DaySalesMetrics {
       armaCorta: corta,
       armaLarga: larga,
       municion: muni,
+      municionBalas: muniBalas,
       payments: payments,
       sellers: sellers,
       sales: sales,

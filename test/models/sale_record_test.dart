@@ -84,6 +84,52 @@ void main() {
       expect(s.collectedUsd, 5);
     });
 
+    test('collected usa totales del servidor en pago dividido (dual)', () {
+      // Pago 50% efectivo (ARS) + 50% dólar: TODAS las líneas quedan con el
+      // método primario y guardan ambos importes; el reparto real vive en los
+      // totales del servidor. Sumar por líneas sobre-reportaría ARS y ocultaría
+      // el USD, así que collected* debe reflejar total_ars/total_usd.
+      final row = {
+        'id': 'dual',
+        'created_at': '2026-01-15T12:00:00Z',
+        'total_ars': 50000,
+        'total_usd': 50,
+        'items': {
+          'lines': [
+            {
+              'productId': 'p1',
+              'lineArs': 100000,
+              'lineUsd': 100,
+              'paymentMethod': 'efectivo',
+            },
+          ],
+          'allocations': [
+            {'method': 'efectivo', 'amountArs': 50000, 'amountUsd': 0, 'share': 0.5},
+            {'method': 'dolar_billete', 'amountArs': 0, 'amountUsd': 50, 'share': 0.5},
+          ],
+        },
+      };
+      final s = SaleRecord.fromRow(row);
+      expect(s.collectedArs, 50000);
+      expect(s.collectedUsd, 50);
+    });
+
+    test('collected cae a las líneas cuando no hay totales de servidor', () {
+      final row = {
+        'id': 'legacy',
+        'created_at': '2026-01-15T12:00:00Z',
+        'items': {
+          'lines': [
+            {'productId': 'p1', 'lineArs': 600, 'paymentMethod': 'lista'},
+            {'productId': 'p2', 'lineUsd': 5, 'paymentMethod': 'dolar_billete'},
+          ],
+        },
+      };
+      final s = SaleRecord.fromRow(row);
+      expect(s.collectedArs, 600);
+      expect(s.collectedUsd, 5);
+    });
+
     test('lee campos de anulación', () {
       final row = baseRow()
         ..addAll({

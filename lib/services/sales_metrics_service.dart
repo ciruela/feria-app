@@ -5,18 +5,26 @@ import 'supabase_sales_repository.dart';
 
 class SalesMetricsService {
   SalesMetricsService({CatalogService? catalog})
-      : _repository = SupabaseSalesRepository(catalog: catalog);
+      : _catalog = catalog,
+        _repository = SupabaseSalesRepository(catalog: catalog);
 
+  final CatalogService? _catalog;
   final SupabaseSalesRepository _repository;
+
+  /// Balas por caja del catálogo para derivar balas vendidas de munición.
+  int _roundsPerBoxOf(String productId) =>
+      _catalog?.productById(productId)?.roundsPerBox ?? 0;
 
   Future<DaySalesMetrics> metricsForDay(DateTime day) async {
     final sales = await _repository.fetchForDay(day);
-    return DaySalesMetrics.fromSales(day, sales);
+    return DaySalesMetrics.fromSales(day, sales,
+        roundsPerBoxOf: _roundsPerBoxOf);
   }
 
   Future<DaySalesMetrics> metricsForRange(DateTime start, DateTime end) async {
     final sales = await _repository.fetchForRange(start, end);
-    return DaySalesMetrics.fromSales(start, sales);
+    return DaySalesMetrics.fromSales(start, sales,
+        roundsPerBoxOf: _roundsPerBoxOf);
   }
 
   Future<List<SaleRecord>> salesForRange(DateTime start, DateTime end) {

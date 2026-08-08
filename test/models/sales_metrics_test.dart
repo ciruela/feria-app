@@ -62,4 +62,28 @@ void main() {
 
     expect(metrics.sales.where((s) => s.pendienteFacturacion).length, 1);
   });
+
+  test('municionBalas deriva cajas × balas por caja del catálogo', () {
+    // Dos ventas de munición: 2 cajas c/u = 4 cajas; con 50 balas/caja = 200.
+    final metrics = DaySalesMetrics.fromSales(
+      day,
+      [
+        _sale(id: 'a', ars: 1000),
+        _sale(id: 'b', ars: 1000),
+      ],
+      roundsPerBoxOf: (_) => 50,
+    );
+
+    expect(metrics.municion.units, 4);
+    expect(metrics.municionBalas, 200);
+  });
+
+  test('municionBalas es 0 sin resolver de balas por caja', () {
+    final metrics = DaySalesMetrics.fromSales(day, [
+      _sale(id: 'a', ars: 1000),
+    ]);
+
+    expect(metrics.municion.units, 2);
+    expect(metrics.municionBalas, 0);
+  });
 }
