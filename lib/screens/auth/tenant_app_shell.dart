@@ -54,23 +54,8 @@ class TenantAppShell extends StatelessWidget {
           },
         );
       case TenantAppPhase.adminHome:
-        return Navigator(
-          key: flow.adminNavigatorKey(),
-          onGenerateInitialRoutes: (_, __) {
-            return [
-              MaterialPageRoute<void>(
-                settings: const RouteSettings(name: '/'),
-                builder: (_) => const AdminHomeScreen(),
-              ),
-            ];
-          },
-          onGenerateRoute: (settings) {
-            return MaterialPageRoute<void>(
-              settings: settings,
-              builder: (_) => const AdminHomeScreen(),
-            );
-          },
-        );
+        // Sin Navigator anidado: evita stacks vacíos tras el diálogo del PIN.
+        return const AdminHomeScreen();
     }
   }
 
@@ -79,6 +64,7 @@ class TenantAppShell extends StatelessWidget {
     AdminUser admin,
     InTenantFlowService flow,
   ) {
+    FocusManager.instance.primaryFocus?.unfocus();
     context.read<AuthService>().loginAs(AppRole.admin);
     context.read<AdminService>().startSession(admin);
     final email = context.read<TenantSessionService>().email.trim();

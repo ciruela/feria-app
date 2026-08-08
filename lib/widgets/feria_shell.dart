@@ -72,14 +72,22 @@ class FeriaScaffold extends StatelessWidget {
     final width = MediaQuery.sizeOf(context).width;
     final shouldConstrain = constrainBody && kIsWeb && width >= 720;
 
+    // SelectionArea solo en web y DENTRO del Scaffold (bajo Overlay del
+    // Navigator). Si envuelve MaterialApp.builder, SelectableRegion no
+    // encuentra Overlay y el panel admin queda en blanco.
+    Widget content = shouldConstrain
+        ? FeriaPageConstraint(maxWidth: maxContentWidth, child: body)
+        : body;
+    // Copia de texto solo en web, DENTRO del Scaffold (bajo Overlay).
+    // Nunca en MaterialApp.builder: ahí SelectableRegion no tiene Overlay.
+    if (kIsWeb) {
+      content = SelectionArea(child: content);
+    }
+
     return Scaffold(
       backgroundColor: AppColors.surface,
       appBar: appBar,
-      body: FeriaBackground(
-        child: shouldConstrain
-            ? FeriaPageConstraint(maxWidth: maxContentWidth, child: body)
-            : body,
-      ),
+      body: FeriaBackground(child: content),
       bottomNavigationBar: bottomNavigationBar,
       floatingActionButton: floatingActionButton,
     );
