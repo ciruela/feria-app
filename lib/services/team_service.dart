@@ -263,6 +263,7 @@ class TeamService {
       final response = await SupabaseService.client.functions.invoke(
         name,
         body: body,
+        headers: const {'Content-Type': 'application/json'},
       );
       final map = _asStringKeyedMap(response.data);
       if (response.status >= 400) {
@@ -271,6 +272,10 @@ class TeamService {
           response.status,
           fallback: fallbackMessage,
         ));
+      }
+      if (map['error'] != null) {
+        throw StateError(_errorMessage(map, response.status,
+            fallback: fallbackMessage));
       }
       return map;
     } on FunctionException catch (error) {

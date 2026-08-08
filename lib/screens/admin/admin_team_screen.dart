@@ -547,16 +547,22 @@ class _InviteDialogState extends State<_InviteDialog> {
               controller: _email,
               autofocus: true,
               keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
               decoration: const InputDecoration(
                 labelText: 'Email',
                 hintText: 'persona@mail.com',
                 helperText:
-                    'Debe ser el mismo email con el que se registró en la app',
+                    'Le llega un mail para crear su contraseña y entrar',
                 border: OutlineInputBorder(),
               ),
               validator: (value) {
-                final v = value?.trim() ?? '';
-                if (!v.contains('@')) return 'Email inválido';
+                final v = (value ?? '')
+                    .replaceAll(RegExp(r'[\u200B-\u200D\uFEFF]'), '')
+                    .trim();
+                if (v.isEmpty) return 'Ingresá un email';
+                if (!v.contains('@') || !v.contains('.')) {
+                  return 'Email inválido (ej: persona@mail.com)';
+                }
                 return null;
               },
             ),
@@ -600,10 +606,14 @@ class _InviteDialogState extends State<_InviteDialog> {
         FilledButton(
           onPressed: () {
             if (_formKey.currentState?.validate() ?? false) {
+              final email = _email.text
+                  .replaceAll(RegExp(r'[\u200B-\u200D\uFEFF]'), '')
+                  .trim()
+                  .toLowerCase();
               Navigator.pop(
                 context,
                 _InviteForm(
-                  email: _email.text.trim(),
+                  email: email,
                   nombre: _nombre.text.trim(),
                   rol: _rol,
                 ),

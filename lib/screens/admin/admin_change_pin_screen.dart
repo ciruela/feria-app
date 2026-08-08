@@ -39,7 +39,7 @@ class _AdminChangePinScreenState extends State<AdminChangePinScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Mínimo 4 dígitos. Compartilo solo con encargados.',
+              'Mínimo 4 dígitos. Se sincroniza en web y phone para esta armería.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 24),

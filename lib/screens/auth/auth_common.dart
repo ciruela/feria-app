@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/admin_service.dart';
+import '../../services/auth_service.dart';
 import '../../services/cart_service.dart';
 import '../../services/catalog_service.dart';
 import '../../services/exchange_rate_service.dart';
@@ -17,12 +18,14 @@ Future<void> reloadTenantData(BuildContext context) async {
   context.read<SellerService>().bindTenant(tenantId);
   context.read<ExchangeRateService>().bindTenant(tenantId);
   context.read<CartService>().bindTenant(tenantId);
+  context.read<AuthService>().bindTenant(tenantId);
 
   await Future.wait([
     context.read<CatalogService>().load(),
     context.read<SellerService>().load(),
     context.read<AdminService>().load(),
     context.read<ExchangeRateService>().load(),
+    context.read<AuthService>().load(),
   ]);
   if (!context.mounted) return;
   await context.read<CartService>().load(

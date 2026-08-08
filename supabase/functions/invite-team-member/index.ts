@@ -39,13 +39,37 @@ Deno.serve(async (req) => {
     const jwt = authHeader.replace(/^Bearer\s+/i, "").trim();
     if (!jwt) return json({ error: "No autorizado" }, 401);
 
-    const body = await req.json().catch(() => ({}));
-    const email = String(body.email ?? "").trim().toLowerCase();
-    const nombre = String(body.nombre ?? "").trim();
-    const rol = String(body.rol ?? "admin").trim().toLowerCase();
+    let parsedBody: Record<string, unknown> = {};
+    try {
+      const raw = await req.json();
+      if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+        parsedBody = raw as Record<string, unknown>;
+      } else if (typeof raw === "string" && raw.trim()) {
+        const nested = JSON.parse(raw);
+        if (nested && typeof nested === "object") {
+          parsedBody = nested as Record<string, unknown>;
+        }
+      }
+    } catch {
+      parsedBody = {};
+    }
 
-    if (!email || !email.includes("@")) {
-      return json({ error: "Email inválido" }, 400);
+    // Limpia espacios / caracteres invisibles de paste (móvil/web).
+    const email = String(parsedBody.email ?? "")
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      .trim()
+      .toLowerCase();
+    const nombre = String(parsedBody.nombre ?? "").trim();
+    const rol = String(parsedBody.rol ?? "admin").trim().toLowerCase();
+
+    if (!email || !email.includes("@") || !email.includes(".")) {
+      return json(
+        {
+          error:
+            "Email inválido. Usá un correo completo (ej: persona@empresa.com).",
+        },
+        400,
+      );
     }
     if (rol !== "owner" && rol !== "admin") {
       return json({ error: "Rol inválido" }, 400);
@@ -106,8 +130,14 @@ Deno.serve(async (req) => {
     let emailSent = false;
     let status: "invited" | "added" = "added";
 
+    const redirectTo =
+      Deno.env.get("INVITE_REDIRECT_URL")?.trim() ||
+      Deno.env.get("SITE_URL")?.trim() ||
+      "https://app.armenext.com";
+
     const { data: invited, error: inviteErr } = await admin.auth.admin
       .inviteUserByEmail(email, {
+        redirectTo,
         data: {
           full_name: displayName,
           invited_tenant_id: tenantId,
