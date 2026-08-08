@@ -134,4 +134,28 @@ void main() {
     await restored.load();
     expect(restored.isEmpty, isTrue);
   });
+
+  test('cart is isolated per seller within tenant (AR-54)', () async {
+    cart.bindTenant('tenant-a');
+    cart.bindSeller('seller-1');
+    expect(cart.addProduct(testProduct(id: 'p-s1')), CartAddResult.added);
+    await Future<void>.delayed(Duration.zero);
+
+    cart.bindSeller('seller-2');
+    expect(cart.isEmpty, isTrue);
+    expect(cart.addProduct(testProduct(id: 'p-s2')), CartAddResult.added);
+    await Future<void>.delayed(Duration.zero);
+
+    final seller1 = CartService()
+      ..bindTenant('tenant-a')
+      ..bindSeller('seller-1');
+    await seller1.load();
+    expect(seller1.items.single.product.id, 'p-s1');
+
+    final seller2 = CartService()
+      ..bindTenant('tenant-a')
+      ..bindSeller('seller-2');
+    await seller2.load();
+    expect(seller2.items.single.product.id, 'p-s2');
+  });
 }

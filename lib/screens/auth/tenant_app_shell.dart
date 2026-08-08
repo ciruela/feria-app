@@ -7,6 +7,7 @@ import '../../models/audit_entry.dart';
 import '../../services/admin_service.dart';
 import '../../services/audit_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/cart_service.dart';
 import '../../services/in_tenant_flow_service.dart';
 import '../../services/seller_service.dart';
 import '../../services/tenant_session_service.dart';
@@ -95,6 +96,7 @@ void exitInTenantFlow(BuildContext context) {
   }
   auth.logout();
   context.read<SellerService>().clearSelection();
+  context.read<CartService>().bindSeller(null);
   context.read<InTenantFlowService>().reset();
 }
 

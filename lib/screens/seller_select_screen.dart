@@ -8,6 +8,7 @@ import '../services/seller_service.dart';
 import '../utils/layout_breakpoints.dart';
 import '../widgets/employee/seller_select_desktop.dart';
 import '../widgets/employee/seller_select_mobile.dart';
+import 'auth/auth_common.dart';
 
 class SellerSelectScreen extends StatefulWidget {
   const SellerSelectScreen({
@@ -45,6 +46,8 @@ class _SellerSelectScreenState extends State<SellerSelectScreen> {
     setState(() => _confirming = true);
     try {
       await context.read<SellerService>().selectSeller(seller);
+      if (!mounted) return;
+      await loadCartForSeller(context, seller.id);
       if (!mounted) return;
       widget.onSellerSelected(seller);
     } catch (e) {

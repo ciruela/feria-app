@@ -11,6 +11,7 @@ import '../../services/pricing_settings_service.dart';
 import '../../services/seller_service.dart';
 import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
+import 'auth_common.dart';
 
 /// Carga catálogo/vendedores/admins del tenant activo antes de mostrar [child].
 class TenantScopeLoader extends StatefulWidget {
@@ -70,9 +71,10 @@ class _TenantScopeLoaderState extends State<TenantScopeLoader> {
         context.read<AuthService>().load(),
       ]);
       if (!mounted) return;
-      await context.read<CartService>().load(
-            catalog: context.read<CatalogService>(),
-          );
+      await loadCartForSeller(
+        context,
+        context.read<SellerService>().selected?.id,
+      );
       if (!mounted) return;
       setState(() => _ready = true);
     } catch (e) {

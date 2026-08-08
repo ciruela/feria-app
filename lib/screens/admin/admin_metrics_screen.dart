@@ -286,11 +286,11 @@ class _SummarySection extends StatelessWidget {
           onTap: onComprobantesTap,
         ),
         const SizedBox(height: 12),
+        // AR-53: sin icono — en mobile el monto quedaba achicado.
         Row(
           children: [
             Expanded(
               child: StatCard(
-                icon: Icons.payments_rounded,
                 label: 'Total cobrado ARS',
                 value: formatArs(metrics.totalArs),
                 accentColor: AppColors.goldDark,
@@ -299,7 +299,6 @@ class _SummarySection extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: StatCard(
-                icon: Icons.attach_money_rounded,
                 label: 'Total cobrado USD',
                 value: formatUsd(metrics.totalUsd),
                 accentColor: AppColors.armaCorta,

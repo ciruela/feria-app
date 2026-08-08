@@ -12,6 +12,7 @@ import '../../services/pricing_settings_service.dart';
 import '../../services/seller_service.dart';
 import '../../services/tenant_session_service.dart';
 import '../../theme/app_theme.dart';
+import 'auth_common.dart';
 
 /// Carga datos del tenant y restaura el vendedor del portal (sesión anónima).
 class SellerPortalScopeLoader extends StatefulWidget {
@@ -64,7 +65,6 @@ class _SellerPortalScopeLoaderState extends State<SellerPortalScopeLoader> {
     final exchangeRateService = context.read<ExchangeRateService>();
     final pricingSettings = context.read<PricingSettingsService>();
     final sellerService = context.read<SellerService>();
-    final cartService = context.read<CartService>();
 
     try {
       await Future.wait([
@@ -72,7 +72,6 @@ class _SellerPortalScopeLoaderState extends State<SellerPortalScopeLoader> {
         exchangeRateService.load(),
         pricingSettings.load(),
       ]);
-      await cartService.load(catalog: catalogService);
 
       try {
         await sellerService.load();
@@ -96,6 +95,13 @@ class _SellerPortalScopeLoaderState extends State<SellerPortalScopeLoader> {
               );
         }
       }
+
+      if (!mounted) return;
+      // AR-54: cargar carrito después de conocer el vendedor.
+      await loadCartForSeller(
+        context,
+        sellerService.selected?.id ?? sellerId,
+      );
 
       if (!mounted) return;
       setState(() => _ready = true);
