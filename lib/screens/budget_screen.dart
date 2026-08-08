@@ -269,9 +269,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
       return;
     }
 
-    if (budget.lines.any((line) => line.unitUsd <= 0)) {
+    // Urban (Bersa, etc.): precio en ARS fijos con USD 0. Basta con ARS > 0.
+    if (budget.lines.any((line) => line.unitArs <= 0 && line.unitUsd <= 0)) {
       _showMessage(
-        'Hay productos sin precio USD. Sacalos del carrito o pedí que los carguen.',
+        'Hay productos sin precio. Sacalos del carrito o pedí que los carguen.',
       );
       return;
     }
@@ -316,9 +317,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
         }
 
         snapshot = _buildBudget(cart);
-        if (snapshot.lines.any((line) => line.unitUsd <= 0)) {
+        if (snapshot.lines.any((line) => line.unitArs <= 0 && line.unitUsd <= 0)) {
           _showMessage(
-            'Hay productos sin precio USD. Sacalos del carrito o pedí que los carguen.',
+            'Hay productos sin precio. Sacalos del carrito o pedí que los carguen.',
           );
           return;
         }

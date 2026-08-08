@@ -117,4 +117,37 @@ void main() {
     expect(compact.lines.first.detail, contains('19'));
     expect(compact.lines.first.detail, contains('9mm'));
   });
+
+  test('Urban Bersa: USD 0 with fixed ARS still builds sellable lines', () {
+    const bersa = Product(
+      id: 'bersa_1',
+      type: ProductType.armaCorta,
+      marca: 'BERSA',
+      calibre: '9',
+      codigo: '0T9',
+      modelo: 'TPR9',
+      precioUsd: 0,
+      stock: 5,
+      fixedPrices: FixedPrices(efectivoArs: 500000, tarjetaArs: 520000),
+    );
+    expect(cart.addProduct(bersa), CartAddResult.added);
+    cart.setCheckoutPayment(
+      const CartCheckoutPayment.single(PaymentMethod.efectivo),
+    );
+
+    final budget = budgetService.buildFromCart(
+      cart: cart,
+      exchangeRate: exchangeRate,
+      pricingSettings: settings,
+    );
+
+    expect(budget.lines, hasLength(1));
+    expect(budget.lines.single.unitUsd, 0);
+    expect(budget.lines.single.unitArs, 500000);
+    // Criterio de checkout: alcanza con ARS > 0 (no exigir USD).
+    expect(
+      budget.lines.any((line) => line.unitArs <= 0 && line.unitUsd <= 0),
+      isFalse,
+    );
+  });
 }
