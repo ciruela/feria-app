@@ -835,7 +835,7 @@ class _AdminComprobanteDetailScreenState
             final hasSerial = line.serialNumber.trim().isNotEmpty;
 
             final copyParts = <String>[title];
-            if (line.code.isNotEmpty && line.detail.isNotEmpty) {
+            if (line.code.isNotEmpty && line.code != title) {
               copyParts.add('Cód: ${line.code}');
             }
             copyParts.add('Cant: ${line.quantity}');
@@ -861,6 +861,17 @@ class _AdminComprobanteDetailScreenState
                           title,
                           style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
+                        if (line.code.isNotEmpty && line.code != title) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Cód: ${line.code}',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 4),
                         Text(
                           'Cant: ${line.quantity} · $amount',
