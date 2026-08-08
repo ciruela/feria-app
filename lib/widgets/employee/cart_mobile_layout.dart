@@ -41,43 +41,41 @@ class CartMobileLayout extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // AR-38: explicit back — bottom nav alone is easy to miss on mobile.
+        // AR-38: back must be an obvious, labeled action. A muted chevron alone
+        // was missed by testers ("sigue sin tener forma de volver para atrás").
         Padding(
-          padding: const EdgeInsets.fromLTRB(4, 4, 20, 8),
-          child: Row(
+          padding: const EdgeInsets.fromLTRB(4, 4, 20, 0),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => Navigator.of(context).maybePop(),
+              icon: const Icon(Icons.chevron_left_rounded, size: 20),
+              label: const Text('Volver al catálogo'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              IconButton(
-                onPressed: () => Navigator.of(context).maybePop(),
-                icon: const Icon(Icons.chevron_left_rounded, size: 24),
-                color: AppColors.textMuted,
-                tooltip: 'Volver',
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Carrito',
-                        style: AppText.heading.copyWith(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        cart.isEmpty
-                            ? 'Todavía no cargaste nada'
-                            : '${cart.itemCount} item${cart.itemCount == 1 ? '' : 's'}'
-                                '${seller != null ? ' · ${formatSellerFirstName(seller.nombre)}' : ''}',
-                        style: AppText.bodySmall
-                            .copyWith(color: AppColors.textMuted),
-                      ),
-                    ],
-                  ),
+              Text(
+                'Carrito',
+                style: AppText.heading.copyWith(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w600,
                 ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                cart.isEmpty
+                    ? 'Todavía no cargaste nada'
+                    : '${cart.itemCount} item${cart.itemCount == 1 ? '' : 's'}'
+                        '${seller != null ? ' · ${formatSellerFirstName(seller.nombre)}' : ''}',
+                style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
               ),
             ],
           ),

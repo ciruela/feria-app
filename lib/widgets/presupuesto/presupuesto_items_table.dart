@@ -228,8 +228,11 @@ class _DetailedItemsTable extends StatelessWidget {
   }
 
   TableRow _buildRow(PresupuestoItemRow row, double rowHeight) {
-    final cellHeight =
-        row.isArma ? (rowHeight + 16).clamp(rowHeight, 52.0) : rowHeight;
+    // AR-52: un arma muestra detalle (hasta 2 líneas) + "SERIE:". Con varias
+    // armas, rowHeight se achica y la celda quedaba corta, pisando la fila de
+    // abajo. Garantizamos un mínimo fijo que contenga ambas líneas.
+    const armaMinHeight = 52.0;
+    final cellHeight = row.isArma ? math.max(rowHeight, armaMinHeight) : rowHeight;
 
     if (row.isEmpty) {
       return TableRow(
@@ -260,9 +263,12 @@ class _DetailedItemsTable extends StatelessWidget {
               children: [
                 Text(
                   row.detail,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
+                    height: 1.15,
                   ),
                 ),
                 if (row.isArma) ...[

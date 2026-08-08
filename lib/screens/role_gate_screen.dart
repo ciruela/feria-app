@@ -147,6 +147,7 @@ class _AdminPinDialog extends StatefulWidget {
 class _AdminPinDialogState extends State<_AdminPinDialog> {
   final _pinKey = GlobalKey<AdminPinEntryState>();
   bool _wrong = false;
+  bool _closing = false;
 
   AdminUser? _resolve(String pin) {
     final named = context.read<AdminService>().verifyPin(pin);
@@ -162,9 +163,13 @@ class _AdminPinDialogState extends State<_AdminPinDialog> {
   }
 
   void _submit(String pin) {
+    if (_closing) return;
     final admin = _resolve(pin);
     if (admin != null) {
-      Navigator.of(context).pop(admin);
+      _closing = true;
+      FocusManager.instance.primaryFocus?.unfocus();
+      // maybePop: si el diálogo ya cerró, no poppear AuthGate (pantalla negra).
+      Navigator.of(context).maybePop(admin);
       return;
     }
     HapticFeedback.lightImpact();

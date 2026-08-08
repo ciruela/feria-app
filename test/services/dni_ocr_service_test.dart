@@ -39,6 +39,50 @@ MARIA
       expect(result.fullName, 'Maria Perez');
       expect(result.dni, '23456789');
     });
+
+    test('AR-50: número de documento con espacios como separador', () {
+      const raw = '''
+APELLIDO / SURNAME
+RAMIREZ
+NOMBRE / NAME
+LUCAS
+12 345 678
+''';
+
+      final result = ocr.parseRecognizedText(raw, hint: DniScanSide.front);
+
+      expect(result.fullName, 'Lucas Ramirez');
+      expect(result.dni, '12345678');
+    });
+
+    test('AR-50: DOCUMENTO N° con espacios', () {
+      const raw = '''
+APELLIDO / SURNAME
+SOSA
+NOMBRE / NAME
+ANA
+DOCUMENTO N° 9 876 543
+''';
+
+      final result = ocr.parseRecognizedText(raw, hint: DniScanSide.front);
+
+      expect(result.dni, '9876543');
+    });
+
+    test('AR-50: etiquetas en plural (APELLIDO/S, NOMBRE/S)', () {
+      const raw = '''
+APELLIDO/S / SURNAME/S
+FERNANDEZ
+NOMBRE/S / NAME/S
+JOSE LUIS
+30.111.222
+''';
+
+      final result = ocr.parseRecognizedText(raw, hint: DniScanSide.front);
+
+      expect(result.fullName, 'Jose Luis Fernandez');
+      expect(result.dni, '30111222');
+    });
   });
 
   group('dorso DNI', () {

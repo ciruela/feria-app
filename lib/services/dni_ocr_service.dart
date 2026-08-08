@@ -283,17 +283,20 @@ class DniOcrService {
   }
 
   String? _extractDocumentNumberFromText(String raw) {
+    // El OCR lee el DNI con puntos, con espacios o sin separador:
+    // "12.345.678", "12 345 678", "12345678".
     final labeled = RegExp(
-      r'(?:DOCUMENTO|DNI|DOC\.?)\s*(?:N[°º.]?\s*)?(\d{1,2}\.?\d{3}\.?\d{3})',
+      r'(?:DOCUMENTO|DNI|DOC\.?)\s*(?:N[°º.]?\s*)?(\d{1,2}[.\s]?\d{3}[.\s]?\d{3})',
       caseSensitive: false,
     ).firstMatch(raw);
     if (labeled != null) {
-      return labeled.group(1)!.replaceAll('.', '');
+      return _digitsOnly(labeled.group(1)!);
     }
 
-    final dotted = RegExp(r'\b(\d{1,2}\.\d{3}\.\d{3})\b').firstMatch(raw);
-    if (dotted != null) {
-      return dotted.group(1)!.replaceAll('.', '');
+    final grouped =
+        RegExp(r'\b(\d{1,2}[.\s]\d{3}[.\s]\d{3})\b').firstMatch(raw);
+    if (grouped != null) {
+      return _digitsOnly(grouped.group(1)!);
     }
 
     final plain = RegExp(r'\b(\d{7,8})\b').allMatches(raw);
@@ -303,6 +306,8 @@ class DniOcrService {
     }
     return null;
   }
+
+  String _digitsOnly(String value) => value.replaceAll(RegExp(r'\D'), '');
 
   String? _extractCuil(String raw) {
     final match = _cuilPattern.firstMatch(raw);
@@ -485,7 +490,8 @@ class DniOcrService {
   }
 
   bool _containsLabel(String upper, String label) {
-    return RegExp('\\b$label\\b').hasMatch(upper);
+    // Tolera el plural que imprimen algunos DNI ("APELLIDO/S", "NOMBRE/S").
+    return RegExp('\\b${label}S?\\b').hasMatch(upper);
   }
 
   bool _isBilingualLabelOnly(String line) {

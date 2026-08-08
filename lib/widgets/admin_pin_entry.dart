@@ -25,6 +25,7 @@ class AdminPinEntry extends StatefulWidget {
 class AdminPinEntryState extends State<AdminPinEntry> {
   late final TextEditingController _controller;
   final _focusNode = FocusNode(debugLabel: 'AdminPinEntry');
+  bool _submitted = false;
 
   @override
   void initState() {
@@ -43,6 +44,7 @@ class AdminPinEntryState extends State<AdminPinEntry> {
   }
 
   void clear() {
+    _submitted = false;
     _controller.clear();
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensureFocus());
   }
@@ -54,6 +56,16 @@ class AdminPinEntryState extends State<AdminPinEntry> {
     if (!_focusNode.hasFocus) {
       _focusNode.requestFocus();
     }
+  }
+
+  void _emitSubmit(String value) {
+    // Evita doble onSubmit (listener al 4º dígito + onSubmitted/check):
+    // el 2º Navigator.pop se comía AuthGate y dejaba el Navigator raíz vacío
+    // (_history.isNotEmpty → pantalla negra/blanca).
+    if (_submitted) return;
+    if (value.isEmpty) return;
+    _submitted = true;
+    widget.onSubmit?.call(value);
   }
 
   void _onControllerChanged() {
@@ -74,18 +86,21 @@ class AdminPinEntryState extends State<AdminPinEntry> {
     widget.onChanged?.call(next);
 
     if (next.length == widget.maxDigits) {
-      widget.onSubmit?.call(next);
+      _emitSubmit(next);
     }
   }
 
   void _append(String digit) {
+    if (_submitted) return;
     if (_controller.text.length >= widget.maxDigits) return;
     _controller.text = '${_controller.text}$digit';
-    _controller.selection = TextSelection.collapsed(offset: _controller.text.length);
+    _controller.selection =
+        TextSelection.collapsed(offset: _controller.text.length);
     _ensureFocus();
   }
 
   void _backspace() {
+    if (_submitted) return;
     if (_controller.text.isEmpty) return;
     final next = _controller.text.substring(0, _controller.text.length - 1);
     _controller.text = next;
@@ -94,8 +109,7 @@ class AdminPinEntryState extends State<AdminPinEntry> {
   }
 
   void _submit() {
-    if (_controller.text.isEmpty) return;
-    widget.onSubmit?.call(_controller.text);
+    _emitSubmit(_controller.text);
   }
 
   @override
