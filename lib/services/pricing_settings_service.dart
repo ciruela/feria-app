@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/pricing_limits.dart';
 import '../models/product.dart';
+import '../utils/municion_calibre.dart';
 import '../utils/tenant_cache.dart';
 import 'supabase_config_repository.dart';
 import 'supabase_service.dart';
@@ -11,7 +12,7 @@ import 'supabase_service.dart';
 /// Con Supabase: por tenant en `app_config.pricing_settings`.
 ///
 /// Override opcional por tipo (`municion`): p. ej. World Guns — 10% efectivo/
-/// transferencia y 3 cuotas sin interés solo en munición.
+/// transferencia en toda la munición; 3 cuotas SI solo en munición de arma larga.
 class PricingSettingsService extends ChangeNotifier {
   static const _efectivoKeyBase = 'pricing_efectivo_pct';
   static const _debitoKeyBase = 'pricing_debito_pct';
@@ -25,6 +26,7 @@ class PricingSettingsService extends ChangeNotifier {
   static const _munEfectivoKeyBase = 'pricing_municion_efectivo_pct';
   static const _munT3KeyBase = 'pricing_municion_tarjeta3_pct';
   static const _munTransferKeyBase = 'pricing_municion_transfer_efectivo';
+  static const _munT3LargaKeyBase = 'pricing_municion_tarjeta3_solo_larga';
 
   final SupabaseConfigRepository _configRepo = SupabaseConfigRepository();
   String? _tenantScope;
@@ -38,14 +40,18 @@ class PricingSettingsService extends ChangeNotifier {
   double recargoTarjeta12Pct = 35;
   double recargoTarjeta18Pct = 45;
 
-  /// Si true, munición usa [municionDescuentoEfectivoPct] / [municionRecargoTarjeta3Pct]
-  /// (resto de medios siguen el % global).
+  /// Si true, munición usa [municionDescuentoEfectivoPct] (y opcionalmente
+  /// [municionRecargoTarjeta3Pct]); el resto de medios siguen el % global.
   bool municionOverrideEnabled = false;
   double municionDescuentoEfectivoPct = 10;
   double municionRecargoTarjeta3Pct = 0;
 
   /// Transferencia con el mismo monto que efectivo (promo WG).
   bool municionTransferenciaComoEfectivo = true;
+
+  /// Si true, el recargo 3 cuotas de munición solo aplica a calibres de arma
+  /// larga; munición de arma corta usa el % global de 3 cuotas.
+  bool municionTarjeta3SoloArmaLarga = true;
 
   void bindTenant(String? tenantId) {
     final next = tenantId?.trim();
@@ -83,6 +89,7 @@ class PricingSettingsService extends ChangeNotifier {
     double? municionEfectivoPct,
     double? municionTarjeta3Pct,
     bool? municionTransferenciaComoEfectivo,
+    bool? municionTarjeta3SoloArmaLarga,
   }) async {
     descuentoEfectivoPct = PricingLimits.clamp('efectivo', efectivoPct);
     recargoDebitoPct = PricingLimits.clamp('debito', debitoPct);
@@ -108,6 +115,9 @@ class PricingSettingsService extends ChangeNotifier {
       this.municionTransferenciaComoEfectivo =
           municionTransferenciaComoEfectivo;
     }
+    if (municionTarjeta3SoloArmaLarga != null) {
+      this.municionTarjeta3SoloArmaLarga = municionTarjeta3SoloArmaLarga;
+    }
 
     await _persistCache();
 
@@ -126,12 +136,19 @@ class PricingSettingsService extends ChangeNotifier {
     return descuentoEfectivoPct;
   }
 
-  /// % recargo 3 cuotas según tipo.
-  double recargoTarjeta3PctFor(ProductType type) {
-    if (type == ProductType.municion && municionOverrideEnabled) {
-      return municionRecargoTarjeta3Pct;
+  /// % recargo 3 cuotas según producto (calibre de munición puede limitar la promo).
+  double recargoTarjeta3PctFor(Product product) {
+    if (product.type != ProductType.municion || !municionOverrideEnabled) {
+      return recargoTarjeta3Pct;
     }
-    return recargoTarjeta3Pct;
+    if (municionTarjeta3SoloArmaLarga &&
+        !isMunicionArmaLarga(
+          calibre: product.calibre,
+          descripcion: product.descripcion,
+        )) {
+      return recargoTarjeta3Pct;
+    }
+    return municionRecargoTarjeta3Pct;
   }
 
   /// Transferencia = efectivo solo en munición con override activo.
@@ -157,6 +174,7 @@ class PricingSettingsService extends ChangeNotifier {
         'efectivo': municionDescuentoEfectivoPct,
         'tarjeta3': municionRecargoTarjeta3Pct,
         'transferencia_como_efectivo': municionTransferenciaComoEfectivo,
+        'tarjeta3_solo_arma_larga': municionTarjeta3SoloArmaLarga,
       };
     }
     return map;
@@ -175,6 +193,7 @@ class PricingSettingsService extends ChangeNotifier {
     municionDescuentoEfectivoPct = 10;
     municionRecargoTarjeta3Pct = 0;
     municionTransferenciaComoEfectivo = true;
+    municionTarjeta3SoloArmaLarga = true;
   }
 
   void _applyMap(Map<String, dynamic> map) {
@@ -218,6 +237,17 @@ class PricingSettingsService extends ChangeNotifier {
       } else if (transfer == 0 || transfer == '0' || transfer == 'false') {
         municionTransferenciaComoEfectivo = false;
       }
+      final soloLarga = mun['tarjeta3_solo_arma_larga'];
+      if (soloLarga is bool) {
+        municionTarjeta3SoloArmaLarga = soloLarga;
+      } else if (soloLarga == 1 || soloLarga == '1' || soloLarga == 'true') {
+        municionTarjeta3SoloArmaLarga = true;
+      } else if (soloLarga == 0 || soloLarga == '0' || soloLarga == 'false') {
+        municionTarjeta3SoloArmaLarga = false;
+      } else {
+        // Default WG: 3 SI solo arma larga.
+        municionTarjeta3SoloArmaLarga = true;
+      }
     } else {
       municionOverrideEnabled = false;
     }
@@ -239,6 +269,8 @@ class PricingSettingsService extends ChangeNotifier {
   String get _munT3Key => tenantCacheKey(_munT3KeyBase, _tenantScope);
   String get _munTransferKey =>
       tenantCacheKey(_munTransferKeyBase, _tenantScope);
+  String get _munT3LargaKey =>
+      tenantCacheKey(_munT3LargaKeyBase, _tenantScope);
 
   Future<void> _loadFromCache() async {
     final prefs = await SharedPreferences.getInstance();
@@ -264,6 +296,8 @@ class PricingSettingsService extends ChangeNotifier {
     municionRecargoTarjeta3Pct = prefs.getDouble(_munT3Key) ?? 0;
     municionTransferenciaComoEfectivo =
         prefs.getBool(_munTransferKey) ?? true;
+    municionTarjeta3SoloArmaLarga =
+        prefs.getBool(_munT3LargaKey) ?? true;
   }
 
   Future<void> _persistCache() async {
@@ -280,5 +314,6 @@ class PricingSettingsService extends ChangeNotifier {
     await prefs.setDouble(_munEfectivoKey, municionDescuentoEfectivoPct);
     await prefs.setDouble(_munT3Key, municionRecargoTarjeta3Pct);
     await prefs.setBool(_munTransferKey, municionTransferenciaComoEfectivo);
+    await prefs.setBool(_munT3LargaKey, municionTarjeta3SoloArmaLarga);
   }
 }
