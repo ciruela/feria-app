@@ -397,7 +397,7 @@ class _UrbanField extends StatelessWidget {
   }
 }
 
-class _UrbanDomicilioField extends StatelessWidget {
+class _UrbanDomicilioField extends StatefulWidget {
   const _UrbanDomicilioField({
     required this.controllers,
     required this.readOnly,
@@ -408,41 +408,63 @@ class _UrbanDomicilioField extends StatelessWidget {
   final bool readOnly;
   final VoidCallback? onChanged;
 
+  @override
+  State<_UrbanDomicilioField> createState() => _UrbanDomicilioFieldState();
+}
+
+class _UrbanDomicilioFieldState extends State<_UrbanDomicilioField> {
   String get _combinedLine {
     return BudgetCustomer(
-      address: controllers.address.text,
-      city: controllers.city.text,
+      address: widget.controllers.address.text,
+      city: widget.controllers.city.text,
     ).domicilioLine;
+  }
+
+  /// AR-58: Urban tiene un solo campo DOMICILIO. Si el OCR dejó calle/localidad
+  /// separados, los unimos en `address` para que el usuario vea y edite todo.
+  void _mergeCityIntoAddressIfNeeded() {
+    if (widget.readOnly) return;
+    final merged = BudgetCustomer(
+      address: widget.controllers.address.text,
+      city: widget.controllers.city.text,
+    ).mergeDomicilioIntoAddress();
+    if (widget.controllers.city.text.trim().isEmpty &&
+        widget.controllers.address.text == merged.address) {
+      return;
+    }
+    widget.controllers.address.text = merged.address;
+    widget.controllers.city.text = merged.city;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _mergeCityIntoAddressIfNeeded();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _UrbanDomicilioField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _mergeCityIntoAddressIfNeeded();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (readOnly) {
+    if (widget.readOnly) {
       return _UrbanReadOnlyField(label: 'DOMICILIO:', value: _combinedLine);
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _UrbanField(
-          label: 'DOMICILIO:',
-          controller: controllers.address,
-          readOnly: readOnly,
-          onChanged: onChanged,
-        ),
-        if (controllers.city.text.trim().isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 4),
-            child: Text(
-              'Localidad (DNI): ${controllers.city.text.trim()}',
-              style: const TextStyle(
-                fontSize: 7.5,
-                fontWeight: FontWeight.w600,
-                color: Colors.black54,
-              ),
-            ),
-          ),
-      ],
+    return _UrbanField(
+      label: 'DOMICILIO:',
+      controller: widget.controllers.address,
+      readOnly: widget.readOnly,
+      onChanged: widget.onChanged,
     );
   }
 }

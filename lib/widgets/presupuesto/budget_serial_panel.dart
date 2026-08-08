@@ -6,7 +6,8 @@ import '../../theme/app_theme.dart';
 import '../../utils/uppercase_input.dart';
 import '../employee/catalog_product_list.dart';
 
-/// AR-40: N° de serie editable fuera del A4 (FittedBox rompe foco/tap).
+/// AR-40 / AR-58: N° de serie editable fuera del A4 (el preview escalado
+/// no permite cargar bien el campo SERIE en mobile).
 class BudgetSerialPanel extends StatelessWidget {
   const BudgetSerialPanel({super.key});
 
