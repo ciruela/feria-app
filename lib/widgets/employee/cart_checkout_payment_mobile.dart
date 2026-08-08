@@ -22,6 +22,7 @@ class CartCheckoutPaymentMobileContent extends StatelessWidget {
     required this.onSelectSingle,
     required this.onOpenDualPayment,
     required this.onConfirm,
+    this.methods = checkoutDialogPaymentMethods,
     this.scrollController,
   });
 
@@ -34,6 +35,7 @@ class CartCheckoutPaymentMobileContent extends StatelessWidget {
   final ValueChanged<PaymentMethod> onSelectSingle;
   final VoidCallback onOpenDualPayment;
   final VoidCallback onConfirm;
+  final List<PaymentMethod> methods;
   final ScrollController? scrollController;
 
   @override
@@ -88,7 +90,7 @@ class CartCheckoutPaymentMobileContent extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             children: [
               _PaymentMethodListCard(
-                methods: selectablePaymentMethods,
+                methods: methods,
                 selectedMethod: selectedMethod,
                 cart: cart,
                 exchangeRate: exchangeRate,

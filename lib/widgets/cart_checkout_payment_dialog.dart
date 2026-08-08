@@ -4,11 +4,13 @@ import 'package:provider/provider.dart';
 
 import '../config/payment_config.dart';
 import '../models/cart_checkout_payment.dart';
+import '../models/presupuesto_branding.dart';
 import '../models/product_prices.dart';
 import '../services/cart_service.dart';
 import '../services/cart_totals_service.dart';
 import '../services/exchange_rate_service.dart';
 import '../services/pricing_settings_service.dart';
+import '../services/tenant_session_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/formatters.dart';
 import '../utils/layout_breakpoints.dart';
@@ -217,6 +219,11 @@ class _CartCheckoutPaymentDialogState extends State<_CartCheckoutPaymentDialog> 
     CartTotalsService totalsService, {
     required bool isDesktop,
   }) {
+    final isWorldGuns = PresupuestoBranding.forTenant(
+      slug: context.read<TenantSessionService>().activeTenantSlug,
+    ).isWorldGuns;
+    final methods = checkoutPaymentMethods(isWorldGuns: isWorldGuns);
+
     if (widget.asSheet) {
       return CartCheckoutPaymentMobileContent(
         selected: _selected,
@@ -225,6 +232,7 @@ class _CartCheckoutPaymentDialogState extends State<_CartCheckoutPaymentDialog> 
         exchangeRate: exchangeRate,
         pricingSettings: pricingSettings,
         totalsService: totalsService,
+        methods: methods,
         scrollController: widget.scrollController,
         onSelectSingle: _selectSingle,
         onOpenDualPayment: () => _openDualPayment(
@@ -237,8 +245,6 @@ class _CartCheckoutPaymentDialogState extends State<_CartCheckoutPaymentDialog> 
         onConfirm: _confirm,
       );
     }
-
-    final methods = checkoutDialogPaymentMethods;
 
     return ConstrainedBox(
       constraints: BoxConstraints(
@@ -717,7 +723,10 @@ class _MethodPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final methods = (mobileHandoff ? selectablePaymentMethods : checkoutDialogPaymentMethods)
+    final isWorldGuns = PresupuestoBranding.forTenant(
+      slug: context.read<TenantSessionService>().activeTenantSlug,
+    ).isWorldGuns;
+    final methods = checkoutPaymentMethods(isWorldGuns: isWorldGuns)
         .where((method) => !exclude.contains(method))
         .toList();
     final listaTotal = totalsService.cartTotalAtMethod(

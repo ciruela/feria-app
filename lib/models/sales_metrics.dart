@@ -177,7 +177,7 @@ class DaySalesMetrics {
 
   static String _paymentLabel(String key) {
     return switch (key) {
-      'dolar_billete' => 'Dólar billete',
+      'dolar_billete' => 'USD',
       'transferencia' => 'Transferencia',
       'lista' => 'Lista',
       'efectivo' => 'Efectivo',

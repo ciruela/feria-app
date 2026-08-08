@@ -241,7 +241,16 @@ class _DetailPricingColumn extends StatelessWidget {
             value: formatArs(prices.efectivo),
             highlight: true,
           ),
-          _PaymentRow(label: 'Dólar billete', value: formatArs(prices.lista)),
+          _PaymentRow(
+            label: prices.efectivoDescuentoPct > 0
+                ? 'USD (-${prices.efectivoDescuentoPct}%)'
+                : 'USD',
+            value: formatUsd(
+              prices.lista > 0
+                  ? prices.usd * (prices.efectivo / prices.lista)
+                  : prices.usd,
+            ),
+          ),
           _PaymentRow(
             label: prices.transferenciaConDescuentoEfectivo
                 ? 'Transferencia (-${prices.efectivoDescuentoPct}%)'

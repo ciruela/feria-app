@@ -118,7 +118,7 @@ class ProductPrices {
 }
 
 enum PaymentMethod {
-  dolarBillete('Dólar billete', 'dolar_billete'),
+  dolarBillete('USD', 'dolar_billete'),
   transferencia('Transferencia', 'transferencia'),
   lista('Lista', 'lista'),
   efectivo('Efectivo', 'efectivo'),
@@ -139,7 +139,7 @@ enum PaymentMethod {
 
   /// Etiqueta corta para diálogos y chips.
   String get shortLabel => switch (this) {
-        PaymentMethod.dolarBillete => 'Dólar billete',
+        PaymentMethod.dolarBillete => 'USD',
         PaymentMethod.transferencia => 'Transferencia',
         PaymentMethod.efectivo => 'Efectivo',
         PaymentMethod.lista => 'Lista',
@@ -153,9 +153,11 @@ enum PaymentMethod {
       };
 
   /// Monto en pesos según la forma de pago elegida.
+  ///
+  /// USD / dólar billete cotiza como efectivo (mismo descuento).
   double totalArsFor(ProductPrices prices) {
     return switch (this) {
-      PaymentMethod.dolarBillete => prices.lista,
+      PaymentMethod.dolarBillete => prices.efectivo,
       PaymentMethod.transferencia => prices.transferencia,
       PaymentMethod.lista => prices.lista,
       PaymentMethod.efectivo => prices.efectivo,
@@ -169,8 +171,13 @@ enum PaymentMethod {
     };
   }
 
-  /// Monto en dólares del producto (siempre el precio catálogo).
-  double totalUsdFor(ProductPrices prices) => prices.usd;
+  /// Monto en dólares. USD billete aplica el mismo % que efectivo.
+  double totalUsdFor(ProductPrices prices) {
+    if (this == PaymentMethod.dolarBillete && prices.lista > 0) {
+      return prices.usd * (prices.efectivo / prices.lista);
+    }
+    return prices.usd;
+  }
 
   static PaymentMethod fromKey(String key) {
     for (final method in PaymentMethod.values) {
@@ -206,6 +213,15 @@ const checkoutDialogPaymentMethods = [
   PaymentMethod.tarjeta12,
   PaymentMethod.tarjeta18,
 ];
+
+/// Checkout: en World Guns incluye USD (mismo descuento que efectivo).
+List<PaymentMethod> checkoutPaymentMethods({required bool isWorldGuns}) {
+  if (!isWorldGuns) return checkoutDialogPaymentMethods;
+  return [
+    PaymentMethod.dolarBillete,
+    ...checkoutDialogPaymentMethods,
+  ];
+}
 
 /// Formas de pago seleccionables en diálogos (sin "lista", que es solo referencia de precio).
 const selectablePaymentMethods = weaponPaymentMethods;

@@ -36,15 +36,28 @@ void main() {
       final p = _prices();
       expect(PaymentMethod.lista.totalArsFor(p), 150000);
       expect(PaymentMethod.transferencia.totalArsFor(p), 150000);
-      expect(PaymentMethod.dolarBillete.totalArsFor(p), 150000);
+      expect(PaymentMethod.dolarBillete.totalArsFor(p), 142500);
       expect(PaymentMethod.efectivo.totalArsFor(p), 142500);
       expect(PaymentMethod.debito.totalArsFor(p), 157500);
       expect(PaymentMethod.tarjeta6.totalArsFor(p), 180000);
       expect(PaymentMethod.tarjeta18.totalArsFor(p), 217500);
     });
 
-    test('totalUsdFor siempre el precio catálogo', () {
-      expect(PaymentMethod.tarjeta12.totalUsdFor(_prices()), 100);
+    test('totalUsdFor en USD aplica descuento efectivo', () {
+      final p = _prices();
+      expect(PaymentMethod.tarjeta12.totalUsdFor(p), 100);
+      expect(PaymentMethod.dolarBillete.totalUsdFor(p), closeTo(95, 0.01));
+    });
+
+    test('checkoutPaymentMethods incluye USD solo en World Guns', () {
+      expect(
+        checkoutPaymentMethods(isWorldGuns: false),
+        isNot(contains(PaymentMethod.dolarBillete)),
+      );
+      expect(
+        checkoutPaymentMethods(isWorldGuns: true).first,
+        PaymentMethod.dolarBillete,
+      );
     });
 
     test('shortLabel definido para todos los métodos', () {

@@ -44,7 +44,7 @@ class BudgetService {
         exchangeRate,
         pricingSettings,
       );
-      final unitUsd = prices.usd;
+      final unitUsd = method.totalUsdFor(prices);
       final unitArs = method.totalArsFor(prices);
       final lineUsd = unitUsd * item.quantity;
       final lineArs = unitArs * item.quantity;
