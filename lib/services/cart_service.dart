@@ -264,7 +264,13 @@ class CartService extends ChangeNotifier {
       }
       existing.quantity = newQuantity;
     } else {
-      _items.add(CartItem(product: product, quantity: quantity));
+      // Munición nueva de un calibre que ya tiene TC cargada: hereda esa TC
+      // (una sola tarjeta de consumo por calibre).
+      _items.add(CartItem(
+        product: product,
+        quantity: quantity,
+        tarjetaConsumo: _tarjetaConsumoForCaliber(product),
+      ));
     }
     _notifyAndPersist();
     return CartAddResult.added;
@@ -335,8 +341,42 @@ class CartService extends ChangeNotifier {
         _items.where((element) => element.lineKey == lineKey).firstOrNull;
     if (item == null) return;
 
-    item.tarjetaConsumo = tarjetaConsumo.trim();
+    final value = tarjetaConsumo.trim();
+    item.tarjetaConsumo = value;
+
+    // La tarjeta de consumo es por calibre: replicar en todas las líneas de
+    // munición del mismo calibre para que compartan una sola TC.
+    if (item.product.isMunicion) {
+      final cal = _calibreKey(item.product);
+      if (cal.isNotEmpty) {
+        for (final other in _items) {
+          if (other.lineKey == lineKey) continue;
+          if (other.product.isMunicion && _calibreKey(other.product) == cal) {
+            other.tarjetaConsumo = value;
+          }
+        }
+      }
+    }
+
     _notifyAndPersist();
+  }
+
+  /// Clave normalizada de calibre para agrupar tarjetas de consumo de munición.
+  String _calibreKey(Product product) => product.calibre.trim().toLowerCase();
+
+  /// TC ya cargada para el calibre de [product] (munición), si existe.
+  String _tarjetaConsumoForCaliber(Product product) {
+    if (!product.isMunicion) return '';
+    final cal = _calibreKey(product);
+    if (cal.isEmpty) return '';
+    for (final item in _items) {
+      if (item.product.isMunicion &&
+          _calibreKey(item.product) == cal &&
+          item.tarjetaConsumo.trim().isNotEmpty) {
+        return item.tarjetaConsumo.trim();
+      }
+    }
+    return '';
   }
 
   void clear() {

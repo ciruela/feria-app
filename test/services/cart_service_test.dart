@@ -65,6 +65,40 @@ void main() {
     expect(cart.items.first.quantity, 2);
   });
 
+  test('tarjeta de consumo se comparte por calibre en municion', () {
+    final nueveA = testProduct(id: '9a', calibre: '9MM', codigo: 'M9A', stock: 10);
+    final nueveB = testProduct(id: '9b', calibre: '9MM', codigo: 'M9B', stock: 10);
+    final veintidos =
+        testProduct(id: '22', calibre: '.22 LR', codigo: 'M22', stock: 10);
+
+    cart.addProduct(nueveA);
+    cart.addProduct(nueveB);
+    cart.addProduct(veintidos);
+
+    final line9a = cart.items.firstWhere((i) => i.product.id == '9a').lineKey;
+    cart.updateTarjetaConsumo(line9a, '1234567');
+
+    // Ambos 9MM comparten la misma TC; el .22 queda sin tocar.
+    expect(cart.items.firstWhere((i) => i.product.id == '9a').tarjetaConsumo,
+        '1234567');
+    expect(cart.items.firstWhere((i) => i.product.id == '9b').tarjetaConsumo,
+        '1234567');
+    expect(cart.items.firstWhere((i) => i.product.id == '22').tarjetaConsumo,
+        '');
+  });
+
+  test('municion nueva de un calibre hereda la TC ya cargada', () {
+    final nueveA = testProduct(id: '9a', calibre: '9MM', codigo: 'M9A', stock: 10);
+    cart.addProduct(nueveA);
+    cart.updateTarjetaConsumo(cart.items.single.lineKey, '7654321');
+
+    final nueveB = testProduct(id: '9b', calibre: '9MM', codigo: 'M9B', stock: 10);
+    cart.addProduct(nueveB);
+
+    expect(cart.items.firstWhere((i) => i.product.id == '9b').tarjetaConsumo,
+        '7654321');
+  });
+
   test('clears checkout payment when cart is cleared', () {
     cart.addProduct(testProduct());
     cart.setCheckoutPayment(
