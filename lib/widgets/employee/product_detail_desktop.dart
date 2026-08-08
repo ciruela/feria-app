@@ -235,12 +235,20 @@ class _DetailPricingColumn extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           _PaymentRow(
-            label: 'Efectivo (-5%)',
+            label: prices.efectivoDescuentoPct > 0
+                ? 'Efectivo (-${prices.efectivoDescuentoPct}%)'
+                : 'Efectivo',
             value: formatArs(prices.efectivo),
             highlight: true,
           ),
           _PaymentRow(label: 'Dólar billete', value: formatArs(prices.lista)),
-          _PaymentRow(label: 'Transferencia', value: formatArs(prices.lista)),
+          _PaymentRow(
+            label: prices.transferenciaConDescuentoEfectivo
+                ? 'Transferencia (-${prices.efectivoDescuentoPct}%)'
+                : 'Transferencia',
+            value: formatArs(prices.transferencia),
+            highlight: prices.transferenciaConDescuentoEfectivo,
+          ),
           _PaymentRow(label: 'Débito', value: formatArs(prices.debito)),
           _PaymentRow(label: '1 cuota', value: formatArs(prices.tarjeta1)),
           _CuotaRow(count: 3, total: prices.tarjeta3, cuota: prices.cuota3),

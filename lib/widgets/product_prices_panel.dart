@@ -75,13 +75,17 @@ class ProductPricesPanel extends StatelessWidget {
             compact: compact,
           ),
           _PriceLine(
-            label: 'EFECTIVO',
+            label: prices.efectivoDescuentoPct > 0
+                ? 'EFECTIVO (-${prices.efectivoDescuentoPct}%)'
+                : 'EFECTIVO',
             value: formatArs(prices.efectivo),
             compact: compact,
           ),
           _PriceLine(
-            label: 'TRANSFER.',
-            value: formatArs(prices.lista),
+            label: prices.transferenciaConDescuentoEfectivo
+                ? 'TRANSFER. (-${prices.efectivoDescuentoPct}%)'
+                : 'TRANSFER.',
+            value: formatArs(prices.transferencia),
             compact: compact,
           ),
           _PriceLine(
