@@ -105,6 +105,16 @@ class ProductPrices {
   double get cuota9 => tarjeta9 / 9;
   double get cuota12 => tarjeta12 / 12;
   double get cuota18 => tarjeta18 / 18;
+
+  /// % de descuento efectivo vs lista (para labels de catálogo). 0 si no aplica.
+  int get efectivoDescuentoPct {
+    if (lista <= 0 || efectivo >= lista) return 0;
+    return ((1 - efectivo / lista) * 100).round();
+  }
+
+  /// True cuando transferencia cotiza igual que efectivo (promo WG munición).
+  bool get transferenciaConDescuentoEfectivo =>
+      transferencia == efectivo && efectivo < lista;
 }
 
 enum PaymentMethod {
