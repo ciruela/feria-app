@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/product.dart';
+import '../../models/product_search_index.dart';
 import '../../services/catalog_service.dart';
 import '../../services/exchange_rate_service.dart';
 import '../../services/tenant_session_service.dart';
@@ -150,8 +151,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
           !(product.stock != null && product.stock! <= kLowStockThreshold)) {
         return false;
       }
-      if (_marcaFilter != null &&
-          product.marca.toLowerCase() != _marcaFilter!.toLowerCase()) {
+      if (_marcaFilter != null && !sameMarca(product.marca, _marcaFilter!)) {
         return false;
       }
       if (query.isEmpty) return true;
@@ -183,8 +183,17 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
     final source = _typeFilter == null
         ? catalog.products
         : catalog.byType(_typeFilter!);
-    final brands = source.map((product) => product.marca).toSet().toList();
-    brands.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    final byKey = <String, String>{};
+    for (final product in source) {
+      final raw = product.marca.trim();
+      if (raw.isEmpty) continue;
+      final key = marcaKey(raw);
+      final existing = byKey[key];
+      byKey[key] =
+          existing == null ? raw : preferMarcaLabel(existing, raw);
+    }
+    final brands = byKey.values.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
     return brands;
   }
 
@@ -197,7 +206,10 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
 
   void _toggleMarca(String marca) {
     setState(() {
-      _marcaFilter = _marcaFilter == marca ? null : marca;
+      _marcaFilter =
+          _marcaFilter != null && sameMarca(_marcaFilter!, marca)
+              ? null
+              : marca;
     });
   }
 
@@ -373,7 +385,8 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                           child: FilterChipButton(
                             compact: true,
                             label: marca.toUpperCase(),
-                            selected: _marcaFilter == marca,
+                            selected: _marcaFilter != null &&
+                                sameMarca(_marcaFilter!, marca),
                             onTap: () => _toggleMarca(marca),
                           ),
                         );
