@@ -411,16 +411,7 @@ class SupabaseSalesRepository {
 
   Map<String, dynamic> _pricingPayload(PricingSettingsService? settings) {
     if (settings == null) return <String, dynamic>{};
-    return {
-      'efectivo': settings.descuentoEfectivoPct,
-      'debito': settings.recargoDebitoPct,
-      'tarjeta1': settings.recargoTarjeta1Pct,
-      'tarjeta3': settings.recargoTarjeta3Pct,
-      'tarjeta6': settings.recargoTarjeta6Pct,
-      'tarjeta9': settings.recargoTarjeta9Pct,
-      'tarjeta12': settings.recargoTarjeta12Pct,
-      'tarjeta18': settings.recargoTarjeta18Pct,
-    };
+    return settings.toMap();
   }
 
   Future<Map<String, dynamic>> _registerSaleWithRetry(

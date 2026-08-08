@@ -141,6 +141,10 @@ class ExcelCatalogService {
         h.startsWith('u\$s') ||
         h == 'importe' ||
         h == 'valor' ||
+        h == 'pvp' ||
+        h.startsWith('pvp ') ||
+        h == 'monto' ||
+        h == 'cotizacion' ||
         h.contains('p. unit') ||
         h.contains('p unit') ||
         h == 'punit' ||
@@ -150,6 +154,8 @@ class ExcelCatalogService {
 
     switch (h) {
       case 'tipo':
+      case 'type':
+      case 'categoria':
         return 'tipo';
       case 'marca':
       case 'brand':
@@ -161,10 +167,16 @@ class ExcelCatalogService {
       case 'calib':
         return 'calibre';
       case 'modelo':
+      case 'model':
         return 'modelo';
       case 'codigo':
       case 'code':
       case 'cod':
+      case 'sku':
+      case 'cod.':
+      case 'nro':
+      case 'nro.':
+      case 'numero':
         return 'codigo';
       case 'descripcion':
       case 'detalle':
@@ -181,13 +193,19 @@ class ExcelCatalogService {
       case 'cajax':
       case 'balas/caja':
       case 'x caja':
+      case 'unidades por caja':
+      case 'u/caja':
         return 'balas_por_caja';
       case 'stock':
       case 'cajas':
       case 'stock_cajas':
       case 'stock cajas':
+      case 'stock (cajas)':
+      case 'stock(cajas)':
       case 'total de cajas':
       case 'total cajas':
+      case 'existencia':
+      case 'existencias':
         return 'stock';
       case 'total':
       case 'total_balas':
@@ -235,8 +253,9 @@ class ExcelCatalogService {
   /// encabezados partidos en dos filas, como CAJA + X / PRECIO + U$D.) y
   /// detecta la marca si aparece como "Marca: XXX" en el preámbulo.
   static _HeaderMatch _findHeader(List<List<Data?>> rows) {
-    final maxScan = rows.length < 25 ? rows.length : 25;
+    final maxScan = rows.length < 40 ? rows.length : 40;
     _HeaderMatch? best;
+    final sampleHeaders = <String>[];
 
     for (var h = 0; h < maxScan; h++) {
       final cols = <String, int>{};
@@ -250,6 +269,10 @@ class ExcelCatalogService {
         for (var i = 0; i < width; i++) {
           final topText = i < above.length ? _cellText(above[i]) : '';
           final curText = i < cur.length ? _cellText(cur[i]) : '';
+          if (h < 8 && curText.trim().isNotEmpty && sampleHeaders.length < 12) {
+            final t = curText.trim();
+            if (!sampleHeaders.contains(t)) sampleHeaders.add(t);
+          }
           _registerHeader(curText, cols, i);
           _registerHeader(topText, cols, i);
           _registerHeader('$topText $curText', cols, i);
@@ -271,10 +294,14 @@ class ExcelCatalogService {
     }
 
     if (best == null) {
+      final hint = sampleHeaders.isEmpty
+          ? ''
+          : ' Celdas vistas: ${sampleHeaders.take(8).join(', ')}.';
       throw Exception(
         'No encontré los encabezados en el Excel. Necesito al menos una columna '
-        'de código, descripción o modelo, y otra de precio (precio, USD, '
-        'importe o p. unit). Si es .xls o CSV, guardalo como .xlsx e intentá de nuevo.',
+        'de código/descripción/modelo y otra de precio (precio_usd, USD, PVP, '
+        'importe). Tip: usá "EXPORTAR EXCEL" como plantilla, o si es .xls/CSV '
+        'guardalo como .xlsx.$hint',
       );
     }
     return best;

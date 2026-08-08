@@ -69,6 +69,7 @@ void main() {
     expect(prices.usd, 3500);
     expect(prices.efectivo, 5495000);
     expect(prices.lista, 5495000); // transferencia = efectivo
+    expect(prices.transferencia, 5495000);
     expect(prices.debito, 0); // Urban no usa débito
     expect(prices.tarjeta1, 5659850); // PVP tarjeta 1 pago
     expect(prices.tarjeta3, closeTo(2058864.77 * 3, 0.01));
@@ -77,6 +78,46 @@ void main() {
     expect(prices.tarjeta12, closeTo(644232.43 * 12, 0.01));
     expect(prices.tarjeta9, 0); // Urban no usa 9 cuotas
     expect(prices.tarjeta18, 0);
+
+    exchange.dispose();
+  });
+
+  test('override munición: 10% efectivo/transf y 3 cuotas SI', () {
+    const municion = Product(
+      id: 'm',
+      type: ProductType.municion,
+      marca: 'CCI',
+      calibre: '.22',
+      codigo: '960',
+      precioUsd: 100,
+    );
+    const arma = Product(
+      id: 'a',
+      type: ProductType.armaLarga,
+      marca: 'Rem',
+      calibre: '.308',
+      codigo: 'R1',
+      precioUsd: 100,
+    );
+
+    final exchange = ExchangeRateService();
+    final settings = PricingSettingsService()
+      ..municionOverrideEnabled = true
+      ..municionDescuentoEfectivoPct = 10
+      ..municionRecargoTarjeta3Pct = 0
+      ..municionTransferenciaComoEfectivo = true;
+
+    final munPrices = PricingService().pricesFor(municion, exchange, settings);
+    expect(munPrices.lista, 150000);
+    expect(munPrices.efectivo, closeTo(135000, 0.01)); // -10%
+    expect(munPrices.transferencia, closeTo(135000, 0.01));
+    expect(munPrices.tarjeta3, closeTo(150000, 0.01)); // 0% SI
+    expect(munPrices.tarjeta6, closeTo(180000, 0.01)); // global +20%
+
+    final armaPrices = PricingService().pricesFor(arma, exchange, settings);
+    expect(armaPrices.efectivo, closeTo(142500, 0.01)); // global -5%
+    expect(armaPrices.transferencia, 150000); // lista
+    expect(armaPrices.tarjeta3, closeTo(172500, 0.01)); // global +15%
 
     exchange.dispose();
   });

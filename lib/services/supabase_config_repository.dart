@@ -52,7 +52,7 @@ class SupabaseConfigRepository {
         );
   }
 
-  Future<Map<String, double>?> fetchPricingSettings() async {
+  Future<Map<String, dynamic>?> fetchPricingSettings() async {
     var query = SupabaseService.client
         .from(_table)
         .select('pricing_settings')
@@ -68,18 +68,24 @@ class SupabaseConfigRepository {
     final raw = row['pricing_settings'];
     if (raw is! Map) return null;
 
-    final out = <String, double>{};
+    final out = <String, dynamic>{};
     for (final entry in raw.entries) {
       final key = entry.key.toString();
       final value = entry.value;
       if (value is num) {
         out[key] = value.toDouble();
+      } else if (value is Map) {
+        out[key] = Map<String, dynamic>.from(
+          value.map((k, v) => MapEntry(k.toString(), v)),
+        );
+      } else if (value is bool) {
+        out[key] = value;
       }
     }
     return out.isEmpty ? null : out;
   }
 
-  Future<void> upsertPricingSettings(Map<String, double> settings) async {
+  Future<void> upsertPricingSettings(Map<String, dynamic> settings) async {
     final tenantId = _tenantIdFromJwt();
     if (tenantId == null || tenantId.isEmpty) {
       throw StateError(

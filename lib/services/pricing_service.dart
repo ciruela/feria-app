@@ -16,15 +16,21 @@ class PricingService {
     }
 
     final lista = exchangeRate.toArs(product.precioUsd);
-    final efectivo = lista * (1 - settings.descuentoEfectivoPct / 100);
+    final efectivoPct = settings.descuentoEfectivoPctFor(product.type);
+    final tarjeta3Pct = settings.recargoTarjeta3PctFor(product.type);
+    final efectivo = lista * (1 - efectivoPct / 100);
+    final transferencia = settings.transferenciaComoEfectivoFor(product.type)
+        ? efectivo
+        : lista;
 
     return ProductPrices(
       usd: product.precioUsd,
       lista: lista,
       efectivo: efectivo,
+      transferencia: transferencia,
       debito: lista * (1 + settings.recargoDebitoPct / 100),
       tarjeta1: lista * (1 + settings.recargoTarjeta1Pct / 100),
-      tarjeta3: lista * (1 + settings.recargoTarjeta3Pct / 100),
+      tarjeta3: lista * (1 + tarjeta3Pct / 100),
       tarjeta6: lista * (1 + settings.recargoTarjeta6Pct / 100),
       tarjeta9: lista * (1 + settings.recargoTarjeta9Pct / 100),
       tarjeta12: lista * (1 + settings.recargoTarjeta12Pct / 100),
@@ -43,6 +49,7 @@ class PricingService {
       usd: f.efectivoUsd ?? product.precioUsd,
       lista: efectivo, // transferencia/lista = efectivo en el Excel de Urban
       efectivo: efectivo,
+      transferencia: efectivo,
       debito: 0,
       tarjeta1: f.tarjetaArs ?? 0,
       tarjeta3: f.tarjeta3Total ?? 0,

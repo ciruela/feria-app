@@ -82,11 +82,15 @@ class ProductPrices {
     required this.tarjeta9,
     required this.tarjeta12,
     required this.tarjeta18,
-  });
+    double? transferencia,
+  }) : transferencia = transferencia ?? lista;
 
   final double usd;
   final double lista;
   final double efectivo;
+
+  /// Transferencia: por defecto = lista; en promos (p. ej. munición WG) = efectivo.
+  final double transferencia;
   final double debito;
   final double tarjeta1;
   final double tarjeta3;
@@ -142,7 +146,7 @@ enum PaymentMethod {
   double totalArsFor(ProductPrices prices) {
     return switch (this) {
       PaymentMethod.dolarBillete => prices.lista,
-      PaymentMethod.transferencia => prices.lista,
+      PaymentMethod.transferencia => prices.transferencia,
       PaymentMethod.lista => prices.lista,
       PaymentMethod.efectivo => prices.efectivo,
       PaymentMethod.debito => prices.debito,

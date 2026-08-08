@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/pricing_limits.dart';
+import '../../models/presupuesto_branding.dart';
 import '../../services/pricing_settings_service.dart';
+import '../../services/tenant_session_service.dart';
 import '../../widgets/feria_shell.dart';
 
 class AdminPricingScreen extends StatefulWidget {
@@ -21,6 +23,16 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
   late final TextEditingController _t9;
   late final TextEditingController _t12;
   late final TextEditingController _t18;
+  late final TextEditingController _munEfectivo;
+  late final TextEditingController _munT3;
+  late bool _municionOverride;
+  late bool _municionTransferEfectivo;
+  bool _saving = false;
+
+  bool get _isWorldGuns {
+    final slug = context.read<TenantSessionService>().activeTenantSlug;
+    return PresupuestoBranding.forTenant(slug: slug).isWorldGuns;
+  }
 
   @override
   void initState() {
@@ -34,6 +46,14 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
     _t9 = TextEditingController(text: settings.recargoTarjeta9Pct.toString());
     _t12 = TextEditingController(text: settings.recargoTarjeta12Pct.toString());
     _t18 = TextEditingController(text: settings.recargoTarjeta18Pct.toString());
+    _munEfectivo = TextEditingController(
+      text: settings.municionDescuentoEfectivoPct.toString(),
+    );
+    _munT3 = TextEditingController(
+      text: settings.municionRecargoTarjeta3Pct.toString(),
+    );
+    _municionOverride = settings.municionOverrideEnabled;
+    _municionTransferEfectivo = settings.municionTransferenciaComoEfectivo;
   }
 
   @override
@@ -46,27 +66,117 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
     _t9.dispose();
     _t12.dispose();
     _t18.dispose();
+    _munEfectivo.dispose();
+    _munT3.dispose();
     super.dispose();
+  }
+
+  Future<void> _save() async {
+    final error = _validateAndMessage();
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      await context.read<PricingSettingsService>().save(
+            efectivoPct: double.parse(_efectivo.text),
+            debitoPct: double.parse(_debito.text),
+            tarjeta1Pct: double.parse(_t1.text),
+            tarjeta3Pct: double.parse(_t3.text),
+            tarjeta6Pct: double.parse(_t6.text),
+            tarjeta9Pct: double.parse(_t9.text),
+            tarjeta12Pct: double.parse(_t12.text),
+            tarjeta18Pct: double.parse(_t18.text),
+            municionOverrideEnabled: _isWorldGuns ? _municionOverride : false,
+            municionEfectivoPct: double.tryParse(_munEfectivo.text),
+            municionTarjeta3Pct: double.tryParse(_munT3.text),
+            municionTransferenciaComoEfectivo: _municionTransferEfectivo,
+          );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Precios y promos actualizados')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo guardar: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final showMunicion = _isWorldGuns;
+
     return FeriaScaffold(
       appBar: const FeriaAppBar(title: Text('Precios y cuotas')),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
           Text(
-            'Promos tarjeta',
+            'Promos y descuentos',
             style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Lista = USD × tipo de cambio. Transferencia usa precio lista. '
-            'Efectivo aplica descuento sobre lista. Débito y cuotas recargan % sobre lista. '
-            'Los % se guardan en la armería (todos los dispositivos usan los mismos).',
+          Text(
+            showMunicion
+                ? 'Lista = USD × tipo de cambio. Abajo están las promos '
+                    'generales (armas) y la promo exclusiva de munición. '
+                    'Los % se guardan en la armería (todos los dispositivos).'
+                : 'Lista = USD × tipo de cambio. Transferencia usa precio lista. '
+                    'Efectivo aplica descuento sobre lista. Débito y cuotas '
+                    'recargan % sobre lista. Los % se guardan en la armería.',
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
-          const SizedBox(height: 20),
+          if (showMunicion) ...[
+            const SizedBox(height: 24),
+            Text(
+              'Promo munición (World Guns)',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Aplica solo a productos tipo munición. Armas siguen los % '
+              'generales de abajo. Ej.: 10% efectivo/transferencia y 3 cuotas '
+              'sin interés (recargo 0%).',
+            ),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Activar promo munición'),
+              value: _municionOverride,
+              onChanged: (v) => setState(() => _municionOverride = v),
+            ),
+            if (_municionOverride) ...[
+              _field('Descuento efectivo munición (%)', _munEfectivo),
+              _field('Recargo 3 cuotas munición (%)', _munT3),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Transferencia = mismo descuento que efectivo'),
+                subtitle: const Text(
+                  'Si está apagado, transferencia usa precio lista.',
+                ),
+                value: _municionTransferEfectivo,
+                onChanged: (v) =>
+                    setState(() => _municionTransferEfectivo = v),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Text(
+              'Resto del catálogo (armas)',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+          ] else ...[
+            const SizedBox(height: 20),
+          ],
           _field('Descuento efectivo (%)', _efectivo),
           _field('Recargo débito (%)', _debito),
           _field('Recargo 1 cuota (%)', _t1),
@@ -77,32 +187,8 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
           _field('Recargo 18 cuotas (%)', _t18),
           const SizedBox(height: 20),
           ElevatedButton(
-            onPressed: () async {
-              final error = _validateAndMessage();
-              if (error != null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(error)),
-                );
-                return;
-              }
-
-              await context.read<PricingSettingsService>().save(
-                    efectivoPct: double.parse(_efectivo.text),
-                    debitoPct: double.parse(_debito.text),
-                    tarjeta1Pct: double.parse(_t1.text),
-                    tarjeta3Pct: double.parse(_t3.text),
-                    tarjeta6Pct: double.parse(_t6.text),
-                    tarjeta9Pct: double.parse(_t9.text),
-                    tarjeta12Pct: double.parse(_t12.text),
-                    tarjeta18Pct: double.parse(_t18.text),
-                  );
-
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Precios actualizados')),
-              );
-            },
-            child: const Text('GUARDAR'),
+            onPressed: _saving ? null : _save,
+            child: Text(_saving ? 'GUARDANDO…' : 'GUARDAR'),
           ),
         ],
       ),
@@ -121,6 +207,21 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
       ('tarjeta12', 'El recargo de 12 cuotas', _t12.text),
       ('tarjeta18', 'El recargo de 18 cuotas', _t18.text),
     ];
+
+    if (_isWorldGuns && _municionOverride) {
+      entries.addAll([
+        (
+          'efectivo',
+          'El descuento de efectivo (munición)',
+          _munEfectivo.text,
+        ),
+        (
+          'tarjeta3',
+          'El recargo de 3 cuotas (munición)',
+          _munT3.text,
+        ),
+      ]);
+    }
 
     for (final (key, label, text) in entries) {
       final value = double.tryParse(text);
