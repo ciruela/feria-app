@@ -33,7 +33,7 @@ class CartTotalsService {
       pricingSettings,
     );
     return CartLineTotal(
-      usd: prices.usd * item.quantity,
+      usd: method.totalUsdFor(prices) * item.quantity,
       ars: method.totalArsFor(prices) * item.quantity,
     );
   }
