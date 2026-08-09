@@ -214,9 +214,12 @@ const checkoutDialogPaymentMethods = [
   PaymentMethod.tarjeta18,
 ];
 
-/// Checkout: en World Guns incluye USD (mismo descuento que efectivo).
-List<PaymentMethod> checkoutPaymentMethods({required bool isWorldGuns}) {
-  if (!isWorldGuns) return checkoutDialogPaymentMethods;
+/// Checkout: USD (`dolar_billete`) cuando el tenant lo habilita (WG / Urban).
+///
+/// Quien llama debe pasar [includeUsd] solo si el carrito tiene precio USD
+/// usable en todos los ítems (ver [CartTotalsService.cartSupportsUsdCheckout]).
+List<PaymentMethod> checkoutPaymentMethods({required bool includeUsd}) {
+  if (!includeUsd) return checkoutDialogPaymentMethods;
   return [
     PaymentMethod.dolarBillete,
     ...checkoutDialogPaymentMethods,

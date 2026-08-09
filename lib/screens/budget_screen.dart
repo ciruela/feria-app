@@ -283,6 +283,15 @@ class _BudgetScreenState extends State<BudgetScreen> {
       return;
     }
 
+    // Cobro USD sin precio USD en catálogo (típico Urban solo-ARS).
+    if (budget.hasUsdPayments && budget.totalUsd <= 0) {
+      _showMessage(
+        'Este carrito no tiene precio USD. Elegí otro medio de pago '
+        'o pedí que carguen el USD en el producto.',
+      );
+      return;
+    }
+
     final missingSerial = cart.weaponsMissingSerial;
     if (missingSerial.isNotEmpty) {
       final labels =

@@ -36,7 +36,7 @@ Budget _budgetWithMethods(
 }
 
 void main() {
-  test('urban payment abbrev maps EF TR TC OTROS', () {
+  test('urban payment abbrev maps EF TR TC USD OTROS', () {
     final branding = PresupuestoBranding.urbanTactical;
 
     expect(
@@ -56,6 +56,12 @@ void main() {
         _budgetWithMethods({PaymentMethod.tarjeta3}),
       ).paymentAbbrevFor(branding),
       'TC',
+    );
+    expect(
+      PresupuestoSummary(
+        _budgetWithMethods({PaymentMethod.dolarBillete}),
+      ).paymentAbbrevFor(branding),
+      'USD',
     );
     expect(
       PresupuestoSummary(

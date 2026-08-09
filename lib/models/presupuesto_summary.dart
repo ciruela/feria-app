@@ -65,7 +65,7 @@ class PresupuestoSummary {
     ];
   }
 
-  /// Abreviatura para recibo Urban (EF, TR, TC, OTROS, EF/TR, SORTEO).
+  /// Abreviatura para recibo Urban (EF, TR, TC, USD, OTROS, EF/TR, SORTEO).
   String get urbanPaymentAbbrev {
     final methods = paymentMethods;
     if (methods.isEmpty) return '—';
@@ -88,10 +88,8 @@ class PresupuestoSummary {
     return switch (method) {
       PaymentMethod.efectivo => 'EF',
       PaymentMethod.transferencia => 'TR',
-      PaymentMethod.debito ||
-      PaymentMethod.lista ||
-      PaymentMethod.dolarBillete =>
-        'OTROS',
+      PaymentMethod.dolarBillete => 'USD',
+      PaymentMethod.debito || PaymentMethod.lista => 'OTROS',
       PaymentMethod.tarjeta1 ||
       PaymentMethod.tarjeta3 ||
       PaymentMethod.tarjeta6 ||
