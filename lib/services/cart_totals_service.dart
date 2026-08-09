@@ -61,6 +61,27 @@ class CartTotalsService {
     return CartLineTotal(usd: usd, ars: ars);
   }
 
+  /// True si todos los ítems tienen monto USD > 0 para cobro en dólar billete.
+  ///
+  /// Evita ofrecer USD en Urban cuando el Excel solo trae ARS (efectivo_usd = 0).
+  bool cartSupportsUsdCheckout({
+    required CartService cart,
+    required ExchangeRateService exchangeRate,
+    required PricingSettingsService pricingSettings,
+  }) {
+    if (cart.items.isEmpty) return false;
+    for (final item in cart.items) {
+      final line = lineTotal(
+        item: item,
+        method: PaymentMethod.dolarBillete,
+        exchangeRate: exchangeRate,
+        pricingSettings: pricingSettings,
+      );
+      if (line.usd <= 0) return false;
+    }
+    return true;
+  }
+
   /// Asigna montos y [PaymentAllocation.share] (suma 1) para register_sale.
   /// Dual USD+ARS: cada medio lleva su moneda con la porción de venta.
   List<PaymentAllocation> allocationsFor({

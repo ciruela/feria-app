@@ -95,4 +95,67 @@ void main() {
     expect(cart.isEmpty, isTrue);
     expect(cart.hasCheckoutPayment, isFalse);
   });
+
+  test('cartSupportsUsdCheckout requiere USD > 0 en todos los ítems', () {
+    expect(
+      totalsService.cartSupportsUsdCheckout(
+        cart: cart,
+        exchangeRate: exchangeRate,
+        pricingSettings: settings,
+      ),
+      isFalse,
+    );
+
+    cart.addProduct(testProduct(id: 'wg', precioUsd: 100));
+    expect(
+      totalsService.cartSupportsUsdCheckout(
+        cart: cart,
+        exchangeRate: exchangeRate,
+        pricingSettings: settings,
+      ),
+      isTrue,
+    );
+
+    cart.clear();
+    cart.addProduct(
+      const Product(
+        id: 'urban-ars',
+        type: ProductType.armaCorta,
+        marca: 'BERSA',
+        calibre: '9MM',
+        codigo: 'B1',
+        precioUsd: 0,
+        fixedPrices: FixedPrices(efectivoArs: 500000),
+      ),
+    );
+    expect(
+      totalsService.cartSupportsUsdCheckout(
+        cart: cart,
+        exchangeRate: exchangeRate,
+        pricingSettings: settings,
+      ),
+      isFalse,
+    );
+
+    cart.clear();
+    cart.addProduct(
+      const Product(
+        id: 'urban-usd',
+        type: ProductType.armaCorta,
+        marca: 'BERSA',
+        calibre: '9MM',
+        codigo: 'B2',
+        precioUsd: 0,
+        fixedPrices: FixedPrices(efectivoArs: 500000, efectivoUsd: 350),
+      ),
+    );
+    expect(
+      totalsService.cartSupportsUsdCheckout(
+        cart: cart,
+        exchangeRate: exchangeRate,
+        pricingSettings: settings,
+      ),
+      isTrue,
+    );
+  });
 }

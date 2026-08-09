@@ -16,6 +16,27 @@ import '../utils/formatters.dart';
 import '../utils/layout_breakpoints.dart';
 import 'employee/cart_checkout_payment_mobile.dart';
 
+/// Medios de checkout del tenant; USD solo si WG/Urban y el carrito tiene USD.
+List<PaymentMethod> _checkoutMethodsFor(
+  BuildContext context, {
+  required CartService cart,
+  required ExchangeRateService exchangeRate,
+  required PricingSettingsService pricingSettings,
+  required CartTotalsService totalsService,
+}) {
+  final branding = PresupuestoBranding.forTenant(
+    slug: context.read<TenantSessionService>().activeTenantSlug,
+  );
+  final tenantAllowsUsd = branding.isWorldGuns || branding.isUrban;
+  final includeUsd = tenantAllowsUsd &&
+      totalsService.cartSupportsUsdCheckout(
+        cart: cart,
+        exchangeRate: exchangeRate,
+        pricingSettings: pricingSettings,
+      );
+  return checkoutPaymentMethods(includeUsd: includeUsd);
+}
+
 Future<CartCheckoutPayment?> showCartCheckoutPaymentDialog(
   BuildContext context, {
   CartCheckoutPayment? current,
@@ -219,10 +240,13 @@ class _CartCheckoutPaymentDialogState extends State<_CartCheckoutPaymentDialog> 
     CartTotalsService totalsService, {
     required bool isDesktop,
   }) {
-    final isWorldGuns = PresupuestoBranding.forTenant(
-      slug: context.read<TenantSessionService>().activeTenantSlug,
-    ).isWorldGuns;
-    final methods = checkoutPaymentMethods(isWorldGuns: isWorldGuns);
+    final methods = _checkoutMethodsFor(
+      context,
+      cart: cart,
+      exchangeRate: exchangeRate,
+      pricingSettings: pricingSettings,
+      totalsService: totalsService,
+    );
 
     if (widget.asSheet) {
       return CartCheckoutPaymentMobileContent(
@@ -723,12 +747,13 @@ class _MethodPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isWorldGuns = PresupuestoBranding.forTenant(
-      slug: context.read<TenantSessionService>().activeTenantSlug,
-    ).isWorldGuns;
-    final methods = checkoutPaymentMethods(isWorldGuns: isWorldGuns)
-        .where((method) => !exclude.contains(method))
-        .toList();
+    final methods = _checkoutMethodsFor(
+      context,
+      cart: cart,
+      exchangeRate: exchangeRate,
+      pricingSettings: pricingSettings,
+      totalsService: totalsService,
+    ).where((method) => !exclude.contains(method)).toList();
     final listaTotal = totalsService.cartTotalAtMethod(
       cart: cart,
       method: PaymentMethod.lista,

@@ -49,13 +49,13 @@ void main() {
       expect(PaymentMethod.dolarBillete.totalUsdFor(p), closeTo(95, 0.01));
     });
 
-    test('checkoutPaymentMethods incluye USD solo en World Guns', () {
+    test('checkoutPaymentMethods incluye USD solo con includeUsd', () {
       expect(
-        checkoutPaymentMethods(isWorldGuns: false),
+        checkoutPaymentMethods(includeUsd: false),
         isNot(contains(PaymentMethod.dolarBillete)),
       );
       expect(
-        checkoutPaymentMethods(isWorldGuns: true).first,
+        checkoutPaymentMethods(includeUsd: true).first,
         PaymentMethod.dolarBillete,
       );
     });

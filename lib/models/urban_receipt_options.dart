@@ -4,6 +4,7 @@ abstract final class UrbanReceiptOptions {
     'EF',
     'TR',
     'TC',
+    'USD',
     'OTROS',
     'EF/TR',
     'SORTEO',
