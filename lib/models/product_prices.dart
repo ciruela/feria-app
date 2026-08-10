@@ -152,6 +152,17 @@ enum PaymentMethod {
         PaymentMethod.tarjeta18 => '18 cuotas',
       };
 
+  /// Cantidad de cuotas del método de tarjeta (null si no aplica).
+  int? get installments => switch (this) {
+        PaymentMethod.tarjeta1 => 1,
+        PaymentMethod.tarjeta3 => 3,
+        PaymentMethod.tarjeta6 => 6,
+        PaymentMethod.tarjeta9 => 9,
+        PaymentMethod.tarjeta12 => 12,
+        PaymentMethod.tarjeta18 => 18,
+        _ => null,
+      };
+
   /// Monto en pesos según la forma de pago elegida.
   ///
   /// USD / dólar billete cotiza como efectivo (mismo descuento).

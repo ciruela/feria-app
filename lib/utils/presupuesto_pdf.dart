@@ -816,7 +816,9 @@ class PresupuestoPdf {
             (line) => pw.Padding(
               padding: const pw.EdgeInsets.only(bottom: 2),
               child: pw.Text(
-                '· ${line.label}: ${line.amount}',
+                line.detail == null
+                    ? '· ${line.label}: ${line.amount}'
+                    : '· ${line.label}: ${line.amount} (${line.detail})',
                 style:
                     pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
               ),

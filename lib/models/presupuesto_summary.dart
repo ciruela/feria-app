@@ -23,16 +23,20 @@ class PresupuestoSummary {
       formatArs(budget.totalArsLines).replaceAll(r'$ ', '');
 
   List<PaymentAllocationLine> get paymentAllocationLines {
-    return budget.paymentAllocations
-        .map(
-          (allocation) => PaymentAllocationLine(
-            label: allocation.method.label.toUpperCase(),
-            amount: allocation.paysInUsd
-                ? formatUsd(allocation.amountUsd)
-                : formatArs(allocation.amountArs),
-          ),
-        )
-        .toList();
+    return budget.paymentAllocations.map((allocation) {
+      final cuotas = allocation.method.installments;
+      // Detalle "N x $cuota" para tarjetas en cuotas (solo en pesos).
+      final detail = (!allocation.paysInUsd && cuotas != null && cuotas > 1)
+          ? '$cuotas x ${formatArs(allocation.amountArs / cuotas)}'
+          : null;
+      return PaymentAllocationLine(
+        label: allocation.method.label.toUpperCase(),
+        amount: allocation.paysInUsd
+            ? formatUsd(allocation.amountUsd)
+            : formatArs(allocation.amountArs),
+        detail: detail,
+      );
+    }).toList();
   }
 
   bool get usesPesos =>
@@ -183,8 +187,12 @@ class PaymentAllocationLine {
   const PaymentAllocationLine({
     required this.label,
     required this.amount,
+    this.detail,
   });
 
   final String label;
   final String amount;
+
+  /// Detalle opcional (ej: "3 x $53.475" para cuotas).
+  final String? detail;
 }

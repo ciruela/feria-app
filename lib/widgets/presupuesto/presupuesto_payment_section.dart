@@ -151,7 +151,9 @@ class _PaymentAllocationSection extends StatelessWidget {
             (line) => Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: Text(
-                '· ${line.label}: ${line.amount}',
+                line.detail == null
+                    ? '· ${line.label}: ${line.amount}'
+                    : '· ${line.label}: ${line.amount} (${line.detail})',
                 style: const TextStyle(
                   fontSize: 10.5,
                   fontWeight: FontWeight.w800,
