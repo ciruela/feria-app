@@ -237,8 +237,12 @@ def rows_accesorios(wb):
       precio USD + equivalente ARS al TC, código ACCS-xx.
 
     Layout nuevo:  A=SKU B=MARCA C=MODELO(nombre) D=DESCRIPCION E=STOCK
-                   G=PVP TARJETA  H=EFECTIVO/TRANSFERENCIA
+                   H=EFECTIVO/TRANSFERENCIA  I=PVP TARJETA
+                   J=TC 6 CUOTAS SIN INTERES (valor de CADA cuota, en ARS)
     Layout viejo:  A=nombre B=stock D=pvp.
+
+    Tarjeta y 6 cuotas (I/J) vienen SIEMPRE en ARS, incluso para accesorios
+    cotizados en USD (solo el efectivo/transferencia de esos está en USD).
     """
     ws = wb["Accesorios"]
     # El encabezado puede estar en la fila 1 o 2 según la versión del Excel.
@@ -259,21 +263,24 @@ def rows_accesorios(wb):
             marca = txt(cell(ws, r, 2))
             name = txt(cell(ws, r, 3))
             stock = num(cell(ws, r, 5))
-            col_tarjeta = num(cell(ws, r, 7))   # PVP TARJETA
-            col_efectivo = num(cell(ws, r, 8))  # EFECTIVO/TRANSFERENCIA
+            col_efectivo = num(cell(ws, r, 8))  # H = EFECTIVO/TRANSFERENCIA
+            col_tarjeta = num(cell(ws, r, 9))   # I = PVP TARJETA (ARS)
+            col_cuota6 = num(cell(ws, r, 10))   # J = 6 CUOTAS SIN INTERES (ARS/cuota)
             if not name:
                 continue
-            # La munición 3DURBAN cotiza en ARS; el precio cambió de columna
-            # entre versiones del Excel (PVP TARJETA -> EFECTIVO), tomamos la que
-            # tenga valor. Los accesorios cotizan en USD (misma columna).
+            # La munición 3DURBAN cotiza en ARS (H es el precio en pesos); los
+            # accesorios cotizan en USD (H es el precio en dólares). Tarjeta (I) y
+            # 6 cuotas (J) están SIEMPRE en ARS.
             up = name.upper()
             is_ammo = (marca.upper() == "3DURBAN"
                        or "CAJA" in up or "MUNIC" in up)
-            precio_col = col_tarjeta if col_tarjeta is not None else col_efectivo
+            precio_col = col_efectivo if col_efectivo is not None else col_tarjeta
         else:
             marca = ""
             name = txt(cell(ws, r, 1))
             stock = num(cell(ws, r, 2))
+            col_tarjeta = None
+            col_cuota6 = None
             if not name:
                 continue
             # Layout viejo: solo munición.
@@ -302,9 +309,9 @@ def rows_accesorios(wb):
                 "stock_inicial": stock_int,
                 "efectivo_ars": precio_ars,
                 "efectivo_usd": None,
-                "tarjeta_ars": None,
+                "tarjeta_ars": round(col_tarjeta, 2) if col_tarjeta else None,
                 "cuota3_ars": None,
-                "cuota6_ars": None,
+                "cuota6_ars": round(col_cuota6, 2) if col_cuota6 else None,
                 "cuota12_ars": None,
             })
         else:
@@ -326,9 +333,9 @@ def rows_accesorios(wb):
                 "stock_inicial": stock_int,
                 "efectivo_ars": precio_ars,
                 "efectivo_usd": precio_usd,
-                "tarjeta_ars": None,
+                "tarjeta_ars": round(col_tarjeta, 2) if col_tarjeta else None,
                 "cuota3_ars": None,
-                "cuota6_ars": None,
+                "cuota6_ars": round(col_cuota6, 2) if col_cuota6 else None,
                 "cuota12_ars": None,
             })
     total = idx_ammo + idx_acc
