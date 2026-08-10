@@ -23,16 +23,23 @@ class PresupuestoSummary {
       formatArs(budget.totalArsLines).replaceAll(r'$ ', '');
 
   List<PaymentAllocationLine> get paymentAllocationLines {
-    return budget.paymentAllocations
-        .map(
-          (allocation) => PaymentAllocationLine(
-            label: allocation.method.label.toUpperCase(),
-            amount: allocation.paysInUsd
-                ? formatUsd(allocation.amountUsd)
-                : formatArs(allocation.amountArs),
-          ),
-        )
-        .toList();
+    return budget.paymentAllocations.map((allocation) {
+      final cuotas = allocation.method.installments;
+      // Detalle "N x $cuota" para tarjetas en cuotas (solo en pesos).
+      final detail = (!allocation.paysInUsd && cuotas != null && cuotas > 1)
+          ? '$cuotas x ${formatArs(allocation.amountArs / cuotas)}'
+          : null;
+      // Delta vs lista: "- $ X" ahorro / "+ $ X" recargo.
+      final delta = formatSignedArsDelta(allocation.deltaArs);
+      return PaymentAllocationLine(
+        label: allocation.method.label.toUpperCase(),
+        amount: allocation.paysInUsd
+            ? formatUsd(allocation.amountUsd)
+            : formatArs(allocation.amountArs),
+        detail: detail,
+        delta: delta,
+      );
+    }).toList();
   }
 
   bool get usesPesos =>
@@ -183,8 +190,23 @@ class PaymentAllocationLine {
   const PaymentAllocationLine({
     required this.label,
     required this.amount,
+    this.detail,
+    this.delta,
   });
 
   final String label;
   final String amount;
+
+  /// Detalle opcional del pago (ej: "3 x $53.475" para cuotas).
+  final String? detail;
+
+  /// Ahorro/recargo vs lista (ej: "- $ 20.000" / "+ $ 34.875").
+  final String? delta;
+
+  /// Texto compuesto "LABEL: AMOUNT (detalle · delta)" para el comprobante.
+  String get displayText {
+    final extras = [if (detail != null) detail!, if (delta != null) delta!];
+    final suffix = extras.isEmpty ? '' : ' (${extras.join(' · ')})';
+    return '$label: $amount$suffix';
+  }
 }

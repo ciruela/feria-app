@@ -216,14 +216,37 @@ class _CheckoutSummary extends StatelessWidget {
           final amount = allocation.paysInUsd
               ? formatUsd(allocation.amountUsd)
               : formatArs(allocation.amountArs);
+          final cuotas = allocation.method.installments;
+          final detail = (!allocation.paysInUsd && cuotas != null && cuotas > 1)
+              ? '$cuotas x ${formatArs(allocation.amountArs / cuotas)}'
+              : null;
+          final lineDelta = formatSignedArsDelta(allocation.deltaArs);
+          final sub = [
+            if (detail != null) detail,
+            if (lineDelta != null) lineDelta,
+          ].join(' · ');
           return Padding(
-            padding: const EdgeInsets.only(bottom: 4),
+            padding: const EdgeInsets.only(bottom: 6),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: Text(
-                    allocation.method.shortLabel,
-                    style: AppText.bodySmall,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        allocation.method.shortLabel,
+                        style: AppText.bodySmall,
+                      ),
+                      if (sub.isNotEmpty)
+                        Text(
+                          sub,
+                          style: AppText.bodySmall.copyWith(
+                            color: AppColors.textMuted,
+                            fontSize: 11,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 Text(

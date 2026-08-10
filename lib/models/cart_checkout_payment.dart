@@ -41,6 +41,7 @@ class PaymentAllocation {
     required this.amountUsd,
     required this.amountArs,
     this.share = 1.0,
+    this.deltaArs = 0,
   });
 
   final PaymentMethod method;
@@ -49,6 +50,10 @@ class PaymentAllocation {
 
   /// Porción de la venta (0–1). Debe sumar 1 entre todas las allocations.
   final double share;
+
+  /// Diferencia vs precio de lista de los productos de este medio, en ARS.
+  /// Negativo = ahorro (descuento); positivo = recargo (ej: cuotas).
+  final double deltaArs;
 
   bool get paysInUsd => method.isUsdPayment;
 }

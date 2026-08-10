@@ -440,6 +440,19 @@ Future<void> _showLinePaymentPicker(
       ? formatUsd(method.totalUsdFor(prices) * qty)
       : formatArs(method.totalArsFor(prices) * qty);
 
+  // Subtítulo por opción: desglose de cuota + ahorro/recargo vs lista (ARS).
+  String? subtitleFor(PaymentMethod method) {
+    if (method.isUsdPayment) return null;
+    final total = method.totalArsFor(prices) * qty;
+    if (total <= 0) return null;
+    final parts = <String>[];
+    final n = method.installments;
+    if (n != null && n > 1) parts.add('$n x ${formatArs(total / n)}');
+    final delta = formatSignedArsDelta(total - prices.lista * qty);
+    if (delta != null) parts.add(delta);
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
+
   await showModalBottomSheet<void>(
     context: context,
     backgroundColor: AppColors.canvas,
@@ -493,6 +506,7 @@ Future<void> _showLinePaymentPicker(
                         _LinePaymentOption(
                           label: method.shortLabel,
                           trailing: amountFor(method),
+                          subtitle: subtitleFor(method),
                           selected: selected == method,
                           onTap: () {
                             cart.setLinePaymentMethod(item.lineKey, method);
@@ -574,6 +588,7 @@ class _LinePaymentOption extends StatelessWidget {
     required this.trailing,
     required this.selected,
     required this.onTap,
+    this.subtitle,
   });
 
   final String label;
@@ -581,8 +596,12 @@ class _LinePaymentOption extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
+  /// Detalle opcional bajo el nombre (ej: "3 x $53.475 · + $ 6.975").
+  final String? subtitle;
+
   @override
   Widget build(BuildContext context) {
+    final fg = selected ? AppColors.canvas : AppColors.textPrimary;
     return Material(
       color: selected ? AppColors.textPrimary : AppColors.surfaceTouch,
       borderRadius: BorderRadius.circular(AppDecorations.radius),
@@ -598,19 +617,33 @@ class _LinePaymentOption extends StatelessWidget {
                 const SizedBox(width: 8),
               ],
               Expanded(
-                child: Text(
-                  label,
-                  style: AppText.bodyLarge.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: selected ? AppColors.canvas : AppColors.textPrimary,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: AppText.bodyLarge.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: fg,
+                      ),
+                    ),
+                    if (subtitle != null)
+                      Text(
+                        subtitle!,
+                        style: AppText.bodySmall.copyWith(
+                          color: selected
+                              ? AppColors.canvas.withValues(alpha: 0.75)
+                              : AppColors.textMuted,
+                        ),
+                      ),
+                  ],
                 ),
               ),
               Text(
                 trailing,
                 style: AppText.bodyLarge.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: selected ? AppColors.canvas : AppColors.textPrimary,
+                  color: fg,
                 ),
               ),
             ],
