@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../models/budget_customer_controllers.dart';
+import '../../utils/date_input_formatter.dart';
 import '../../utils/uppercase_input.dart';
 
 class PresupuestoLabeledField extends StatelessWidget {
@@ -172,6 +173,8 @@ class PresupuestoCustomerFields extends StatelessWidget {
                 controller: controllers.cluExpiry,
                 readOnly: readOnly,
                 onChanged: onChanged,
+                keyboardType: TextInputType.number,
+                inputFormatters: DateTextInputFormatter.formatters,
               ),
             ),
           ],

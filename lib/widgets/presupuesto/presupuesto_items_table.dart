@@ -199,7 +199,9 @@ class _DetailedItemsTable extends StatelessWidget {
       bodyHeight: bodyHeight,
       headerHeight: PresupuestoItemsTable._headerHeight,
       armaPref: 52,
-      normalPref: 22,
+      // Alto suficiente para 2 líneas de detalle (nombres largos de munición)
+      // sin que el texto se monte sobre el renglón de abajo.
+      normalPref: 32,
       fillerPref: 22,
     );
 
@@ -253,34 +255,38 @@ class _DetailedItemsTable extends StatelessWidget {
         ),
         SizedBox(
           height: cellHeight,
-          child: Padding(
-            padding: const EdgeInsets.all(4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  row.detail,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    height: 1.15,
+          // ClipRect: si el nombre no entra en la fila, se recorta en el borde
+          // en lugar de pintarse sobre el renglón siguiente (superposición).
+          child: ClipRect(
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    row.detail,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      height: 1.1,
+                    ),
                   ),
-                ),
-                if (row.isArma) ...[
-                  const SizedBox(height: 4),
-                  _SerialInlineField(
-                    key: ValueKey('serial-${row.lineKey}'),
-                    lineKey: row.lineKey,
-                    initialValue: row.serialNumber,
-                    // AR-58: editar serie solo en BudgetSerialPanel.
-                    readOnly: true,
-                    onChanged: onSerialChanged,
-                  ),
+                  if (row.isArma) ...[
+                    const SizedBox(height: 4),
+                    _SerialInlineField(
+                      key: ValueKey('serial-${row.lineKey}'),
+                      lineKey: row.lineKey,
+                      initialValue: row.serialNumber,
+                      // AR-58: editar serie solo en BudgetSerialPanel.
+                      readOnly: true,
+                      onChanged: onSerialChanged,
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
