@@ -9,13 +9,18 @@ class CatalogCategoryChips extends StatelessWidget {
     required this.selected,
     required this.onSelected,
     this.desktopHandoff = false,
+    this.hasAccesorios = false,
   });
 
   final ProductType? selected;
   final ValueChanged<ProductType?> onSelected;
   final bool desktopHandoff;
 
-  static const _labels = {
+  /// Muestra el chip "Accesorios" solo cuando el tenant tiene accesorios, para
+  /// no agregar un filtro vacío a tenants que no los usan.
+  final bool hasAccesorios;
+
+  static const _baseLabels = {
     null: 'Todo',
     ProductType.armaCorta: 'Cortas',
     ProductType.armaLarga: 'Largas',
@@ -25,12 +30,16 @@ class CatalogCategoryChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final horizontalPadding = desktopHandoff ? 28.0 : 20.0;
+    final labels = {
+      ..._baseLabels,
+      if (hasAccesorios) ProductType.accesorios: 'Accesorios',
+    };
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
       child: Row(
-        children: _labels.entries.map((entry) {
+        children: labels.entries.map((entry) {
           final isSelected = selected == entry.key;
           final selectedBg =
               desktopHandoff ? AppColors.textPrimary : AppColors.textPrimary;

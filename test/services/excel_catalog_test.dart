@@ -339,6 +339,53 @@ void main() {
       }
     });
 
+    test('planilla Stopping Power: Dolares u\$s + Mayorista/por', () {
+      // Reproduce STOPPING.xlsx (hoja "Table 1"): Código, Descripción,
+      // Mayorista (total balas), por (balas/caja), Dolares u$s, MARCA.
+      final excel = Excel.createExcel();
+      final name = excel.sheets.keys.first;
+      excel.rename(name, 'Table 1');
+      final s = excel['Table 1'];
+      void put(int c, int r, String v) => s
+          .cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r))
+          .value = TextCellValue(v);
+
+      put(0, 0, 'Código');
+      put(1, 0, 'Descripción');
+      put(2, 0, 'Mayorista');
+      put(3, 0, 'por');
+      put(5, 0, 'Dolares u\$s');
+      put(6, 0, 'MARCA');
+      put(0, 1, '98052');
+      put(1, 1, 'C.12/70 15 PELLETS ANTITUMULTO CARTUCHO STOPP');
+      put(2, 1, '0');
+      put(3, 1, '25');
+      put(5, 1, '40');
+      put(6, 1, 'STOPPING POWER');
+      put(0, 2, '5096');
+      put(1, 2, 'C.24GA 23GR M7 CARTUCHO STOPPING POWER (25)');
+      put(2, 2, '200');
+      put(3, 2, '25');
+      put(5, 2, '25');
+      put(6, 2, 'STOPPING POWER');
+
+      final rows =
+          service.parseRows(Uint8List.fromList(excel.encode()!));
+      expect(rows.length, 2);
+      expect(rows.first['codigo'], '98052');
+      expect(rows.first['precio_usd'], '40');
+      expect(rows.first['marca'], 'STOPPING POWER');
+      expect(rows.first['balas_por_caja'], '25');
+      expect(rows.first['total_balas'], '0');
+
+      final second = ExcelProductRow.fromMap(rows[1]);
+      expect(second.codigo, '5096');
+      expect(second.precioUsd, 25);
+      expect(second.roundsPerBox, 25);
+      expect(second.stock, 8); // 200 balas / 25 por caja
+      expect(second.marca, 'STOPPING POWER');
+    });
+
     test('planilla PPU: encabezado partido con fila vacía en el medio', () {
       final rows = service.parseRows(_ppuReportBytes());
       expect(rows.length, 1);
@@ -499,6 +546,85 @@ void main() {
       final rows = ExcelCatalogService().parseRows(bytes);
       expect(rows.single['codigo'], '0034');
       expect(rows.single['marca'], 'CCI');
+    });
+  });
+
+  group('accesorios', () {
+    test('resolveProductType lee la columna tipo (accesorios/singular)', () {
+      expect(
+        ExcelCatalogService.resolveProductType(
+          tipoRaw: 'accesorios',
+          sheetName: 'Hoja',
+        ),
+        ProductType.accesorios,
+      );
+      expect(
+        ExcelCatalogService.resolveProductType(
+          tipoRaw: 'accesorio',
+          sheetName: 'Hoja',
+        ),
+        ProductType.accesorios,
+      );
+    });
+
+    test('resolveProductType infiere accesorios por nombre de hoja', () {
+      expect(
+        ExcelCatalogService.resolveProductType(
+          tipoRaw: '',
+          sheetName: 'Accesorios',
+        ),
+        ProductType.accesorios,
+      );
+      // Sin tipo ni hoja reconocida -> munición (planillas CCI).
+      expect(
+        ExcelCatalogService.resolveProductType(tipoRaw: '', sheetName: 'CCI'),
+        ProductType.municion,
+      );
+    });
+
+    test('parsea una fila de accesorio desde la columna tipo', () {
+      final bytes = _sheetBytes(
+        ['tipo', 'marca', 'codigo', 'descripcion', 'precio_usd', 'stock'],
+        [
+          ['accesorios', 'Accesorios', 'FUNDA-01', 'Funda Glock 19 cal. 9mm',
+            '45', '10'],
+        ],
+      );
+      final row = ExcelProductRow.fromMap(
+        ExcelCatalogService().parseRows(bytes).single,
+      );
+      expect(row.type, ProductType.accesorios);
+      expect(row.isAccesorios, isTrue);
+      expect(row.calibre, isEmpty);
+      expect(row.descripcion, contains('Funda Glock'));
+      expect(row.roundsPerBox, isNull);
+      final product = row.toNewProduct(0);
+      expect(product.type, ProductType.accesorios);
+      expect(product.roundsPerBox, isNull);
+    });
+
+    test('infiere accesorios desde el nombre de hoja si falta tipo', () {
+      final excel = Excel.createExcel();
+      final defaultName = excel.sheets.keys.first;
+      excel.rename(defaultName, 'Accesorios');
+      final sheet = excel['Accesorios'];
+      void put(int c, int r, String v) => sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r))
+          .value = TextCellValue(v);
+      put(0, 0, 'codigo');
+      put(1, 0, 'descripcion');
+      put(2, 0, 'precio_usd');
+      put(3, 0, 'stock');
+      put(0, 1, 'LINT-01');
+      put(1, 1, 'Linterna táctica');
+      put(2, 1, '80');
+      put(3, 1, '5');
+
+      final parsed = ExcelCatalogService()
+          .parseRows(Uint8List.fromList(excel.encode()!))
+          .single;
+      final row = ExcelProductRow.fromMap(parsed);
+      expect(row.type, ProductType.accesorios);
     });
   });
 }

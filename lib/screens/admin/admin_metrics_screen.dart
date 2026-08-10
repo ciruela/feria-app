@@ -147,6 +147,15 @@ class _AdminMetricsScreenState extends State<AdminMetricsScreen> {
                           icon: Icons.local_fire_department_rounded,
                           balas: _metrics!.municionBalas,
                         ),
+                        if (_metrics!.accesorios.units > 0) ...[
+                          const SizedBox(height: 10),
+                          _CategoryCard(
+                            label: 'Accesorios',
+                            metrics: _metrics!.accesorios,
+                            color: AppColors.accesorios,
+                            icon: Icons.category_rounded,
+                          ),
+                        ],
                         const SizedBox(height: 24),
                         const SectionHeader(
                           title: 'Formas de pago',

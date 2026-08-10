@@ -357,11 +357,13 @@ class CatalogService extends ChangeNotifier {
     final trimmedModelo = modelo.trim();
     final trimmedDescripcion = descripcion.trim();
     final isMunicion = type == ProductType.municion;
+    final isAccesorios = type == ProductType.accesorios;
 
     if (trimmedMarca.isEmpty) {
       throw ArgumentError('Completá la marca');
     }
-    if (trimmedCalibre.isEmpty) {
+    // Accesorios: el calibre es opcional (si aplica, va en la descripción).
+    if (trimmedCalibre.isEmpty && !isAccesorios) {
       throw ArgumentError('Completá el calibre');
     }
     if (precioUsd < 0) {
@@ -390,6 +392,9 @@ class CatalogService extends ChangeNotifier {
     if (!_canCreateFromRow(row)) {
       if (isArma) {
         throw ArgumentError('Completá modelo o ref. interna');
+      }
+      if (isAccesorios) {
+        throw ArgumentError('Completá el código o la descripción');
       }
       throw ArgumentError('Completá el código');
     }
@@ -521,6 +526,7 @@ class CatalogService extends ChangeNotifier {
       ProductType.municion => 'mun',
       ProductType.armaCorta => 'ac',
       ProductType.armaLarga => 'al',
+      ProductType.accesorios => 'acc',
     };
 
     // ID globalmente unico: en multi-tenant no puede ser secuencial por tenant

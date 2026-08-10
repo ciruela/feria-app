@@ -320,7 +320,7 @@ class _AdminProductEditScreenState extends State<AdminProductEditScreen> {
               border: OutlineInputBorder(),
             ),
           ),
-          if (product.isMunicion) ...[
+          if (product.isMunicion || product.isAccesorios) ...[
             const SizedBox(height: 12),
             TextField(
               controller: _descripcionController,
@@ -437,7 +437,8 @@ class _AdminProductEditScreenState extends State<AdminProductEditScreen> {
     }
 
     final calibre = _calibreController.text.trim();
-    if (calibre.isEmpty) {
+    // Accesorios: calibre opcional (si aplica, va en la descripción).
+    if (calibre.isEmpty && !product.isAccesorios) {
       _showError('Completá el calibre');
       return;
     }
@@ -470,8 +471,9 @@ class _AdminProductEditScreenState extends State<AdminProductEditScreen> {
       foto: '',
       fotoUrls: live.fotoUrls,
       modelo: product.isArma ? _modeloController.text.trim() : live.modelo,
-      descripcion:
-          product.isMunicion ? _descripcionController.text.trim() : live.descripcion,
+      descripcion: product.isMunicion || product.isAccesorios
+          ? _descripcionController.text.trim()
+          : live.descripcion,
       calibre: calibre,
       codigo: codigo,
       roundsPerBox: roundsPerBox,

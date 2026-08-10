@@ -3,15 +3,23 @@ import 'product_prices.dart';
 enum ProductType {
   municion('municion', 'Munición'),
   armaCorta('arma_corta', 'Armas cortas'),
-  armaLarga('arma_larga', 'Armas largas');
+  armaLarga('arma_larga', 'Armas largas'),
+  accesorios('accesorios', 'Accesorios');
 
   const ProductType(this.key, this.label);
 
   final String key;
   final String label;
 
+  /// Resuelve el tipo desde su clave. Si la clave es desconocida (p. ej. una
+  /// app vieja lee un tipo agregado después), NO crashea: cae en [municion],
+  /// el bucket genérico no-arma. Así un cliente desactualizado sigue mostrando
+  /// y vendiendo el producto en lugar de romper toda la pantalla.
   static ProductType fromKey(String key) {
-    return ProductType.values.firstWhere((type) => type.key == key);
+    return ProductType.values.firstWhere(
+      (type) => type.key == key,
+      orElse: () => ProductType.municion,
+    );
   }
 }
 
@@ -48,7 +56,8 @@ class Product {
   /// Rutas en Storage, ej. `arma_corta/ac-001/1734567890.jpg`
   final List<String> fotoUrls;
 
-  /// Saldo actual en unidades vendibles: armas = unidades, munición = cajas.
+  /// Saldo actual en unidades vendibles: armas/accesorios = unidades, munición
+  /// = cajas.
   final int? stock;
 
   /// Saldo inicial (misma unidad que [stock]). Se fija en la primera carga.
@@ -70,6 +79,8 @@ class Product {
       type == ProductType.armaCorta || type == ProductType.armaLarga;
 
   bool get isMunicion => type == ProductType.municion;
+
+  bool get isAccesorios => type == ProductType.accesorios;
 
   String get modeloDisplay => modelo.isNotEmpty ? modelo : codigo;
 

@@ -8,7 +8,8 @@ Pestañas de entrada:
                 fusiles/PCC/DEC = arma_larga). Efectivo/PVP en USD, cuotas en ARS.
   - Taurus    : idem Gral pero columnas corridas (precio en E, descripción en F).
   - BERSA     : pistolas agrupadas por calibre, con variantes por acabado. ARS.
-  - Accesorios: munición (cajas). ARS.
+  - Accesorios: munición 3DURBAN (cajas, ARS -> tipo municion) + accesorios
+                (fundas/linternas/etc., USD -> tipo accesorios).
 
 Salida: un único sheet "Catalogo" con encabezados canónicos + precios fijos.
 
@@ -24,7 +25,7 @@ import zipfile
 
 import openpyxl
 
-TC = 1570.0  # tipo de cambio del Excel (celda R2 "TC:")
+TC = 1570.0  # tipo de cambio del Excel (celda R2 "TC:"); se lee dinámicamente en main()
 
 OUT_HEADERS = [
     "tipo", "marca", "calibre", "modelo", "codigo", "descripcion",
@@ -142,6 +143,20 @@ def rows_gral_taurus(wb, sheet, desc_col, price_lista_col):
     return out
 
 
+def bersa_calibre(model, section_cal):
+    """Corrige el calibre de BERSA cuando la armería agrupó modelos bajo una
+    sección equivocada. En el Excel no hay secciones ".40" ni ".45": los TPR40 y
+    TPR45 quedan bajo "CALIBRE 9x19 MM". El nombre del modelo sí trae el calibre
+    (TPR40, TPR45), así que lo derivamos de ahí. Si no hay match, se respeta la
+    sección (fiel al Excel)."""
+    m = (model or "").upper()
+    if re.search(r"(?<!\d)45(?!\d)", m):
+        return ".45 ACP"
+    if re.search(r"(?<!\d)40(?!\d)", m):
+        return ".40 S&W"
+    return section_cal
+
+
 def rows_bersa(wb):
     ws = wb["BERSA"]
     out = []
@@ -179,7 +194,7 @@ def rows_bersa(wb):
             out.append({
                 "tipo": "arma_corta",
                 "marca": "BERSA",
-                "calibre": current_cal,
+                "calibre": bersa_calibre(current_model, current_cal),
                 "modelo": modelo or current_model,
                 "codigo": f,
                 "descripcion": current_desc or modelo,
@@ -212,38 +227,120 @@ def parse_accesorio_name(name):
 
 
 def rows_accesorios(wb):
+    """Hoja "Accesorios". Mezcla dos cosas y las separa fielmente:
+
+    - Munición 3DURBAN (cajas, precio en ARS) -> tipo `municion` (código ACC-xx).
+    - Accesorios (fundas, linternas, etc., cotizados en USD) -> tipo `accesorios`
+      (código ACCS-xx). Antes se descartaban; ahora la app tiene el tipo.
+
+    Layout nuevo:  A=SKU B=MARCA C=MODELO(nombre) D=DESCRIPCION E=STOCK
+                   G=PVP TARJETA  H=EFECTIVO/TRANSFERENCIA
+    Layout viejo:  A=nombre B=stock D=pvp  (solo munición; sin accesorios).
+    """
     ws = wb["Accesorios"]
+    # El encabezado puede estar en la fila 1 o 2 según la versión del Excel.
+    header_row = 1
+    for hr in range(1, 6):
+        vals = [txt(cell(ws, hr, c)).upper() for c in range(1, ws.max_column + 1)]
+        if "MODELO" in vals or "SKU" in vals or "DESCRIPCION" in vals:
+            header_row = hr
+            break
+    header = [txt(cell(ws, header_row, c)).upper() for c in range(1, ws.max_column + 1)]
+    nuevo = "MODELO" in header  # encabezado del formato nuevo
+
     out = []
-    idx = 0
-    for r in range(2, ws.max_row + 1):
-        name = txt(cell(ws, r, 1))
-        if not name:
+    idx_ammo = 0
+    idx_acc = 0
+    for r in range(header_row + 1, ws.max_row + 1):
+        if nuevo:
+            marca = txt(cell(ws, r, 2))
+            name = txt(cell(ws, r, 3))
+            stock = num(cell(ws, r, 5))
+            col_tarjeta = num(cell(ws, r, 7))   # PVP TARJETA
+            col_efectivo = num(cell(ws, r, 8))  # EFECTIVO/TRANSFERENCIA
+            if not name:
+                continue
+            # La munición 3DURBAN cotiza en ARS; el precio cambió de columna
+            # entre versiones del Excel (PVP TARJETA -> EFECTIVO), tomamos la que
+            # tenga valor. Los accesorios cotizan en USD (misma columna).
+            up = name.upper()
+            is_ammo = (marca.upper() == "3DURBAN"
+                       or "CAJA" in up or "MUNIC" in up)
+            precio_col = col_tarjeta if col_tarjeta is not None else col_efectivo
+        else:
+            marca = ""
+            name = txt(cell(ws, r, 1))
+            stock = num(cell(ws, r, 2))
+            if not name:
+                continue
+            # Layout viejo: solo munición.
+            is_ammo = True
+            precio_col = num(cell(ws, r, 4))
+        if precio_col is None:
             continue
-        stock = num(cell(ws, r, 2))
-        pvp = num(cell(ws, r, 4))
-        if pvp is None:
-            continue
-        idx += 1
-        calibre, rounds = parse_accesorio_name(name)
-        out.append({
-            "tipo": "municion",
-            "marca": "Munición",
-            "calibre": calibre,
-            "modelo": "",
-            "codigo": f"ACC-{idx:02d}",
-            "descripcion": clean_desc(name),
-            "precio_usd": 0,
-            "stock": int(stock) if stock is not None else None,
-            "stock_inicial": int(stock) if stock is not None else None,
-            "efectivo_ars": round(pvp, 2),
-            "efectivo_usd": None,
-            "tarjeta_ars": round(pvp, 2),
-            "cuota3_ars": None,
-            "cuota6_ars": None,
-            "cuota12_ars": None,
-            "balas_por_caja": rounds,
-        })
+        stock_int = int(stock) if stock is not None else None
+
+        if is_ammo:
+            idx_ammo += 1
+            calibre, rounds = parse_accesorio_name(name)
+            precio_ars = round(precio_col, 2)
+            out.append({
+                "tipo": "municion",
+                "marca": "Munición",
+                "calibre": calibre,
+                "modelo": "",
+                "codigo": f"ACC-{idx_ammo:02d}",
+                "descripcion": clean_desc(name),
+                "precio_usd": 0,
+                "stock": stock_int,
+                "stock_inicial": stock_int,
+                "efectivo_ars": precio_ars,
+                "efectivo_usd": None,
+                "tarjeta_ars": precio_ars,
+                "cuota3_ars": None,
+                "cuota6_ars": None,
+                "cuota12_ars": None,
+                "balas_por_caja": rounds,
+            })
+        else:
+            # Accesorio: cotizado en USD. Fiel al Excel = guardamos la referencia
+            # en USD y su equivalente en ARS al TC del propio Excel (igual que las
+            # armas Gral/Taurus). La app muestra estos montos, no recalcula.
+            idx_acc += 1
+            precio_usd = round(precio_col, 2)
+            precio_ars = round(precio_col * TC, 2)
+            out.append({
+                "tipo": "accesorios",
+                "marca": marca or "Accesorios",
+                "calibre": "",
+                "modelo": "",
+                "codigo": f"ACCS-{idx_acc:02d}",
+                "descripcion": clean_desc(name),
+                "precio_usd": precio_usd,
+                "stock": stock_int,
+                "stock_inicial": stock_int,
+                "efectivo_ars": precio_ars,
+                "efectivo_usd": precio_usd,
+                "tarjeta_ars": None,
+                "cuota3_ars": None,
+                "cuota6_ars": None,
+                "cuota12_ars": None,
+            })
+    if idx_acc:
+        print(f"Accesorios (tipo accesorios) emitidos: {idx_acc}")
     return out
+
+
+def read_tc(wb, default=1570.0):
+    """Lee el TC del Excel (label 'TC:' en la cabecera de Gral, valor a la derecha)."""
+    ws = wb["Gral"]
+    for r in range(1, 5):
+        for c in range(1, ws.max_column + 1):
+            if txt(cell(ws, r, c)).upper().startswith("TC"):
+                val = num(cell(ws, r, c + 1))
+                if val:
+                    return val
+    return default
 
 
 def _xlsx_cell(v):
@@ -295,6 +392,9 @@ def main():
         "/Users/abritos/Downloads/urban_catalog_clean.xlsx"
 
     wb = openpyxl.load_workbook(src, data_only=True)
+    global TC
+    TC = read_tc(wb)
+    print(f"TC del Excel: {TC}")
     products = []
     products += rows_gral_taurus(wb, "Gral", desc_col=5, price_lista_col=6)
     products += rows_gral_taurus(wb, "Taurus", desc_col=6, price_lista_col=5)

@@ -59,6 +59,7 @@ class DaySalesMetrics {
     this.armaCorta = const CategoryMetrics(),
     this.armaLarga = const CategoryMetrics(),
     this.municion = const CategoryMetrics(),
+    this.accesorios = const CategoryMetrics(),
     this.municionBalas = 0,
     this.payments = const [],
     this.sellers = const [],
@@ -72,6 +73,7 @@ class DaySalesMetrics {
   final CategoryMetrics armaCorta;
   final CategoryMetrics armaLarga;
   final CategoryMetrics municion;
+  final CategoryMetrics accesorios;
 
   /// Balas vendidas de munición (cajas × balas por caja). El conteo de cajas
   /// vive en [municion.units]; esto lo deriva con el `roundsPerBox` del catálogo.
@@ -81,7 +83,7 @@ class DaySalesMetrics {
   final List<SaleRecord> sales;
 
   int get totalUnits =>
-      armaCorta.units + armaLarga.units + municion.units;
+      armaCorta.units + armaLarga.units + municion.units + accesorios.units;
 
   /// [roundsPerBoxOf] resuelve balas por caja de munición (0 si desconocido);
   /// sin él, [municionBalas] queda en 0 y solo se cuentan cajas.
@@ -95,6 +97,7 @@ class DaySalesMetrics {
     var corta = const CategoryMetrics();
     var larga = const CategoryMetrics();
     var muni = const CategoryMetrics();
+    var acc = const CategoryMetrics();
     var muniBalas = 0;
     final paymentMap = <String, PaymentMetrics>{};
     final sellerMap = <String, SellerMetrics>{};
@@ -135,6 +138,8 @@ class DaySalesMetrics {
             corta = corta.merge(category);
           case 'arma_larga':
             larga = larga.merge(category);
+          case 'accesorios':
+            acc = acc.merge(category);
           default:
             muni = muni.merge(category);
             final rpb = roundsPerBoxOf?.call(line.productId) ?? 0;
@@ -168,6 +173,7 @@ class DaySalesMetrics {
       armaCorta: corta,
       armaLarga: larga,
       municion: muni,
+      accesorios: acc,
       municionBalas: muniBalas,
       payments: payments,
       sellers: sellers,

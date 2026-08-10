@@ -55,6 +55,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         return AppColors.armaLarga;
       case ProductType.municion:
         return AppColors.municion;
+      case ProductType.accesorios:
+        return AppColors.accesorios;
     }
   }
 

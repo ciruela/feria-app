@@ -117,6 +117,54 @@ class ExcelCatalogService {
     return t;
   }
 
+  /// Resuelve el [ProductType] de una fila:
+  /// 1) columna `tipo` explícita (`accesorios`, `municion`, `arma_corta`,
+  ///    `arma_larga`);
+  /// 2) si `tipo` está vacío, lo infiere del nombre de la hoja ("Accesorios");
+  /// 3) por defecto munición (planillas CCI vienen sin columna `tipo`).
+  static ProductType resolveProductType({
+    required String? tipoRaw,
+    required String? sheetName,
+  }) {
+    final typeKey = (tipoRaw ?? '').trim().toLowerCase();
+    if (typeKey.isNotEmpty) {
+      return _productTypeFromKey(typeKey);
+    }
+    return _productTypeFromSheetName(sheetName) ?? ProductType.municion;
+  }
+
+  static ProductType _productTypeFromKey(String typeKey) {
+    switch (typeKey) {
+      case 'municion':
+      case 'munición':
+        return ProductType.municion;
+      case 'arma_corta':
+        return ProductType.armaCorta;
+      case 'arma_larga':
+        return ProductType.armaLarga;
+      case 'accesorio':
+      case 'accesorios':
+        return ProductType.accesorios;
+      default:
+        throw FormatException('Tipo inválido: $typeKey');
+    }
+  }
+
+  static ProductType? _productTypeFromSheetName(String? sheetName) {
+    final normalized = (sheetName ?? '')
+        .trim()
+        .toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u');
+    if (normalized == 'accesorio' || normalized == 'accesorios') {
+      return ProductType.accesorios;
+    }
+    return null;
+  }
+
   /// Mapea encabezados libres (CCI, mayúsculas, acentos) a claves canónicas.
   static String? _canonicalHeader(String raw) {
     final h = raw
@@ -131,8 +179,9 @@ class ExcelCatalogService {
         .replaceAll('ú', 'u');
 
     if (h.isEmpty) return null;
-    // Precio: flexible (planillas CCI, export propio, armerías).
+    // Precio: flexible (planillas CCI, Stopping Power, export propio, armerías).
     if (h.startsWith('precio')) return 'precio_usd';
+    if (h.contains('dolar')) return 'precio_usd'; // "Dolares u$s", "Dólares", etc.
     if (h == 'usd' ||
         h == 'u\$d' ||
         h == 'u\$s' ||
@@ -191,10 +240,12 @@ class ExcelCatalogService {
       case 'caja x':
       case 'caja_x':
       case 'cajax':
+      case 'caja por':
       case 'balas/caja':
       case 'x caja':
       case 'unidades por caja':
       case 'u/caja':
+      case 'por': // Stopping Power: columna "por" = balas/caja
         return 'balas_por_caja';
       case 'stock':
       case 'cajas':
@@ -212,6 +263,7 @@ class ExcelCatalogService {
       case 'total balas':
       case 'balas':
       case 'balas_total':
+      case 'mayorista': // Stopping Power: total de balas
         return 'total_balas';
       case 'stock_inicial':
       case 'inicial':
@@ -567,22 +619,15 @@ class ExcelProductRow {
 
   bool get isMunicion => type == ProductType.municion;
 
+  bool get isAccesorios => type == ProductType.accesorios;
+
   factory ExcelProductRow.fromMap(Map<String, String> data) {
-    // tipo: si falta, se asume munición (planillas CCI son munición).
-    final typeKey = data['tipo']?.trim().toLowerCase() ?? '';
-    ProductType type;
-    switch (typeKey) {
-      case '':
-      case 'municion':
-      case 'munición':
-        type = ProductType.municion;
-      case 'arma_corta':
-        type = ProductType.armaCorta;
-      case 'arma_larga':
-        type = ProductType.armaLarga;
-      default:
-        throw FormatException('Tipo inválido: $typeKey');
-    }
+    // tipo: columna explícita, si falta se infiere de la hoja, y por último
+    // munición (planillas CCI son munición y no traen columna `tipo`).
+    final type = ExcelCatalogService.resolveProductType(
+      tipoRaw: data['tipo'],
+      sheetName: data['_sheet'],
+    );
 
     final precio = _parsePrice(data['precio_usd']);
 

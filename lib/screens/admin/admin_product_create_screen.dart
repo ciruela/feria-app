@@ -33,6 +33,8 @@ class _AdminProductCreateScreenState extends State<AdminProductCreateScreen> {
 
   bool get _isMunicion => _type == ProductType.municion;
 
+  bool get _isAccesorios => _type == ProductType.accesorios;
+
   @override
   void dispose() {
     _marcaController.dispose();
@@ -217,17 +219,19 @@ class _AdminProductCreateScreenState extends State<AdminProductCreateScreen> {
                 border: OutlineInputBorder(),
               ),
             ),
-          if (_isMunicion) ...[
+          if (_isMunicion || _isAccesorios) ...[
             const SizedBox(height: 12),
             TextField(
               controller: _descripcionController,
               textCapitalization: TextCapitalization.characters,
               inputFormatters: UpperCaseTextFormatter.formatters,
               enabled: !_saving,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Descripción (opcional)',
-                hintText: 'Ej: C.22 LR VARMINT V-MAX 30GR',
-                border: OutlineInputBorder(),
+                hintText: _isAccesorios
+                    ? 'Ej: FUNDA GLOCK 19 / LINTERNA TÁCTICA'
+                    : 'Ej: C.22 LR VARMINT V-MAX 30GR',
+                border: const OutlineInputBorder(),
               ),
             ),
           ],

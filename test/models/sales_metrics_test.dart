@@ -86,4 +86,32 @@ void main() {
     expect(metrics.municion.units, 2);
     expect(metrics.municionBalas, 0);
   });
+
+  test('accesorios tienen su propio bucket (no se mezclan con munición)', () {
+    final sale = SaleRecord(
+      id: 'acc',
+      createdAt: DateTime(2026, 7, 25, 12, 0),
+      sellerName: 'Vendedor',
+      totalArs: 78500,
+      clienteNombre: 'Cliente',
+      lines: [
+        const SaleLineRecord(
+          productId: 'acc-1',
+          quantity: 3,
+          lineArs: 78500,
+          lineUsd: 0,
+          paymentMethod: 'efectivo',
+          isArma: false,
+          productType: 'accesorios',
+        ),
+      ],
+    );
+
+    final metrics = DaySalesMetrics.fromSales(day, [sale]);
+
+    expect(metrics.accesorios.units, 3);
+    expect(metrics.accesorios.ars, 78500);
+    expect(metrics.municion.units, 0);
+    expect(metrics.totalUnits, 3);
+  });
 }

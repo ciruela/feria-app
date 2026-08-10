@@ -40,6 +40,8 @@ class ProductCard extends StatelessWidget {
         return AppColors.armaLarga;
       case ProductType.municion:
         return AppColors.municion;
+      case ProductType.accesorios:
+        return AppColors.accesorios;
     }
   }
 
