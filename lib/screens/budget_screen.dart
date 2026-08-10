@@ -437,7 +437,13 @@ class _BudgetScreenState extends State<BudgetScreen> {
   Widget build(BuildContext context) {
     final cart = context.watch<CartService>();
     final budget = _buildBudget(cart);
-    final checkoutConfigured = cart.hasCheckoutPayment;
+    // Con medio de pago por línea, el total sale de las líneas (allocation-aware),
+    // no del método global del checkout.
+    final hasPerLineMethods =
+        cart.items.any((item) => item.paymentMethod != null);
+    // El comprobante queda habilitado con medio global O con medios por renglón
+    // (mismo criterio que el gate del carrito), para no pedirlo dos veces.
+    final checkoutConfigured = cart.hasCheckoutPayment || hasPerLineMethods;
     final exchangeRate = context.watch<ExchangeRateService>();
     final seller = context.watch<SellerService>().selected;
     final isDesktop =
@@ -461,10 +467,6 @@ class _BudgetScreenState extends State<BudgetScreen> {
                 )
             : null;
 
-    // Con medio de pago por línea, el total sale de las líneas (allocation-aware),
-    // no del método global del checkout.
-    final hasPerLineMethods =
-        cart.items.any((item) => item.paymentMethod != null);
     final displayTotalArs = hasPerLineMethods
         ? budget.totalArsLines
         : (checkoutTotal?.ars ?? listaTotal.ars);

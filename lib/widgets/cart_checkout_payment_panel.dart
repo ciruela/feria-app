@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../config/payment_config.dart';
 import '../models/cart_checkout_payment.dart';
 import '../models/product_prices.dart';
 import '../services/cart_service.dart';
@@ -33,6 +34,8 @@ class CartCheckoutPaymentPanel extends StatelessWidget {
     final pricingSettings = context.watch<PricingSettingsService>();
     final totalsService = context.read<CartTotalsService>();
     final checkout = cart.checkoutPayment;
+    final hasPerLineMethods =
+        cart.items.any((item) => item.paymentMethod != null);
 
     return Material(
       color: raisedSurface ? AppColors.surfaceRaised : AppColors.surfaceTouch,
@@ -66,9 +69,10 @@ class CartCheckoutPaymentPanel extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              if (checkout == null)
+              if (checkout == null && !hasPerLineMethods)
                 const Text(
-                  'Definí una o dos formas de pago para toda la venta.',
+                  'Elegí el medio de pago general de la venta. '
+                  'Podés ajustar productos puntuales desde su renglón.',
                   style: AppText.bodySmall,
                 )
               else
@@ -98,7 +102,7 @@ class _CheckoutSummary extends StatelessWidget {
     this.budgetHandoff = false,
   });
 
-  final CartCheckoutPayment checkout;
+  final CartCheckoutPayment? checkout;
   final CartService cart;
   final ExchangeRateService exchangeRate;
   final PricingSettingsService pricingSettings;
@@ -124,7 +128,7 @@ class _CheckoutSummary extends StatelessWidget {
     if (hasPerLineMethods) {
       allocations = totalsService.allocationsForCart(
         cart: cart,
-        fallbackMethod: checkout.pricingMethod,
+        fallbackMethod: checkout?.pricingMethod ?? defaultPaymentMethod,
         exchangeRate: exchangeRate,
         pricingSettings: pricingSettings,
       );
@@ -135,17 +139,20 @@ class _CheckoutSummary extends StatelessWidget {
       );
       deltaLabel = formatSignedArsDelta(pricedArs - listaTotal.ars);
     } else {
+      // Sin medios por renglón siempre hay checkout global (el panel no llama
+      // a este resumen si ambos faltan).
+      final method = checkout!.pricingMethod;
       final total = totalsService.cartTotalAtMethod(
         cart: cart,
-        method: checkout.pricingMethod,
+        method: method,
         exchangeRate: exchangeRate,
         pricingSettings: pricingSettings,
       );
       allocations = totalsService.allocationsFor(
-        checkout: checkout,
+        checkout: checkout!,
         total: total,
       );
-      deltaLabel = checkout.pricingMethod.isUsdPayment
+      deltaLabel = method.isUsdPayment
           ? formatSignedUsdDelta(total.usd - listaTotal.usd)
           : formatSignedArsDelta(total.ars - listaTotal.ars);
     }
