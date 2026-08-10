@@ -1262,6 +1262,14 @@ class CatalogService extends ChangeNotifier {
             case PostgresChangeEvent.update:
               final record = payload.newRecord;
               if (record.isEmpty) return;
+              // Borrado lógico (AR-23): activo=false llega como UPDATE por
+              // realtime; hay que sacarlo de la lista en vez de re-agregarlo.
+              final activo = record['activo'];
+              if (activo == false || activo == 0) {
+                final id = record['id'] as String?;
+                if (id != null) _removeRemoteProduct(id);
+                return;
+              }
               _applyRemoteProduct(
                 _supabaseCatalog.productFromRow(record),
               );
