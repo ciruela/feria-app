@@ -20,7 +20,6 @@ class CartCheckoutPaymentMobileContent extends StatelessWidget {
     required this.pricingSettings,
     required this.totalsService,
     required this.onSelectSingle,
-    required this.onOpenDualPayment,
     required this.onConfirm,
     this.methods = checkoutDialogPaymentMethods,
     this.scrollController,
@@ -33,7 +32,6 @@ class CartCheckoutPaymentMobileContent extends StatelessWidget {
   final PricingSettingsService pricingSettings;
   final CartTotalsService totalsService;
   final ValueChanged<PaymentMethod> onSelectSingle;
-  final VoidCallback onOpenDualPayment;
   final VoidCallback onConfirm;
   final List<PaymentMethod> methods;
   final ScrollController? scrollController;
@@ -57,30 +55,13 @@ class CartCheckoutPaymentMobileContent extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Define el precio de referencia del comprobante. '
-                'Si hace falta, dividí el cobro en dos formas y repartí '
-                'el monto de lista entre ambas.',
+                'Es el medio general de la venta. '
+                'Si un producto abona distinto, cambiá su medio desde el '
+                'chip en cada renglón del carrito.',
                 textAlign: TextAlign.center,
                 style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
               ),
             ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: onOpenDualPayment,
-              icon: const Icon(Icons.swap_horiz_rounded, size: 18),
-              label: const Text('Pagar en dos formas'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.textPrimary,
-                side: const BorderSide(color: AppColors.border),
-                minimumSize: const Size.fromHeight(44),
-              ),
-            ),
           ),
         ),
         const SizedBox(height: 16),
