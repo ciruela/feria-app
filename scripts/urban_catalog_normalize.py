@@ -8,8 +8,8 @@ Pestañas de entrada:
                 fusiles/PCC/DEC = arma_larga). Efectivo/PVP en USD, cuotas en ARS.
   - Taurus    : idem Gral pero columnas corridas (precio en E, descripción en F).
   - BERSA     : pistolas agrupadas por calibre, con variantes por acabado. ARS.
-  - Accesorios: munición 3DURBAN (cajas, ARS -> tipo municion) + accesorios
-                (fundas/linternas/etc., USD -> tipo accesorios).
+  - Accesorios: todo -> tipo accesorios. Cajas 3DURBAN (ARS) + fundas/linternas/
+                cargadores/etc. (USD). Urban no llevó munición a la feria.
 
 Salida: un único sheet "Catalogo" con encabezados canónicos + precios fijos.
 
@@ -227,15 +227,18 @@ def parse_accesorio_name(name):
 
 
 def rows_accesorios(wb):
-    """Hoja "Accesorios". Mezcla dos cosas y las separa fielmente:
+    """Hoja "Accesorios". TODO sale como tipo `accesorios` (Urban no llevó
+    munición a la feria). La única diferencia es la moneda del precio:
 
-    - Munición 3DURBAN (cajas, precio en ARS) -> tipo `municion` (código ACC-xx).
-    - Accesorios (fundas, linternas, etc., cotizados en USD) -> tipo `accesorios`
-      (código ACCS-xx). Antes se descartaban; ahora la app tiene el tipo.
+    - Cajas 3DURBAN (cotizan en ARS) -> tipo `accesorios`, precio en ARS,
+      código ACC-xx. Son "cajas de municiones", pero se venden por unidad como
+      accesorios, no como el tipo regulado `municion`.
+    - Fundas, linternas, cargadores, etc. (cotizan en USD) -> tipo `accesorios`,
+      precio USD + equivalente ARS al TC, código ACCS-xx.
 
     Layout nuevo:  A=SKU B=MARCA C=MODELO(nombre) D=DESCRIPCION E=STOCK
                    G=PVP TARJETA  H=EFECTIVO/TRANSFERENCIA
-    Layout viejo:  A=nombre B=stock D=pvp  (solo munición; sin accesorios).
+    Layout viejo:  A=nombre B=stock D=pvp.
     """
     ws = wb["Accesorios"]
     # El encabezado puede estar en la fila 1 o 2 según la versión del Excel.
@@ -281,13 +284,16 @@ def rows_accesorios(wb):
         stock_int = int(stock) if stock is not None else None
 
         if is_ammo:
+            # 3DURBAN vende "cajas de municiones" cotizadas en ARS. Urban NO
+            # llevó munición a la feria: estas cajas se venden como ACCESORIOS
+            # (por unidad), NO como tipo `municion`. Se mantiene el código ACC-xx
+            # para que un re-import sea idempotente si ya existían en la base.
             idx_ammo += 1
-            calibre, rounds = parse_accesorio_name(name)
             precio_ars = round(precio_col, 2)
             out.append({
-                "tipo": "municion",
-                "marca": "Munición",
-                "calibre": calibre,
+                "tipo": "accesorios",
+                "marca": marca or "3DURBAN",
+                "calibre": "",
                 "modelo": "",
                 "codigo": f"ACC-{idx_ammo:02d}",
                 "descripcion": clean_desc(name),
@@ -296,14 +302,13 @@ def rows_accesorios(wb):
                 "stock_inicial": stock_int,
                 "efectivo_ars": precio_ars,
                 "efectivo_usd": None,
-                "tarjeta_ars": precio_ars,
+                "tarjeta_ars": None,
                 "cuota3_ars": None,
                 "cuota6_ars": None,
                 "cuota12_ars": None,
-                "balas_por_caja": rounds,
             })
         else:
-            # Accesorio: cotizado en USD. Fiel al Excel = guardamos la referencia
+            # Accesorio cotizado en USD. Fiel al Excel = guardamos la referencia
             # en USD y su equivalente en ARS al TC del propio Excel (igual que las
             # armas Gral/Taurus). La app muestra estos montos, no recalcula.
             idx_acc += 1
@@ -326,8 +331,10 @@ def rows_accesorios(wb):
                 "cuota6_ars": None,
                 "cuota12_ars": None,
             })
-    if idx_acc:
-        print(f"Accesorios (tipo accesorios) emitidos: {idx_acc}")
+    total = idx_ammo + idx_acc
+    if total:
+        print(f"Accesorios emitidos: {total} "
+              f"({idx_ammo} cajas 3DURBAN en ARS + {idx_acc} en USD)")
     return out
 
 

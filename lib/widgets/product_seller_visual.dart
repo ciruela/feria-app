@@ -81,45 +81,58 @@ class _CodeThumb extends StatelessWidget {
         borderRadius: AppDecorations.radiusMd,
         border: Border.all(color: accent.withValues(alpha: 0.45)),
       ),
-      padding: const EdgeInsets.all(6),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            product.isMunicion
-                ? Icons.inventory_2_outlined
-                : Icons.sports_martial_arts_outlined,
-            color: accent,
-            size: size * 0.24,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            code,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: size * 0.17,
-              fontWeight: FontWeight.w900,
-              color: AppColors.primary,
-              height: 1.05,
+      padding: EdgeInsets.all(size < 48 ? 3 : 6),
+      // FittedBox evita el overflow cuando la miniatura se usa en tamaños
+      // chicos (p. ej. 30x30 como placeholder de foto): escala el contenido
+      // para que entre. En tamaños grandes no escala y se ve igual que antes.
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              product.isMunicion
+                  ? Icons.inventory_2_outlined
+                  : Icons.sports_martial_arts_outlined,
+              color: accent,
+              size: size * 0.24,
             ),
-          ),
-          if (product.calibre.isNotEmpty) ...[
-            const SizedBox(height: 2),
-            Text(
-              product.calibre,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: size * 0.11,
-                fontWeight: FontWeight.w700,
-                color: accent.withValues(alpha: 0.9),
+            const SizedBox(height: 4),
+            SizedBox(
+              width: size * 0.82,
+              child: Text(
+                code,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: size * 0.17,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.primary,
+                  height: 1.05,
+                ),
               ),
             ),
+            if (product.calibre.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              SizedBox(
+                width: size * 0.82,
+                child: Text(
+                  product.calibre,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: size * 0.11,
+                    fontWeight: FontWeight.w700,
+                    color: accent.withValues(alpha: 0.9),
+                  ),
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

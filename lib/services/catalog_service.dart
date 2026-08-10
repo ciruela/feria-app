@@ -944,6 +944,11 @@ class CatalogService extends ChangeNotifier {
           return product;
         }
       }
+      // Los accesorios traen SKU único: si no matcheó por código, es un
+      // producto distinto. NO usar el fallback por marca+descripción, que
+      // fusionaría variantes que comparten nombre (ej. dos "bolso specialist"
+      // con SKU distinto).
+      if (row.type == ProductType.accesorios) return null;
     }
 
     for (final product in _products) {

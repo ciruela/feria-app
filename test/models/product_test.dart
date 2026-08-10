@@ -63,6 +63,8 @@ void main() {
       // Accesorio se vende por unidad y muestra su descripción en el carrito.
       expect(acc.cartQuantityUnit, 'unidades');
       expect(acc.cartDisplayDescription, 'Funda Glock 19');
+      // Sin `modelo`, el título del accesorio es su nombre (no el código).
+      expect(acc.modeloDisplay, 'Funda Glock 19');
     });
 
     test('modeloDisplay cae al código si no hay modelo', () {

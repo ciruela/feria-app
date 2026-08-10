@@ -366,6 +366,11 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                   onTap: () => _setTypeFilter(ProductType.municion),
                 ),
                 _TypeChip(
+                  label: 'ACCESORIOS',
+                  selected: _typeFilter == ProductType.accesorios,
+                  onTap: () => _setTypeFilter(ProductType.accesorios),
+                ),
+                _TypeChip(
                   label: 'STOCK BAJO',
                   selected: _lowStockOnly,
                   onTap: _toggleLowStock,

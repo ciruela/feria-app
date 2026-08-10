@@ -20,7 +20,6 @@ class CatalogMobileLayout extends StatelessWidget {
     required this.searchController,
     required this.searchFocus,
     required this.typeFilter,
-    this.hasAccesorios = false,
     required this.marcaOptions,
     required this.calibreOptions,
     required this.marcaFilter,
@@ -44,7 +43,6 @@ class CatalogMobileLayout extends StatelessWidget {
   final TextEditingController searchController;
   final FocusNode searchFocus;
   final ProductType? typeFilter;
-  final bool hasAccesorios;
   final List<String> marcaOptions;
   final List<String> calibreOptions;
   final String? marcaFilter;
@@ -157,7 +155,6 @@ class CatalogMobileLayout extends StatelessWidget {
         CatalogCategoryChips(
           selected: typeFilter,
           onSelected: onTypeChanged,
-          hasAccesorios: hasAccesorios,
         ),
         const SizedBox(height: 10),
         CatalogFilterBar(

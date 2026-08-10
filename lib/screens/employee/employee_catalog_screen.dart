@@ -211,7 +211,6 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
     final sellerInitial = sellerName.isNotEmpty ? sellerName[0].toUpperCase() : '?';
     final marcaOptions = _marcaOptions(catalog);
     final calibreOptions = _calibreOptions(catalog);
-    final hasAccesorios = available.any((p) => p.isAccesorios);
 
     final catalogBody = _CatalogDesktopBody(
       products: products,
@@ -220,7 +219,6 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
       searchController: _searchController,
       searchFocus: _searchFocus,
       typeFilter: _typeFilter,
-      hasAccesorios: hasAccesorios,
       marcaOptions: marcaOptions,
       calibreOptions: calibreOptions,
       marcaFilter: _marcaFilter,
@@ -255,7 +253,6 @@ class _EmployeeCatalogScreenState extends State<EmployeeCatalogScreen> {
           searchController: _searchController,
           searchFocus: _searchFocus,
           typeFilter: _typeFilter,
-          hasAccesorios: hasAccesorios,
           marcaOptions: marcaOptions,
           calibreOptions: calibreOptions,
           marcaFilter: _marcaFilter,
@@ -294,7 +291,6 @@ class _CatalogDesktopBody extends StatelessWidget {
     required this.searchController,
     required this.searchFocus,
     required this.typeFilter,
-    required this.hasAccesorios,
     required this.marcaOptions,
     required this.calibreOptions,
     required this.marcaFilter,
@@ -316,7 +312,6 @@ class _CatalogDesktopBody extends StatelessWidget {
   final TextEditingController searchController;
   final FocusNode searchFocus;
   final ProductType? typeFilter;
-  final bool hasAccesorios;
   final List<String> marcaOptions;
   final List<String> calibreOptions;
   final String? marcaFilter;
@@ -352,7 +347,6 @@ class _CatalogDesktopBody extends StatelessWidget {
           selected: typeFilter,
           onSelected: onTypeChanged,
           desktopHandoff: true,
-          hasAccesorios: hasAccesorios,
         ),
         const SizedBox(height: 10),
         CatalogFilterBar(

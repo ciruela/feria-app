@@ -82,7 +82,15 @@ class Product {
 
   bool get isAccesorios => type == ProductType.accesorios;
 
-  String get modeloDisplay => modelo.isNotEmpty ? modelo : codigo;
+  String get modeloDisplay {
+    if (modelo.isNotEmpty) return modelo;
+    // Los accesorios no tienen `modelo`; su nombre vive en `descripcion`.
+    // Así el título de la card es el nombre real y no el código interno.
+    if (isAccesorios && descripcion.trim().isNotEmpty) {
+      return descripcion.trim();
+    }
+    return codigo;
+  }
 
   /// Texto para que el vendedor identifique el ítem en carrito / venta.
   String get cartDisplayDescription {
