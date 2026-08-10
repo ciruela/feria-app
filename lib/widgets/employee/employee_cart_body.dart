@@ -116,9 +116,17 @@ class EmployeeCartBody extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Carrito',
-                  style: AppText.heading.copyWith(fontSize: compact ? 20 : 26),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Carrito',
+                        style:
+                            AppText.heading.copyWith(fontSize: compact ? 20 : 26),
+                      ),
+                    ),
+                    const ClearCartButton(),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -209,6 +217,61 @@ class EmployeeCartBody extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+/// Botón "Vaciar" que resetea carrito + forma de pago + datos del cliente
+/// (nueva venta). Pensado para el header de cualquier superficie del carrito.
+class ClearCartButton extends StatelessWidget {
+  const ClearCartButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      onPressed: () => confirmClearCart(context),
+      icon: const Icon(Icons.delete_outline, size: 18),
+      label: const Text('Vaciar'),
+      style: TextButton.styleFrom(
+        foregroundColor: AppColors.textMuted,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        minimumSize: const Size(0, 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
+}
+
+/// Pide confirmación y, si el usuario acepta, vacía el carrito y borra los
+/// datos del cliente cargados. Acción destructiva: siempre confirmar.
+Future<void> confirmClearCart(BuildContext context) async {
+  final cart = context.read<CartService>();
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      backgroundColor: AppColors.surfaceRaised,
+      title: const Text('Vaciar carrito'),
+      content: const Text(
+        'Se van a borrar los productos, la forma de pago y los datos del '
+        'cliente cargados. Esta acción no se puede deshacer.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.danger,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('Vaciar'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true) {
+    cart.clear();
   }
 }
 

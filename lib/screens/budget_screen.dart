@@ -46,11 +46,30 @@ class _BudgetScreenState extends State<BudgetScreen> {
   /// Gate for sidebar actions. Avoid setState on every keystroke: rebuilding
   /// the A4 FittedBox steals focus from Urban fill-in fields (AR-42).
   bool _customerReady = false;
+  bool _draftLoaded = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_draftLoaded) return;
+    _draftLoaded = true;
+    // Recupera los datos del cliente si el usuario volvió al carrito a sumar un
+    // producto olvidado: no queremos que se pierda el DNI ya cargado.
+    final draft = context.read<CartService>().customerDraft;
+    if (draft != null) {
+      _controllers.applyCustomer(draft);
+      _customerReady = _controllers.fullName.text.trim().length >= 3;
+    }
+  }
 
   @override
   void dispose() {
     _controllers.dispose();
     super.dispose();
+  }
+
+  void _saveCustomerDraft() {
+    context.read<CartService>().setCustomerDraft(_customer);
   }
 
   BudgetCustomer get _customer => BudgetCustomer(
@@ -137,6 +156,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
       }
       _customerReady = _controllers.fullName.text.trim().length >= 3;
     });
+    _saveCustomerDraft();
 
     final missing = <String>[];
     if ((result.fullName?.isEmpty ?? true) &&
@@ -405,6 +425,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
   }
 
   void _onCustomerFieldChanged() {
+    // Persistimos en cada tecla sin notificar (evita perder foco en el A4) para
+    // conservar los datos si el usuario vuelve al carrito.
+    _saveCustomerDraft();
     final ready = _controllers.fullName.text.trim().length >= 3;
     if (ready == _customerReady) return;
     setState(() => _customerReady = ready);
@@ -439,6 +462,15 @@ class _BudgetScreenState extends State<BudgetScreen> {
             : null;
 
     final displayTotalArs = checkoutTotal?.ars ?? listaTotal.ars;
+    final displayTotalUsd = checkoutTotal?.usd ?? listaTotal.usd;
+
+    // Cuando el cliente abona íntegramente en dólares, el total grande del
+    // presupuesto debe mostrarse en USD (no en pesos) para que coincida con la
+    // forma de pago elegida.
+    final checkout = cart.checkoutPayment;
+    final showTotalInUsd = checkout != null &&
+        !checkout.isDual &&
+        checkout.pricingMethod.isUsdPayment;
 
     final actions = _BudgetActions(
       finalizing: _finalizing,
@@ -493,6 +525,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
             checkoutConfigured: checkoutConfigured,
             hasCustomerData: hasCustomerData,
             displayTotalArs: displayTotalArs,
+            displayTotalUsd: displayTotalUsd,
+            showTotalInUsd: showTotalInUsd,
             listaArs: listaTotal.ars,
             exchangeRate: exchangeRate.rate,
             onScanDni: _pickScanSource,
@@ -547,6 +581,8 @@ class _BudgetSidebar extends StatelessWidget {
     required this.checkoutConfigured,
     required this.hasCustomerData,
     required this.displayTotalArs,
+    required this.displayTotalUsd,
+    required this.showTotalInUsd,
     required this.listaArs,
     required this.exchangeRate,
     required this.onScanDni,
@@ -558,6 +594,8 @@ class _BudgetSidebar extends StatelessWidget {
   final bool checkoutConfigured;
   final bool hasCustomerData;
   final double displayTotalArs;
+  final double displayTotalUsd;
+  final bool showTotalInUsd;
   final double listaArs;
   final double? exchangeRate;
   final VoidCallback onScanDni;
@@ -623,7 +661,9 @@ class _BudgetSidebar extends StatelessWidget {
         Text('TOTAL DEL PRESUPUESTO', style: sectionLabel),
         const SizedBox(height: 8),
         Text(
-          formatArs(displayTotalArs),
+          showTotalInUsd
+              ? formatUsd(displayTotalUsd)
+              : formatArs(displayTotalArs),
           style: AppText.number
               .copyWith(fontSize: 32, fontWeight: FontWeight.w700),
         ),

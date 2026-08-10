@@ -30,9 +30,16 @@ class EmployeeCartPanel extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Carrito',
-                  style: AppText.heading.copyWith(fontSize: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Carrito',
+                        style: AppText.heading.copyWith(fontSize: 20),
+                      ),
+                    ),
+                    if (!cart.isEmpty) const ClearCartButton(),
+                  ],
                 ),
                 if (cart.isEmpty) ...[
                   const SizedBox(height: 6),

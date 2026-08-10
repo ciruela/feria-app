@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/budget.dart';
 import '../models/cart_checkout_payment.dart';
 import '../config/app_config.dart';
 import '../models/product.dart';
@@ -61,6 +62,7 @@ class CartService extends ChangeNotifier {
 
   final List<CartItem> _items = [];
   CartCheckoutPayment? _checkoutPayment;
+  BudgetCustomer? _customerDraft;
   String? _saleIdempotencyKey;
   String? _tenantScope;
   String? _sellerScope;
@@ -72,6 +74,19 @@ class CartService extends ChangeNotifier {
   CartCheckoutPayment? get checkoutPayment => _checkoutPayment;
   bool get hasCheckoutPayment => _checkoutPayment != null;
   String? get sellerScope => _sellerScope;
+
+  /// Datos del cliente tipeados/escaneados en el presupuesto. Se conservan al
+  /// volver al carrito para sumar un producto olvidado (AR: no perder el DNI).
+  BudgetCustomer? get customerDraft => _customerDraft;
+
+  /// Guarda el borrador del cliente sin notificar por defecto: los campos viven
+  /// dentro del preview A4 (FittedBox) y un rebuild por tecla roba el foco.
+  void setCustomerDraft(BudgetCustomer? customer, {bool notify = false}) {
+    final next = (customer == null || customer.isEmpty) ? null : customer;
+    _customerDraft = next;
+    _schedulePersist();
+    if (notify) notifyListeners();
+  }
 
   /// Clave por armería + vendedor (AR-54). Sin vendedor = solo tenant.
   String get _cacheKey {
@@ -90,6 +105,7 @@ class CartService extends ChangeNotifier {
     _sellerScope = null;
     _items.clear();
     _checkoutPayment = null;
+    _customerDraft = null;
     _saleIdempotencyKey = null;
     notifyListeners();
   }
@@ -102,6 +118,7 @@ class CartService extends ChangeNotifier {
     _sellerScope = normalized;
     _items.clear();
     _checkoutPayment = null;
+    _customerDraft = null;
     _saleIdempotencyKey = null;
     notifyListeners();
   }
@@ -382,6 +399,7 @@ class CartService extends ChangeNotifier {
   void clear() {
     _items.clear();
     _checkoutPayment = null;
+    _customerDraft = null;
     _saleIdempotencyKey = null;
     _notifyAndPersist();
   }
@@ -404,6 +422,7 @@ class CartService extends ChangeNotifier {
       if (raw == null || raw.isEmpty) {
         _items.clear();
         _checkoutPayment = null;
+        _customerDraft = null;
         _saleIdempotencyKey = null;
         return;
       }
@@ -431,10 +450,12 @@ class CartService extends ChangeNotifier {
         ..clear()
         ..addAll(restored);
       _checkoutPayment = _checkoutFromJson(data['checkout']);
+      _customerDraft = _customerDraftFromJson(data['customer']);
       _saleIdempotencyKey = data['saleIdempotencyKey'] as String?;
     } catch (_) {
       _items.clear();
       _checkoutPayment = null;
+      _customerDraft = null;
       _saleIdempotencyKey = null;
     } finally {
       _restoring = false;
@@ -443,7 +464,7 @@ class CartService extends ChangeNotifier {
 
   Future<void> _persistCache() async {
     final prefs = await SharedPreferences.getInstance();
-    if (_items.isEmpty && _checkoutPayment == null) {
+    if (_items.isEmpty && _checkoutPayment == null && _customerDraft == null) {
       await prefs.remove(_cacheKey);
       return;
     }
@@ -451,6 +472,7 @@ class CartService extends ChangeNotifier {
     final payload = <String, dynamic>{
       'items': _items.map((item) => item.toJson()).toList(),
       if (_checkoutPayment != null) 'checkout': _checkoutToJson(_checkoutPayment!),
+      if (_customerDraft != null) 'customer': _customerDraft!.toJson(),
       if (_saleIdempotencyKey != null)
         'saleIdempotencyKey': _saleIdempotencyKey,
     };
@@ -463,6 +485,12 @@ class CartService extends ChangeNotifier {
           'secondMethod': payment.secondMethod!.key,
         'primaryShare': payment.primaryShare,
       };
+
+  BudgetCustomer? _customerDraftFromJson(Object? raw) {
+    if (raw is! Map) return null;
+    final customer = BudgetCustomer.fromJson(raw.cast<String, dynamic>());
+    return customer.isEmpty ? null : customer;
+  }
 
   CartCheckoutPayment? _checkoutFromJson(Object? raw) {
     if (raw is! Map) return null;

@@ -62,12 +62,19 @@ class CartMobileLayout extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Carrito',
-                style: AppText.heading.copyWith(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w600,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Carrito',
+                      style: AppText.heading.copyWith(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  if (!cart.isEmpty) const ClearCartButton(),
+                ],
               ),
               const SizedBox(height: 4),
               Text(

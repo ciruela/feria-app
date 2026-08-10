@@ -133,6 +133,46 @@ class BudgetCustomer {
       notes: notes ?? this.notes,
     );
   }
+
+  bool get isEmpty =>
+      fullName.isEmpty &&
+      dni.isEmpty &&
+      clu.isEmpty &&
+      cluExpiry.isEmpty &&
+      phone.isEmpty &&
+      email.isEmpty &&
+      address.isEmpty &&
+      city.isEmpty &&
+      notes.isEmpty;
+
+  Map<String, dynamic> toJson() => {
+        'fullName': fullName,
+        'dni': dni,
+        'clu': clu,
+        'cluExpiry': cluExpiry,
+        'phone': phone,
+        'email': email,
+        'fiscalCondition': fiscalCondition,
+        'address': address,
+        'city': city,
+        'notes': notes,
+      };
+
+  factory BudgetCustomer.fromJson(Map<String, dynamic> json) {
+    String read(String key) => json[key] as String? ?? '';
+    return BudgetCustomer(
+      fullName: read('fullName'),
+      dni: read('dni'),
+      clu: read('clu'),
+      cluExpiry: read('cluExpiry'),
+      phone: read('phone'),
+      email: read('email'),
+      fiscalCondition: read('fiscalCondition'),
+      address: read('address'),
+      city: read('city'),
+      notes: read('notes'),
+    );
+  }
 }
 
 class Budget {
