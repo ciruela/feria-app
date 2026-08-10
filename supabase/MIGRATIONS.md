@@ -11,7 +11,7 @@ huecos históricos de numeración.
 `016`, `017`, `018`, `019`, `020`, `021*`, `022`, `023`, `024`, `025`, `026`,
 `027`, `028`, `029`, `030`, `031`, `032`, `033`, `034`, `035`, `036`, `037`,
 `038`, `039`, `040`, `041`, `042`, `043`, `044`, `045`, `046`, `047`, `048`, `049`, `050`,
-`051`.
+`051`, `052`.
 
 - `035` — Realtime: `vendedores`/`administradores`/`ventas` en la publication
   + `REPLICA IDENTITY FULL` (AR-18, AR-20).
@@ -32,6 +32,10 @@ huecos históricos de numeración.
   (1 cajón = 20 cajas = 1000 tiros) con `fixed_prices` (USD 440 / $682.000
   final efectivo/transferencia, sin tarjeta ni el 10%). Aplicada por SQL
   Editor + `supabase migration repair --status applied 051`.
+
+- `052` — amplía `productos_type_check` para incluir `'accesorios'`
+  (categoría accesorios). Defensiva/idempotente. Aplicada vía workflow
+  `Supabase Migrations` (run 31392405731, HTTP 201).
 
 ## NO aplicada (decisión pendiente)
 
