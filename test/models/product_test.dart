@@ -19,6 +19,7 @@ void main() {
       expect(ProductType.fromKey('municion'), ProductType.municion);
       expect(ProductType.fromKey('arma_corta'), ProductType.armaCorta);
       expect(ProductType.fromKey('arma_larga'), ProductType.armaLarga);
+      expect(ProductType.fromKey('accesorios'), ProductType.accesorios);
     });
   });
 
@@ -27,6 +28,23 @@ void main() {
       final m = _municion();
       expect(m.isMunicion, isTrue);
       expect(m.isArma, isFalse);
+      expect(m.isAccesorios, isFalse);
+
+      const acc = Product(
+        id: 'acc-1',
+        type: ProductType.accesorios,
+        marca: 'Accesorios',
+        calibre: '',
+        codigo: 'FUNDA-01',
+        descripcion: 'Funda Glock 19',
+        precioUsd: 45,
+        stock: 10,
+      );
+      expect(acc.isAccesorios, isTrue);
+      expect(acc.isArma, isFalse);
+      expect(acc.isMunicion, isFalse);
+      expect(acc.cartQuantityUnit, 'unidades');
+      expect(acc.cartDisplayDescription, 'Funda Glock 19');
 
       const arma = Product(
         id: 'a',

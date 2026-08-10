@@ -71,6 +71,7 @@ class AppColors {
   static const armaCorta = textMuted;
   static const armaLarga = textMuted;
   static const municion = textMuted;
+  static const accesorios = textMuted;
 }
 
 class AppDecorations {

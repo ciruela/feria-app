@@ -501,4 +501,68 @@ void main() {
       expect(rows.single['marca'], 'CCI');
     });
   });
+
+  group('accesorios', () {
+    test('parsea tipo accesorios desde columna', () {
+      final bytes = _sheetBytes(
+        ['tipo', 'marca', 'codigo', 'descripcion', 'precio_usd', 'stock'],
+        [
+          [
+            'accesorios', 'Accesorios', 'FUNDA-01', 'Funda Glock 19 cal. 9mm',
+            '45', '10',
+          ],
+        ],
+      );
+      final row = ExcelProductRow.fromMap(
+        ExcelCatalogService().parseRows(bytes).single,
+      );
+      expect(row.type, ProductType.accesorios);
+      expect(row.calibre, isEmpty);
+      expect(row.descripcion, contains('Funda Glock'));
+      expect(row.roundsPerBox, isNull);
+    });
+
+    test('infiere accesorios desde nombre de hoja si falta tipo', () {
+      final excel = Excel.createExcel();
+      final defaultName = excel.sheets.keys.first;
+      excel.rename(defaultName, 'Accesorios');
+      final sheet = excel['Accesorios'];
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0))
+          .value = TextCellValue('codigo');
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 0))
+          .value = TextCellValue('descripcion');
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 0))
+          .value = TextCellValue('precio_usd');
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 0))
+          .value = TextCellValue('stock');
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1))
+          .value = TextCellValue('LINT-01');
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 1))
+          .value = TextCellValue('Linterna táctica');
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 1))
+          .value = TextCellValue('80');
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 1))
+          .value = TextCellValue('5');
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 0))
+          .value = TextCellValue('marca');
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 1))
+          .value = TextCellValue('Accesorios');
+
+      final parsed = ExcelCatalogService()
+          .parseRows(Uint8List.fromList(excel.encode()!))
+          .single;
+      final row = ExcelProductRow.fromMap(parsed);
+      expect(row.type, ProductType.accesorios);
+    });
+  });
 }

@@ -3,7 +3,8 @@ import 'product_prices.dart';
 enum ProductType {
   municion('municion', 'Munición'),
   armaCorta('arma_corta', 'Armas cortas'),
-  armaLarga('arma_larga', 'Armas largas');
+  armaLarga('arma_larga', 'Armas largas'),
+  accesorios('accesorios', 'Accesorios');
 
   const ProductType(this.key, this.label);
 
@@ -48,7 +49,7 @@ class Product {
   /// Rutas en Storage, ej. `arma_corta/ac-001/1734567890.jpg`
   final List<String> fotoUrls;
 
-  /// Saldo actual en unidades vendibles: armas = unidades, munición = cajas.
+  /// Saldo actual en unidades vendibles: armas/accesorios = unidades, munición = cajas.
   final int? stock;
 
   /// Saldo inicial (misma unidad que [stock]). Se fija en la primera carga.
@@ -70,6 +71,8 @@ class Product {
       type == ProductType.armaCorta || type == ProductType.armaLarga;
 
   bool get isMunicion => type == ProductType.municion;
+
+  bool get isAccesorios => type == ProductType.accesorios;
 
   String get modeloDisplay => modelo.isNotEmpty ? modelo : codigo;
 

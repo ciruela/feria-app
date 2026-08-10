@@ -8,7 +8,7 @@ Pestañas de entrada:
                 fusiles/PCC/DEC = arma_larga). Efectivo/PVP en USD, cuotas en ARS.
   - Taurus    : idem Gral pero columnas corridas (precio en E, descripción en F).
   - BERSA     : pistolas agrupadas por calibre, con variantes por acabado. ARS.
-  - Accesorios: munición (cajas). ARS.
+  - Accesorios: accesorios (unidades). ARS.
 
 Salida: un único sheet "Catalogo" con encabezados canónicos + precios fijos.
 
@@ -224,11 +224,10 @@ def rows_accesorios(wb):
         if pvp is None:
             continue
         idx += 1
-        calibre, rounds = parse_accesorio_name(name)
         out.append({
-            "tipo": "municion",
-            "marca": "Munición",
-            "calibre": calibre,
+            "tipo": "accesorios",
+            "marca": "Accesorios",
+            "calibre": "",
             "modelo": "",
             "codigo": f"ACC-{idx:02d}",
             "descripcion": clean_desc(name),
@@ -241,7 +240,6 @@ def rows_accesorios(wb):
             "cuota3_ars": None,
             "cuota6_ars": None,
             "cuota12_ars": None,
-            "balas_por_caja": rounds,
         })
     return out
 

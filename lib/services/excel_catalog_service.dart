@@ -117,6 +117,49 @@ class ExcelCatalogService {
     return t;
   }
 
+  /// Resuelve [ProductType] desde columna `tipo` o, si falta, desde el nombre de hoja.
+  /// Sin `tipo` ni hoja reconocida, asume munición (planillas CCI).
+  static ProductType resolveProductType({
+    required String? tipoRaw,
+    required String? sheetName,
+  }) {
+    final typeKey = (tipoRaw ?? '').trim().toLowerCase();
+    if (typeKey.isNotEmpty) {
+      return _productTypeFromKey(typeKey);
+    }
+    return _productTypeFromSheetName(sheetName) ?? ProductType.municion;
+  }
+
+  static ProductType _productTypeFromKey(String typeKey) {
+    switch (typeKey) {
+      case 'municion':
+      case 'munición':
+        return ProductType.municion;
+      case 'arma_corta':
+        return ProductType.armaCorta;
+      case 'arma_larga':
+        return ProductType.armaLarga;
+      case 'accesorios':
+        return ProductType.accesorios;
+      default:
+        throw FormatException('Tipo inválido: $typeKey');
+    }
+  }
+
+  static ProductType? _productTypeFromSheetName(String? sheetName) {
+    if (sheetName == null || sheetName.trim().isEmpty) return null;
+    final normalized = sheetName
+        .trim()
+        .toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u');
+    if (normalized == 'accesorios') return ProductType.accesorios;
+    return null;
+  }
+
   /// Mapea encabezados libres (CCI, mayúsculas, acentos) a claves canónicas.
   static String? _canonicalHeader(String raw) {
     final h = raw
@@ -567,22 +610,13 @@ class ExcelProductRow {
 
   bool get isMunicion => type == ProductType.municion;
 
+  bool get isAccesorios => type == ProductType.accesorios;
+
   factory ExcelProductRow.fromMap(Map<String, String> data) {
-    // tipo: si falta, se asume munición (planillas CCI son munición).
-    final typeKey = data['tipo']?.trim().toLowerCase() ?? '';
-    ProductType type;
-    switch (typeKey) {
-      case '':
-      case 'municion':
-      case 'munición':
-        type = ProductType.municion;
-      case 'arma_corta':
-        type = ProductType.armaCorta;
-      case 'arma_larga':
-        type = ProductType.armaLarga;
-      default:
-        throw FormatException('Tipo inválido: $typeKey');
-    }
+    final type = ExcelCatalogService.resolveProductType(
+      tipoRaw: data['tipo'],
+      sheetName: data['_sheet'],
+    );
 
     final precio = _parsePrice(data['precio_usd']);
 

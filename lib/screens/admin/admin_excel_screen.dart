@@ -158,7 +158,7 @@ class _AdminExcelScreenState extends State<AdminExcelScreen> {
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
-          const Text('municion · arma_corta · arma_larga'),
+          const Text('municion · arma_corta · arma_larga · accesorios'),
           if (_busy) ...[
             const SizedBox(height: 24),
             _ImportProgress(
