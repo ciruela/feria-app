@@ -4,6 +4,7 @@ import 'package:app_feria/models/presupuesto_branding.dart';
 import 'package:app_feria/models/presupuesto_summary.dart';
 import 'package:app_feria/models/product_prices.dart';
 import 'package:app_feria/models/urban_receipt_options.dart';
+import 'package:app_feria/utils/formatters.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Budget _budgetWithMethods(
@@ -301,5 +302,38 @@ void main() {
     expect(checks.firstWhere((c) => c.label == '6 CTAS').checked, isTrue);
     expect(checks.firstWhere((c) => c.label == '12 CTAS').checked, isTrue);
     expect(checks.firstWhere((c) => c.label == '1 CTA').checked, isFalse);
+  });
+
+  test('allocation lines: muestran cuotas y ahorro/recargo vs lista', () {
+    final budget = _budgetWithMethods(
+      {PaymentMethod.tarjeta3},
+      allocations: const [
+        // Recargo por cuotas: 3 x 53.475 = 160.425, +34.875 vs lista.
+        PaymentAllocation(
+          method: PaymentMethod.tarjeta3,
+          amountUsd: 0,
+          amountArs: 160425,
+          deltaArs: 34875,
+        ),
+        // Descuento efectivo: ahorra 20.000 vs lista.
+        PaymentAllocation(
+          method: PaymentMethod.efectivo,
+          amountUsd: 0,
+          amountArs: 125550,
+          deltaArs: -20000,
+        ),
+      ],
+    );
+    final lines = PresupuestoSummary(budget).paymentAllocationLines;
+
+    final tarjeta = lines.firstWhere((l) => l.label.contains('3 CUOTAS'));
+    expect(tarjeta.detail, '3 x ${formatArs(53475)}');
+    expect(tarjeta.delta, formatSignedArsDelta(34875));
+    expect(tarjeta.displayText, contains(tarjeta.detail!));
+    expect(tarjeta.displayText, contains(tarjeta.delta!));
+
+    final efectivo = lines.firstWhere((l) => l.label == 'EFECTIVO');
+    expect(efectivo.detail, isNull);
+    expect(efectivo.delta, formatSignedArsDelta(-20000));
   });
 }

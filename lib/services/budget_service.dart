@@ -71,6 +71,7 @@ class BudgetService {
           lineArs: lineArs,
           unitUsd: unitUsd,
           lineUsd: lineUsd,
+          listaArs: prices.lista * item.quantity,
           paymentMethod: method,
           isArma: item.product.isArma,
           serialNumber: item.serialNumber,

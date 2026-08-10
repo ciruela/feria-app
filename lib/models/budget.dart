@@ -20,6 +20,7 @@ class BudgetLine {
     this.tarjetaConsumo = '',
     this.splitPart,
     this.productType = '',
+    this.listaArs = 0,
   });
 
   final String lineKey;
@@ -37,6 +38,9 @@ class BudgetLine {
   final String tarjetaConsumo;
   final int? splitPart;
   final String productType;
+
+  /// Precio de lista de la línea en ARS (referencia para el delta "vs lista").
+  final double listaArs;
 
   bool get isSplitPart => splitPart != null;
 
