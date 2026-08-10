@@ -107,7 +107,9 @@ class CartMobileLayout extends StatelessWidget {
                   totalsService: totalsService,
                   checkout: checkout,
                   pricingMethod: pricingMethod,
-                  onContinue: checkout != null && exchangeRate.hasServerRate
+                  onContinue: (checkout != null ||
+                              cart.items.any((i) => i.paymentMethod != null)) &&
+                          exchangeRate.hasServerRate
                       ? () => _openBudget(context)
                       : null,
                 ),
@@ -140,9 +142,18 @@ class _CartMobileContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasPerLineMethods =
+        cart.items.any((item) => item.paymentMethod != null);
     CartLineTotal? checkoutTotal;
     List<PaymentAllocation> allocations = [];
-    if (checkout != null) {
+    if (hasPerLineMethods) {
+      allocations = totalsService.allocationsForCart(
+        cart: cart,
+        fallbackMethod: pricingMethod,
+        exchangeRate: exchangeRate,
+        pricingSettings: pricingSettings,
+      );
+    } else if (checkout != null) {
       checkoutTotal = totalsService.cartTotalAtMethod(
         cart: cart,
         method: checkout!.pricingMethod,
@@ -200,6 +211,8 @@ class _CartMobileContent extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   child: _CartMobileLine(
                     item: cart.items[i],
+                    prices: _prices(cart.items[i]),
+                    globalMethod: pricingMethod,
                     lineUsd: _lineUsd(cart.items[i]),
                     lineArs: hasRate ? _lineArs(cart.items[i]) : 0,
                     showArs: hasRate,
@@ -237,7 +250,7 @@ class _CartMobileContent extends StatelessWidget {
                         )),
               listaArs: hasRate ? listaTotal.ars : 0,
               allocations: hasRate ? allocations : const [],
-              checkoutConfigured: checkout != null,
+              checkoutConfigured: checkout != null || hasPerLineMethods,
               hasServerRate: hasRate,
               exchangeRate: hasRate ? exchangeRate.rate : null,
               updatedAt: hasRate ? exchangeRate.updatedAt : null,
@@ -262,14 +275,14 @@ class _CartMobileContent extends StatelessWidget {
     );
   }
 
-  double _lineUsd(CartItem item) {
-    final prices = pricing.pricesFor(item.product, exchangeRate, pricingSettings);
-    return prices.usd * item.quantity;
-  }
+  ProductPrices _prices(CartItem item) =>
+      pricing.pricesFor(item.product, exchangeRate, pricingSettings);
+
+  double _lineUsd(CartItem item) => _prices(item).usd * item.quantity;
 
   double _lineArs(CartItem item) {
-    final prices = pricing.pricesFor(item.product, exchangeRate, pricingSettings);
-    return pricingMethod.totalArsFor(prices) * item.quantity;
+    final method = item.paymentMethod ?? pricingMethod;
+    return method.totalArsFor(_prices(item)) * item.quantity;
   }
 
   bool _canIncrease(CartService cart, CartItem item) {
@@ -318,6 +331,8 @@ class _CartMobileCard extends StatelessWidget {
 class _CartMobileLine extends StatelessWidget {
   const _CartMobileLine({
     required this.item,
+    required this.prices,
+    required this.globalMethod,
     required this.lineUsd,
     required this.lineArs,
     required this.canIncrease,
@@ -328,6 +343,8 @@ class _CartMobileLine extends StatelessWidget {
   });
 
   final CartItem item;
+  final ProductPrices prices;
+  final PaymentMethod globalMethod;
   final double lineUsd;
   final double lineArs;
   final bool canIncrease;
@@ -340,6 +357,8 @@ class _CartMobileLine extends StatelessWidget {
   Widget build(BuildContext context) {
     return EmployeeCartLine(
       item: item,
+      prices: prices,
+      globalMethod: globalMethod,
       lineUsd: lineUsd,
       lineArs: lineArs,
       showArs: showArs,

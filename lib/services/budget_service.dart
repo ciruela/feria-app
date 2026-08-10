@@ -33,12 +33,18 @@ class BudgetService {
     cart.ensureWeaponsAreUnitLines();
 
     final checkout = cart.checkoutPayment;
-    final method = checkout?.pricingMethod ?? defaultPaymentMethod;
+    final fallbackMethod = checkout?.pricingMethod ?? defaultPaymentMethod;
+    // AR: cada línea puede tener su propio medio (promo + dos medios). Si al
+    // menos una lo define, el reparto sale de las líneas (montos reales) en vez
+    // del share global del checkout.
+    final hasPerLineMethods =
+        cart.items.any((item) => item.paymentMethod != null);
     final lines = <BudgetLine>[];
     var totalUsd = 0.0;
     var totalArs = 0.0;
 
     for (final item in cart.items) {
+      final method = item.paymentMethod ?? fallbackMethod;
       final prices = _pricing.pricesFor(
         item.product,
         exchangeRate,
@@ -74,17 +80,25 @@ class BudgetService {
       );
     }
 
-    final allocations = checkout == null
-        ? const <PaymentAllocation>[]
-        : _cartTotals.allocationsFor(
-            checkout: checkout,
-            total: _cartTotals.cartTotalAtMethod(
-              cart: cart,
-              method: method,
-              exchangeRate: exchangeRate,
-              pricingSettings: pricingSettings,
-            ),
-          );
+    final List<PaymentAllocation> allocations;
+    if (hasPerLineMethods) {
+      allocations = _cartTotals.allocationsFromLines(
+        lines,
+        exchangeRate: exchangeRate,
+      );
+    } else if (checkout == null) {
+      allocations = const <PaymentAllocation>[];
+    } else {
+      allocations = _cartTotals.allocationsFor(
+        checkout: checkout,
+        total: _cartTotals.cartTotalAtMethod(
+          cart: cart,
+          method: fallbackMethod,
+          exchangeRate: exchangeRate,
+          pricingSettings: pricingSettings,
+        ),
+      );
+    }
 
     return Budget(
       date: DateTime.now(),

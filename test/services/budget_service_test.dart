@@ -118,6 +118,95 @@ void main() {
     expect(compact.lines.first.detail, contains('9mm'));
   });
 
+  test('medio de pago por línea: cada producto se precia con SU método', () {
+    // Caso real: caj\u00f3n en 3 cuotas + munici\u00f3n en efectivo, sin que el
+    // descuento de efectivo contamine al caj\u00f3n (ni el recargo al rev\u00e9s).
+    cart.addProduct(testProduct(id: 'cajon', precioUsd: 440));
+    cart.addProduct(testProduct(id: 'cajas', precioUsd: 380));
+    final keys = {
+      for (final item in cart.items) item.product.id: item.lineKey,
+    };
+
+    double lineArsOf(budget, String productId) =>
+        budget.lines.firstWhere((l) => l.productId == productId).lineArs;
+
+    // Referencia: todo en 3 cuotas.
+    cart.setLinePaymentMethod(keys['cajon']!, PaymentMethod.tarjeta3);
+    cart.setLinePaymentMethod(keys['cajas']!, PaymentMethod.tarjeta3);
+    final allTarjeta3 = budgetService.buildFromCart(
+      cart: cart,
+      exchangeRate: exchangeRate,
+      pricingSettings: settings,
+    );
+
+    // Referencia: todo en efectivo.
+    cart.setLinePaymentMethod(keys['cajon']!, PaymentMethod.efectivo);
+    cart.setLinePaymentMethod(keys['cajas']!, PaymentMethod.efectivo);
+    final allEfectivo = budgetService.buildFromCart(
+      cart: cart,
+      exchangeRate: exchangeRate,
+      pricingSettings: settings,
+    );
+
+    // Mezcla: caj\u00f3n en 3 cuotas, cajas en efectivo.
+    cart.setLinePaymentMethod(keys['cajon']!, PaymentMethod.tarjeta3);
+    cart.setLinePaymentMethod(keys['cajas']!, PaymentMethod.efectivo);
+    final mixed = budgetService.buildFromCart(
+      cart: cart,
+      exchangeRate: exchangeRate,
+      pricingSettings: settings,
+    );
+
+    // El test es significativo solo si ambos métodos dan precios distintos.
+    expect(lineArsOf(allEfectivo, 'cajon'),
+        isNot(lineArsOf(allTarjeta3, 'cajon')));
+
+    // Cada línea de la mezcla usa EXACTAMENTE el precio de su propio método.
+    expect(lineArsOf(mixed, 'cajon'), lineArsOf(allTarjeta3, 'cajon'));
+    expect(lineArsOf(mixed, 'cajas'), lineArsOf(allEfectivo, 'cajas'));
+
+    // Las allocations salen de las líneas (montos reales, no share global).
+    expect(mixed.paymentAllocations, hasLength(2));
+    expect(
+      mixed.paymentAllocations.map((a) => a.method).toSet(),
+      {PaymentMethod.tarjeta3, PaymentMethod.efectivo},
+    );
+    final sumaArs = mixed.paymentAllocations
+        .fold<double>(0, (s, a) => s + a.amountArs);
+    expect(sumaArs,
+        closeTo(lineArsOf(mixed, 'cajon') + lineArsOf(mixed, 'cajas'), 0.001));
+  });
+
+  test('sin método por línea: mantiene el share del checkout (no-regresión)',
+      () {
+    cart.addProduct(testProduct(id: 'a', precioUsd: 100));
+    cart.addProduct(testProduct(id: 'b', precioUsd: 50));
+    cart.setCheckoutPayment(
+      const CartCheckoutPayment.dual(
+        pricingMethod: PaymentMethod.transferencia,
+        secondMethod: PaymentMethod.efectivo,
+        primaryShare: 0.6,
+      ),
+    );
+
+    final budget = budgetService.buildFromCart(
+      cart: cart,
+      exchangeRate: exchangeRate,
+      pricingSettings: settings,
+    );
+
+    // Ambas líneas siguen el método global (no hay override por línea).
+    expect(
+      budget.lines.every((l) => l.paymentMethod == PaymentMethod.transferencia),
+      isTrue,
+    );
+    expect(budget.paymentAllocations, hasLength(2));
+    expect(
+      budget.paymentAllocations[0].share + budget.paymentAllocations[1].share,
+      closeTo(1.0, 0.0001),
+    );
+  });
+
   test('Urban Bersa: USD 0 with fixed ARS still builds sellable lines', () {
     const bersa = Product(
       id: 'bersa_1',

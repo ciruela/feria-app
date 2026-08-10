@@ -1,3 +1,4 @@
+import '../models/budget.dart';
 import '../models/cart_checkout_payment.dart';
 import '../models/product_prices.dart';
 import 'cart_service.dart';
@@ -80,6 +81,96 @@ class CartTotalsService {
       if (line.usd <= 0) return false;
     }
     return true;
+  }
+
+  /// Reparte por medio de pago sumando los montos REALES de cada línea (no un
+  /// porcentaje del total). Habilita "cada producto con su método": p. ej. un
+  /// arma en 3 cuotas y munición en efectivo, sin contaminar el descuento.
+  ///
+  /// Los montos por moneda quedan exactos. [PaymentAllocation.share] es solo la
+  /// proporción de la venta (suma 1); para mezclar monedas usa el tipo de
+  /// cambio como base común, sin alterar los montos.
+  List<PaymentAllocation> allocationsFromLines(
+    List<BudgetLine> lines, {
+    required ExchangeRateService exchangeRate,
+  }) {
+    if (lines.isEmpty) return const [];
+
+    final order = <PaymentMethod>[];
+    final usdByMethod = <PaymentMethod, double>{};
+    final arsByMethod = <PaymentMethod, double>{};
+
+    for (final line in lines) {
+      final method = line.paymentMethod;
+      if (!order.contains(method)) order.add(method);
+      if (line.paysInUsd) {
+        usdByMethod[method] = (usdByMethod[method] ?? 0) + line.lineUsd;
+      } else {
+        arsByMethod[method] = (arsByMethod[method] ?? 0) + line.lineArs;
+      }
+    }
+
+    return _groupedAllocations(order, usdByMethod, arsByMethod, exchangeRate.rate);
+  }
+
+  /// Igual que [allocationsFromLines] pero directo desde el carrito, para el
+  /// preview de totales antes de armar el presupuesto. Cada ítem se precia con
+  /// `item.paymentMethod ?? fallbackMethod`.
+  List<PaymentAllocation> allocationsForCart({
+    required CartService cart,
+    required PaymentMethod fallbackMethod,
+    required ExchangeRateService exchangeRate,
+    required PricingSettingsService pricingSettings,
+  }) {
+    if (cart.items.isEmpty) return const [];
+
+    final order = <PaymentMethod>[];
+    final usdByMethod = <PaymentMethod, double>{};
+    final arsByMethod = <PaymentMethod, double>{};
+
+    for (final item in cart.items) {
+      final method = item.paymentMethod ?? fallbackMethod;
+      final prices =
+          _pricing.pricesFor(item.product, exchangeRate, pricingSettings);
+      if (!order.contains(method)) order.add(method);
+      if (method.isUsdPayment) {
+        usdByMethod[method] =
+            (usdByMethod[method] ?? 0) + method.totalUsdFor(prices) * item.quantity;
+      } else {
+        arsByMethod[method] =
+            (arsByMethod[method] ?? 0) + method.totalArsFor(prices) * item.quantity;
+      }
+    }
+
+    return _groupedAllocations(order, usdByMethod, arsByMethod, exchangeRate.rate);
+  }
+
+  /// Construye las allocations (montos exactos por moneda) y calcula el `share`
+  /// (0–1, suma 1) usando el tipo de cambio solo como base común entre monedas.
+  List<PaymentAllocation> _groupedAllocations(
+    List<PaymentMethod> order,
+    Map<PaymentMethod, double> usdByMethod,
+    Map<PaymentMethod, double> arsByMethod,
+    double rate,
+  ) {
+    double baseOf(PaymentMethod method) {
+      final usd = usdByMethod[method] ?? 0;
+      final ars = arsByMethod[method] ?? 0;
+      return ars + (rate > 0 ? usd * rate : 0);
+    }
+
+    final totalBase =
+        order.fold<double>(0, (sum, method) => sum + baseOf(method));
+
+    return [
+      for (final method in order)
+        PaymentAllocation(
+          method: method,
+          amountUsd: usdByMethod[method] ?? 0,
+          amountArs: arsByMethod[method] ?? 0,
+          share: totalBase > 0 ? baseOf(method) / totalBase : 1.0 / order.length,
+        ),
+    ];
   }
 
   /// Asigna montos y [PaymentAllocation.share] (suma 1) para register_sale.

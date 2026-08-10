@@ -394,7 +394,19 @@ class SupabaseSalesRepository {
       'date': budget.date.toUtc().toIso8601String(),
       if (budget.paymentAllocations.isNotEmpty)
         'allocations': _allocationShares(budget),
+      if (_isPerLinePayment(budget)) 'perLinePayment': true,
     };
+  }
+
+  /// Pago por producto: cada allocation corresponde a un método presente en las
+  /// líneas (a diferencia del cobro dual por share, donde la 2ª forma no está en
+  /// ninguna línea). Le dice al servidor que sume cada línea en su moneda.
+  bool _isPerLinePayment(Budget budget) {
+    if (budget.paymentAllocations.isEmpty) return false;
+    return budget.paymentAllocations.every(
+      (allocation) =>
+          budget.lines.any((line) => line.paymentMethod == allocation.method),
+    );
   }
 
   List<Map<String, dynamic>> _allocationShares(Budget budget) {

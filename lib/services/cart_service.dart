@@ -19,6 +19,7 @@ class CartItem {
     this.quantity = 1,
     this.serialNumber = '',
     this.tarjetaConsumo = '',
+    this.paymentMethod,
     String? lineId,
   }) : lineId = lineId ?? newId('line');
 
@@ -28,6 +29,11 @@ class CartItem {
   String serialNumber;
   String tarjetaConsumo;
 
+  /// Medio de pago elegido para ESTA línea. `null` = usar el método global del
+  /// checkout (o el default). Permite, p. ej., un arma en 3 cuotas y munición
+  /// en efectivo dentro del mismo comprobante.
+  PaymentMethod? paymentMethod;
+
   String get lineKey => lineId;
 
   Map<String, dynamic> toJson() => {
@@ -35,15 +41,20 @@ class CartItem {
         'quantity': quantity,
         'serialNumber': serialNumber,
         'tarjetaConsumo': tarjetaConsumo,
+        if (paymentMethod != null) 'paymentMethod': paymentMethod!.key,
         'product': product.toJson(),
       };
 
   factory CartItem.fromJson(Map<String, dynamic> json) {
+    final pmKey = json['paymentMethod'] as String?;
     return CartItem(
       lineId: json['lineId'] as String? ?? newId('line'),
       quantity: (json['quantity'] as num?)?.toInt() ?? 1,
       serialNumber: json['serialNumber'] as String? ?? '',
       tarjetaConsumo: json['tarjetaConsumo'] as String? ?? '',
+      paymentMethod: (pmKey == null || pmKey.isEmpty)
+          ? null
+          : PaymentMethod.fromKey(pmKey),
       product: Product.fromJson(
         (json['product'] as Map).cast<String, dynamic>(),
       ),
@@ -158,6 +169,7 @@ class CartService extends ChangeNotifier {
             // Solo la primera conserva la serie ya tipada.
             serialNumber: i == 0 ? item.serialNumber : '',
             tarjetaConsumo: i == 0 ? item.tarjetaConsumo : '',
+            paymentMethod: item.paymentMethod,
             lineId: i == 0 ? item.lineId : null,
           ),
         );
@@ -203,6 +215,16 @@ class CartService extends ChangeNotifier {
   void clearCheckoutPayment() {
     if (_checkoutPayment == null) return;
     _checkoutPayment = null;
+    _notifyAndPersist();
+  }
+
+  /// Fija el medio de pago de una línea puntual (AR: promo + dos medios en el
+  /// mismo comprobante). `null` vuelve al método global del checkout.
+  void setLinePaymentMethod(String lineKey, PaymentMethod? method) {
+    final item =
+        _items.where((element) => element.lineKey == lineKey).firstOrNull;
+    if (item == null || item.paymentMethod == method) return;
+    item.paymentMethod = method;
     _notifyAndPersist();
   }
 

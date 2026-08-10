@@ -461,8 +461,16 @@ class _BudgetScreenState extends State<BudgetScreen> {
                 )
             : null;
 
-    final displayTotalArs = checkoutTotal?.ars ?? listaTotal.ars;
-    final displayTotalUsd = checkoutTotal?.usd ?? listaTotal.usd;
+    // Con medio de pago por línea, el total sale de las líneas (allocation-aware),
+    // no del método global del checkout.
+    final hasPerLineMethods =
+        cart.items.any((item) => item.paymentMethod != null);
+    final displayTotalArs = hasPerLineMethods
+        ? budget.totalArsLines
+        : (checkoutTotal?.ars ?? listaTotal.ars);
+    final displayTotalUsd = hasPerLineMethods
+        ? budget.totalUsdLines
+        : (checkoutTotal?.usd ?? listaTotal.usd);
 
     // Cuando el cliente abona íntegramente en dólares, el total grande del
     // presupuesto debe mostrarse en USD (no en pesos) para que coincida con la
@@ -471,6 +479,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
     final showTotalInUsd = checkout != null &&
         !checkout.isDual &&
         checkout.pricingMethod.isUsdPayment;
+
+    // Pago por producto con monedas mezcladas: el total grande muestra ambas.
+    final mixedCurrency =
+        hasPerLineMethods && displayTotalArs > 0 && displayTotalUsd > 0;
 
     final actions = _BudgetActions(
       finalizing: _finalizing,
@@ -527,6 +539,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
             displayTotalArs: displayTotalArs,
             displayTotalUsd: displayTotalUsd,
             showTotalInUsd: showTotalInUsd,
+            mixedCurrency: mixedCurrency,
             listaArs: listaTotal.ars,
             exchangeRate: exchangeRate.rate,
             onScanDni: _pickScanSource,
@@ -583,6 +596,7 @@ class _BudgetSidebar extends StatelessWidget {
     required this.displayTotalArs,
     required this.displayTotalUsd,
     required this.showTotalInUsd,
+    required this.mixedCurrency,
     required this.listaArs,
     required this.exchangeRate,
     required this.onScanDni,
@@ -596,6 +610,7 @@ class _BudgetSidebar extends StatelessWidget {
   final double displayTotalArs;
   final double displayTotalUsd;
   final bool showTotalInUsd;
+  final bool mixedCurrency;
   final double listaArs;
   final double? exchangeRate;
   final VoidCallback onScanDni;
@@ -660,13 +675,26 @@ class _BudgetSidebar extends StatelessWidget {
         const SizedBox(height: 24),
         Text('TOTAL DEL PRESUPUESTO', style: sectionLabel),
         const SizedBox(height: 8),
-        Text(
-          showTotalInUsd
-              ? formatUsd(displayTotalUsd)
-              : formatArs(displayTotalArs),
-          style: AppText.number
-              .copyWith(fontSize: 32, fontWeight: FontWeight.w700),
-        ),
+        if (mixedCurrency) ...[
+          Text(
+            formatArs(displayTotalArs),
+            style: AppText.number
+                .copyWith(fontSize: 28, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            formatUsd(displayTotalUsd),
+            style: AppText.number
+                .copyWith(fontSize: 28, fontWeight: FontWeight.w700),
+          ),
+        ] else
+          Text(
+            showTotalInUsd
+                ? formatUsd(displayTotalUsd)
+                : formatArs(displayTotalArs),
+            style: AppText.number
+                .copyWith(fontSize: 32, fontWeight: FontWeight.w700),
+          ),
         if (exchangeRate != null) ...[
           const SizedBox(height: 4),
           Text(

@@ -66,9 +66,19 @@ class EmployeeCartBody extends StatelessWidget {
       );
     }
 
+    final hasPerLineMethods =
+        cart.items.any((item) => item.paymentMethod != null);
     CartLineTotal? checkoutTotal;
     List<PaymentAllocation> allocations = [];
-    if (checkout != null) {
+    if (hasPerLineMethods) {
+      // Cada producto con su medio: montos reales por método (no share global).
+      allocations = totalsService.allocationsForCart(
+        cart: cart,
+        fallbackMethod: pricingMethod,
+        exchangeRate: exchangeRate,
+        pricingSettings: pricingSettings,
+      );
+    } else if (checkout != null) {
       checkoutTotal = totalsService.cartTotalAtMethod(
         cart: cart,
         method: checkout.pricingMethod,
@@ -90,7 +100,7 @@ class EmployeeCartBody extends StatelessWidget {
             pricingSettings: pricingSettings,
           )
         : const CartLineTotal(usd: 0, ars: 0);
-    final canContinue = checkout != null && hasRate;
+    final canContinue = (checkout != null || hasPerLineMethods) && hasRate;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -156,13 +166,16 @@ class EmployeeCartBody extends StatelessWidget {
                 pricingSettings,
               );
               final lineUsd = prices.usd * item.quantity;
+              final effectiveMethod = item.paymentMethod ?? pricingMethod;
               final lineArs = hasRate
-                  ? pricingMethod.totalArsFor(prices) * item.quantity
+                  ? effectiveMethod.totalArsFor(prices) * item.quantity
                   : 0.0;
 
               final isArma = item.product.isArma;
               return EmployeeCartLine(
                 item: item,
+                prices: prices,
+                globalMethod: pricingMethod,
                 lineUsd: lineUsd,
                 lineArs: lineArs,
                 showArs: hasRate,
@@ -209,7 +222,7 @@ class EmployeeCartBody extends StatelessWidget {
                     )),
           listaArs: hasRate ? listaTotal.ars : 0,
           allocations: hasRate ? allocations : const [],
-          checkoutConfigured: checkout != null,
+          checkoutConfigured: checkout != null || hasPerLineMethods,
           hasServerRate: hasRate,
           exchangeRate: hasRate ? exchangeRate.rate : null,
           updatedAt: hasRate ? exchangeRate.updatedAt : null,
@@ -282,6 +295,8 @@ class EmployeeCartLine extends StatelessWidget {
     required this.lineUsd,
     required this.lineArs,
     required this.canIncrease,
+    this.prices,
+    this.globalMethod,
     this.onDecrease,
     this.onIncrease,
     this.onRemove,
@@ -292,6 +307,13 @@ class EmployeeCartLine extends StatelessWidget {
   final double lineUsd;
   final double lineArs;
   final bool canIncrease;
+
+  /// Precios del producto para poder ofrecer/mostrar el medio de pago por
+  /// línea. Si es null (contexto sin cálculo), el chip no se muestra.
+  final ProductPrices? prices;
+
+  /// Medio de pago global del checkout (fallback cuando la línea no define uno).
+  final PaymentMethod? globalMethod;
   final VoidCallback? onDecrease;
   final VoidCallback? onIncrease;
   final VoidCallback? onRemove;
@@ -304,6 +326,8 @@ class EmployeeCartLine extends StatelessWidget {
     final code = product.codigo.isNotEmpty ? product.codigo : product.modeloDisplay;
     final unitUsd = lineUsd / item.quantity;
     final isArma = product.isArma;
+    final fallbackMethod = globalMethod ?? defaultPaymentMethod;
+    final effectiveMethod = item.paymentMethod ?? fallbackMethod;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -328,6 +352,22 @@ class EmployeeCartLine extends StatelessWidget {
               ),
             ],
           ),
+          if (prices != null) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _LinePaymentChip(
+                method: effectiveMethod,
+                usesGlobal: item.paymentMethod == null,
+                onTap: () => _showLinePaymentPicker(
+                  context,
+                  item: item,
+                  prices: prices!,
+                  globalMethod: fallbackMethod,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 6),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -374,6 +414,208 @@ class EmployeeCartLine extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Selector del medio de pago de UNA línea (promo + dos medios en un mismo
+/// comprobante). Muestra el precio de cada método para este producto y permite
+/// volver al "pago general" del checkout.
+Future<void> _showLinePaymentPicker(
+  BuildContext context, {
+  required CartItem item,
+  required ProductPrices prices,
+  required PaymentMethod globalMethod,
+}) async {
+  final cart = context.read<CartService>();
+  final qty = item.quantity;
+  final usdAvailable = prices.usd > 0;
+  final methods = weaponPaymentMethods.where((method) {
+    if (method.isUsdPayment) return usdAvailable;
+    return method.totalArsFor(prices) > 0;
+  }).toList();
+
+  String amountFor(PaymentMethod method) => method.isUsdPayment
+      ? formatUsd(method.totalUsdFor(prices) * qty)
+      : formatArs(method.totalArsFor(prices) * qty);
+
+  await showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: AppColors.canvas,
+    barrierColor: AppColors.scrim,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(AppDecorations.radiusSheet),
+      ),
+    ),
+    builder: (sheetContext) {
+      final selected = item.paymentMethod;
+      return SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.8,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Medio de pago de este producto',
+                  style: AppText.heading.copyWith(fontSize: 18),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  catalogProductTitle(item.product),
+                  style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 12),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      _LinePaymentOption(
+                        label: 'Usar pago general',
+                        trailing: globalMethod.shortLabel,
+                        selected: selected == null,
+                        onTap: () {
+                          cart.setLinePaymentMethod(item.lineKey, null);
+                          Navigator.of(sheetContext).pop();
+                        },
+                      ),
+                      const Divider(color: AppColors.border, height: 16),
+                      for (final method in methods) ...[
+                        _LinePaymentOption(
+                          label: method.shortLabel,
+                          trailing: amountFor(method),
+                          selected: selected == method,
+                          onTap: () {
+                            cart.setLinePaymentMethod(item.lineKey, method);
+                            Navigator.of(sheetContext).pop();
+                          },
+                        ),
+                        const SizedBox(height: 6),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _LinePaymentChip extends StatelessWidget {
+  const _LinePaymentChip({
+    required this.method,
+    required this.usesGlobal,
+    required this.onTap,
+  });
+
+  final PaymentMethod method;
+  final bool usesGlobal;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = usesGlobal ? AppColors.textMuted : AppColors.accent;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(AppDecorations.radius),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppDecorations.radius),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppDecorations.radius),
+            border: Border.all(color: color.withValues(alpha: 0.6)),
+            color: usesGlobal
+                ? AppColors.surfaceTouch
+                : AppColors.accent.withValues(alpha: 0.12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.payments_outlined, size: 14, color: color),
+              const SizedBox(width: 6),
+              Text(
+                method.shortLabel,
+                style: AppText.bodySmall.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+              if (usesGlobal)
+                Text(
+                  ' · general',
+                  style: AppText.bodySmall.copyWith(color: AppColors.textMuted),
+                ),
+              Icon(Icons.arrow_drop_down, size: 18, color: color),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LinePaymentOption extends StatelessWidget {
+  const _LinePaymentOption({
+    required this.label,
+    required this.trailing,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final String trailing;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.textPrimary : AppColors.surfaceTouch,
+      borderRadius: BorderRadius.circular(AppDecorations.radius),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppDecorations.radius),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              if (selected) ...[
+                const Icon(Icons.check, size: 18, color: AppColors.canvas),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: Text(
+                  label,
+                  style: AppText.bodyLarge.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: selected ? AppColors.canvas : AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              Text(
+                trailing,
+                style: AppText.bodyLarge.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: selected ? AppColors.canvas : AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
