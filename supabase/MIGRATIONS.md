@@ -10,7 +10,8 @@ huecos históricos de numeración.
 `001`, `003`, `004`, `005`, `007`, `008`, `009`, `011`, `012`, `014`, `015`,
 `016`, `017`, `018`, `019`, `020`, `021*`, `022`, `023`, `024`, `025`, `026`,
 `027`, `028`, `029`, `030`, `031`, `032`, `033`, `034`, `035`, `036`, `037`,
-`038`, `039`, `040`, `041`, `042`, `043`, `044`, `045`, `046`, `047`, `048`, `049`, `050`.
+`038`, `039`, `040`, `041`, `042`, `043`, `044`, `045`, `046`, `047`, `048`, `049`, `050`,
+`051`.
 
 - `035` — Realtime: `vendedores`/`administradores`/`ventas` en la publication
   + `REPLICA IDENTITY FULL` (AR-18, AR-20).
@@ -26,6 +27,11 @@ huecos históricos de numeración.
 - `048` — 3 cuotas SI munición solo arma larga (`tarjeta3_solo_arma_larga`).
 - `049` — `dolar_billete` cotiza como efectivo (mismo %); unit_usd alineado.
 - `050` — World Guns: `transferencia_como_efectivo` tenant-wide + restore promos.
+
+- `051` — World Guns: alta del producto especial "Cajón Stopping Power 9mm"
+  (1 cajón = 20 cajas = 1000 tiros) con `fixed_prices` (USD 440 / $682.000
+  final efectivo/transferencia, sin tarjeta ni el 10%). Aplicada por SQL
+  Editor + `supabase migration repair --status applied 051`.
 
 ## NO aplicada (decisión pendiente)
 
