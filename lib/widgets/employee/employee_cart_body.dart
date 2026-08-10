@@ -790,9 +790,16 @@ class EmployeeCartTotalsBlock extends StatelessWidget {
           if (hasServerRate && allocations.any((a) => !a.paysInUsd)) ...[
             Builder(
               builder: (_) {
+                final rate = exchangeRate ?? 0;
+                // Convertimos la porción en USD a ARS para comparar contra lista
+                // (si no, un pago por producto mixto ignora la línea en dólares).
+                if (allocations.any((a) => a.paysInUsd) && rate <= 0) {
+                  return const SizedBox.shrink();
+                }
                 final pricedArs = allocations.fold<double>(
                   0,
-                  (sum, a) => sum + a.amountArs,
+                  (sum, a) =>
+                      sum + (a.paysInUsd ? a.amountUsd * rate : a.amountArs),
                 );
                 final deltaLabel = formatSignedArsDelta(pricedArs - listaArs);
                 if (deltaLabel == null) return const SizedBox.shrink();
