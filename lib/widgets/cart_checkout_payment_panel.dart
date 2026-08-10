@@ -107,25 +107,48 @@ class _CheckoutSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = totalsService.cartTotalAtMethod(
-      cart: cart,
-      method: checkout.pricingMethod,
-      exchangeRate: exchangeRate,
-      pricingSettings: pricingSettings,
-    );
     final listaTotal = totalsService.cartTotalAtMethod(
       cart: cart,
       method: PaymentMethod.lista,
       exchangeRate: exchangeRate,
       pricingSettings: pricingSettings,
     );
-    final allocations = totalsService.allocationsFor(
-      checkout: checkout,
-      total: total,
-    );
-    final deltaLabel = checkout.pricingMethod.isUsdPayment
-        ? formatSignedUsdDelta(total.usd - listaTotal.usd)
-        : formatSignedArsDelta(total.ars - listaTotal.ars);
+
+    // Si hay medios por renglón, el resumen debe reflejar lo que realmente
+    // paga el cliente (mezcla de métodos), no el total al método global.
+    final hasPerLineMethods =
+        cart.items.any((item) => item.paymentMethod != null);
+
+    final List<PaymentAllocation> allocations;
+    final String? deltaLabel;
+    if (hasPerLineMethods) {
+      allocations = totalsService.allocationsForCart(
+        cart: cart,
+        fallbackMethod: checkout.pricingMethod,
+        exchangeRate: exchangeRate,
+        pricingSettings: pricingSettings,
+      );
+      final rate = exchangeRate.rate;
+      final pricedArs = allocations.fold<double>(
+        0,
+        (sum, a) => sum + (a.paysInUsd ? a.amountUsd * rate : a.amountArs),
+      );
+      deltaLabel = formatSignedArsDelta(pricedArs - listaTotal.ars);
+    } else {
+      final total = totalsService.cartTotalAtMethod(
+        cart: cart,
+        method: checkout.pricingMethod,
+        exchangeRate: exchangeRate,
+        pricingSettings: pricingSettings,
+      );
+      allocations = totalsService.allocationsFor(
+        checkout: checkout,
+        total: total,
+      );
+      deltaLabel = checkout.pricingMethod.isUsdPayment
+          ? formatSignedUsdDelta(total.usd - listaTotal.usd)
+          : formatSignedArsDelta(total.ars - listaTotal.ars);
+    }
 
     if (allocations.length == 1) {
       final allocation = allocations.first;
