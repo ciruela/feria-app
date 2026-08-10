@@ -336,4 +336,131 @@ void main() {
     expect(efectivo.detail, isNull);
     expect(efectivo.delta, formatSignedArsDelta(-20000));
   });
+
+  test('urbanPaymentDetail: tarjeta muestra la cantidad de cuotas', () {
+    expect(
+      PresupuestoSummary(
+        _budgetWithMethods(
+          {PaymentMethod.tarjeta6},
+          allocations: const [
+            PaymentAllocation(
+              method: PaymentMethod.tarjeta6,
+              amountUsd: 0,
+              amountArs: 243225,
+            ),
+          ],
+        ),
+      ).urbanPaymentDetail,
+      'TARJETA 6 CUOTAS',
+    );
+  });
+
+  test('urbanPaymentDetail: efectivo se muestra sin ambigüedad', () {
+    expect(
+      PresupuestoSummary(
+        _budgetWithMethods(
+          {PaymentMethod.efectivo},
+          allocations: const [
+            PaymentAllocation(
+              method: PaymentMethod.efectivo,
+              amountUsd: 0,
+              amountArs: 100,
+            ),
+          ],
+        ),
+      ).urbanPaymentDetail,
+      'EFECTIVO',
+    );
+  });
+
+  test('urbanPaymentDetail: pago por producto lista cada cuota distinta', () {
+    final budget = Budget(
+      date: DateTime(2026, 7, 22),
+      customer: const BudgetCustomer(),
+      lines: const [],
+      totalArs: 200,
+      totalUsd: 0,
+      paymentAllocations: const [
+        PaymentAllocation(
+          method: PaymentMethod.tarjeta6,
+          amountUsd: 0,
+          amountArs: 100,
+        ),
+        PaymentAllocation(
+          method: PaymentMethod.tarjeta12,
+          amountUsd: 0,
+          amountArs: 100,
+        ),
+      ],
+    );
+
+    expect(
+      PresupuestoSummary(budget).urbanPaymentDetail,
+      'TARJETA 6 CUOTAS / TARJETA 12 CUOTAS',
+    );
+  });
+
+  test('urbanPaymentDetail: sin pagos devuelve guión', () {
+    final budget = Budget(
+      date: DateTime(2026, 7, 22),
+      customer: const BudgetCustomer(),
+      lines: const [],
+      totalArs: 0,
+      totalUsd: 0,
+    );
+    expect(PresupuestoSummary(budget).urbanPaymentDetail, '—');
+  });
+
+  test('showsInstallmentBreakdown: true con cuotas, false en pago simple', () {
+    final enCuotas = _budgetWithMethods(
+      {PaymentMethod.tarjeta6},
+      allocations: const [
+        PaymentAllocation(
+          method: PaymentMethod.tarjeta6,
+          amountUsd: 0,
+          amountArs: 243225,
+        ),
+      ],
+    );
+    expect(PresupuestoSummary(enCuotas).showsInstallmentBreakdown, isTrue);
+
+    final efectivoSimple = _budgetWithMethods(
+      {PaymentMethod.efectivo},
+      allocations: const [
+        PaymentAllocation(
+          method: PaymentMethod.efectivo,
+          amountUsd: 0,
+          amountArs: 100,
+        ),
+      ],
+    );
+    expect(
+      PresupuestoSummary(efectivoSimple).showsInstallmentBreakdown,
+      isFalse,
+    );
+  });
+
+  test('showsInstallmentBreakdown: true con más de un método (por producto)',
+      () {
+    final budget = Budget(
+      date: DateTime(2026, 7, 22),
+      customer: const BudgetCustomer(),
+      lines: const [],
+      totalArs: 200,
+      totalUsd: 0,
+      paymentAllocations: const [
+        PaymentAllocation(
+          method: PaymentMethod.efectivo,
+          amountUsd: 0,
+          amountArs: 100,
+        ),
+        PaymentAllocation(
+          method: PaymentMethod.transferencia,
+          amountUsd: 0,
+          amountArs: 100,
+        ),
+      ],
+    );
+    expect(PresupuestoSummary(budget).showsInstallmentBreakdown, isTrue);
+  });
 }

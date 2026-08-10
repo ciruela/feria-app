@@ -42,6 +42,46 @@ class PresupuestoSummary {
     }).toList();
   }
 
+  /// Muestra el desglose por método (con "N x $cuota") cuando el pago fue en
+  /// cuotas o hay más de un método (pago por producto). Evita que el
+  /// comprobante quede ambiguo y que la caja cobre una cantidad de cuotas
+  /// distinta a la acordada.
+  bool get showsInstallmentBreakdown {
+    final lines = paymentAllocationLines;
+    return lines.length > 1 || lines.any((line) => line.detail != null);
+  }
+
+  /// Método(s) de pago con las cuotas explícitas para el campo "MÉTODO DE PAGO"
+  /// del comprobante Urban. Reemplaza el "TC" ambiguo: p. ej. "TARJETA 6
+  /// CUOTAS" o, con pago por producto, "TARJETA 6 CUOTAS / TARJETA 12 CUOTAS".
+  String get urbanPaymentDetail {
+    final allocations = budget.paymentAllocations;
+    final methods = allocations.isNotEmpty
+        ? allocations.map((allocation) => allocation.method)
+        : paymentMethods;
+    final tokens = <String>[];
+    for (final method in methods) {
+      final token = _urbanMethodLabel(method);
+      if (!tokens.contains(token)) tokens.add(token);
+    }
+    return tokens.isEmpty ? '—' : tokens.join(' / ');
+  }
+
+  static String _urbanMethodLabel(PaymentMethod method) {
+    final cuotas = method.installments;
+    if (cuotas != null) {
+      return cuotas == 1 ? 'TARJETA 1 PAGO' : 'TARJETA $cuotas CUOTAS';
+    }
+    return switch (method) {
+      PaymentMethod.efectivo => 'EFECTIVO',
+      PaymentMethod.transferencia => 'TRANSFERENCIA',
+      PaymentMethod.dolarBillete => 'USD',
+      PaymentMethod.debito => 'DÉBITO',
+      PaymentMethod.lista => 'LISTA',
+      _ => method.label.toUpperCase(),
+    };
+  }
+
   bool get usesPesos =>
       paymentMethods.contains(PaymentMethod.lista) ||
       paymentMethods.contains(PaymentMethod.transferencia) ||

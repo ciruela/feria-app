@@ -277,7 +277,7 @@ class PresupuestoPdf {
                 child: pw.Column(
                   children: [
                     _fieldRow(
-                        'MÉTODO DE PAGO:', summary.paymentAbbrevFor(branding)),
+                        'MÉTODO DE PAGO:', summary.urbanPaymentDetail),
                     _fieldRow('CUIT:', customer.dni),
                     _fieldRow(
                       'CONDICION FISCAL:',
@@ -326,6 +326,35 @@ class PresupuestoPdf {
             ),
           ),
         ),
+        if (summary.showsInstallmentBreakdown) ...[
+          pw.SizedBox(height: 6),
+          _urbanBox(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'DETALLE DE PAGO',
+                  style: pw.TextStyle(
+                    fontSize: 8,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 3),
+                for (final line in summary.paymentAllocationLines)
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.only(top: 1),
+                    child: pw.Text(
+                      '· ${line.displayText}',
+                      style: pw.TextStyle(
+                        fontSize: 7.5,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
         pw.SizedBox(height: 8),
         pw.Row(
           children: [

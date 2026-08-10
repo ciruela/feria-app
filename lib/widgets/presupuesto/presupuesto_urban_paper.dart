@@ -139,7 +139,7 @@ class PresupuestoUrbanPaper extends StatelessWidget {
                         children: [
                           _UrbanReadOnlyField(
                             label: 'MÉTODO DE PAGO:',
-                            value: summary.paymentAbbrevFor(document.branding),
+                            value: summary.urbanPaymentDetail,
                           ),
                           _UrbanField(
                             label: 'CUIT:',
@@ -203,6 +203,29 @@ class PresupuestoUrbanPaper extends StatelessWidget {
                 ),
               ),
             ),
+            if (summary.showsInstallmentBreakdown) ...[
+              const SizedBox(height: 6),
+              _UrbanBox(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'DETALLE DE PAGO',
+                      style: _urbanText(8.5, weight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 3),
+                    for (final line in summary.paymentAllocationLines)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 1),
+                        child: Text(
+                          '· ${line.displayText}',
+                          style: _urbanText(8, weight: FontWeight.w700),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,

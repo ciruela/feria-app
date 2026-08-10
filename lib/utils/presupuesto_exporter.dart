@@ -91,7 +91,7 @@ class PresupuestoExporter {
       ..writeln('NRO CLU: ${_value(budget.customer.clu)}')
       ..writeln('TELEFONO: ${_value(budget.customer.phone)}')
       ..writeln('DOMICILIO: ${_value(budget.customer.domicilioLine)}')
-      ..writeln('MÉTODO DE PAGO: ${summary.paymentAbbrevFor(branding)}')
+      ..writeln('MÉTODO DE PAGO: ${summary.urbanPaymentDetail}')
       ..writeln('CUIT: ${_value(budget.customer.dni)}')
       ..writeln(
         'CONDICION FISCAL: ${_value(summary.fiscalConditionFor(branding))}',
@@ -112,6 +112,14 @@ class PresupuestoExporter {
     }
     if (budget.hasUsdPayments) {
       buffer.writeln('Total: ${formatUsd(budget.totalUsdLines)}');
+    }
+
+    if (summary.showsInstallmentBreakdown) {
+      buffer.writeln('');
+      buffer.writeln('DETALLE DE PAGO:');
+      for (final line in summary.paymentAllocationLines) {
+        buffer.writeln('- ${line.displayText}');
+      }
     }
 
     return buffer.toString();
