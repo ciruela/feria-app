@@ -440,13 +440,17 @@ Future<void> _showLinePaymentPicker(
       ? formatUsd(method.totalUsdFor(prices) * qty)
       : formatArs(method.totalArsFor(prices) * qty);
 
-  // Desglose "N x $cuota" para tarjetas en cuotas.
-  String? cuotaDetailFor(PaymentMethod method) {
-    final n = method.installments;
-    if (n == null || n <= 1 || method.isUsdPayment) return null;
+  // Subtítulo por opción: desglose de cuota + ahorro/recargo vs lista (ARS).
+  String? subtitleFor(PaymentMethod method) {
+    if (method.isUsdPayment) return null;
     final total = method.totalArsFor(prices) * qty;
     if (total <= 0) return null;
-    return '$n x ${formatArs(total / n)}';
+    final parts = <String>[];
+    final n = method.installments;
+    if (n != null && n > 1) parts.add('$n x ${formatArs(total / n)}');
+    final delta = formatSignedArsDelta(total - prices.lista * qty);
+    if (delta != null) parts.add(delta);
+    return parts.isEmpty ? null : parts.join(' · ');
   }
 
   await showModalBottomSheet<void>(
@@ -502,7 +506,7 @@ Future<void> _showLinePaymentPicker(
                         _LinePaymentOption(
                           label: method.shortLabel,
                           trailing: amountFor(method),
-                          subtitle: cuotaDetailFor(method),
+                          subtitle: subtitleFor(method),
                           selected: selected == method,
                           onTap: () {
                             cart.setLinePaymentMethod(item.lineKey, method);
@@ -592,7 +596,7 @@ class _LinePaymentOption extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  /// Detalle opcional bajo el nombre (ej: "3 x $53.475").
+  /// Detalle opcional bajo el nombre (ej: "3 x $53.475 · + $ 6.975").
   final String? subtitle;
 
   @override

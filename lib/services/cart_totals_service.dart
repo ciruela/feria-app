@@ -99,10 +99,12 @@ class CartTotalsService {
     final order = <PaymentMethod>[];
     final usdByMethod = <PaymentMethod, double>{};
     final arsByMethod = <PaymentMethod, double>{};
+    final listaByMethod = <PaymentMethod, double>{};
 
     for (final line in lines) {
       final method = line.paymentMethod;
       if (!order.contains(method)) order.add(method);
+      listaByMethod[method] = (listaByMethod[method] ?? 0) + line.listaArs;
       if (line.paysInUsd) {
         usdByMethod[method] = (usdByMethod[method] ?? 0) + line.lineUsd;
       } else {
@@ -110,7 +112,13 @@ class CartTotalsService {
       }
     }
 
-    return _groupedAllocations(order, usdByMethod, arsByMethod, exchangeRate.rate);
+    return _groupedAllocations(
+      order,
+      usdByMethod,
+      arsByMethod,
+      exchangeRate.rate,
+      listaByMethod: listaByMethod,
+    );
   }
 
   /// Igual que [allocationsFromLines] pero directo desde el carrito, para el
@@ -127,12 +135,15 @@ class CartTotalsService {
     final order = <PaymentMethod>[];
     final usdByMethod = <PaymentMethod, double>{};
     final arsByMethod = <PaymentMethod, double>{};
+    final listaByMethod = <PaymentMethod, double>{};
 
     for (final item in cart.items) {
       final method = item.paymentMethod ?? fallbackMethod;
       final prices =
           _pricing.pricesFor(item.product, exchangeRate, pricingSettings);
       if (!order.contains(method)) order.add(method);
+      listaByMethod[method] =
+          (listaByMethod[method] ?? 0) + prices.lista * item.quantity;
       if (method.isUsdPayment) {
         usdByMethod[method] =
             (usdByMethod[method] ?? 0) + method.totalUsdFor(prices) * item.quantity;
@@ -142,7 +153,13 @@ class CartTotalsService {
       }
     }
 
-    return _groupedAllocations(order, usdByMethod, arsByMethod, exchangeRate.rate);
+    return _groupedAllocations(
+      order,
+      usdByMethod,
+      arsByMethod,
+      exchangeRate.rate,
+      listaByMethod: listaByMethod,
+    );
   }
 
   /// Construye las allocations (montos exactos por moneda) y calcula el `share`
@@ -151,8 +168,9 @@ class CartTotalsService {
     List<PaymentMethod> order,
     Map<PaymentMethod, double> usdByMethod,
     Map<PaymentMethod, double> arsByMethod,
-    double rate,
-  ) {
+    double rate, {
+    Map<PaymentMethod, double> listaByMethod = const {},
+  }) {
     double baseOf(PaymentMethod method) {
       final usd = usdByMethod[method] ?? 0;
       final ars = arsByMethod[method] ?? 0;
@@ -169,6 +187,11 @@ class CartTotalsService {
           amountUsd: usdByMethod[method] ?? 0,
           amountArs: arsByMethod[method] ?? 0,
           share: totalBase > 0 ? baseOf(method) / totalBase : 1.0 / order.length,
+          // Delta vs lista en ARS: lo pagado (USD a ARS por tipo de cambio)
+          // menos el precio de lista de esos productos.
+          deltaArs: listaByMethod.containsKey(method)
+              ? baseOf(method) - (listaByMethod[method] ?? 0)
+              : 0,
         ),
     ];
   }
