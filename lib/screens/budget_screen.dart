@@ -358,6 +358,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
           idempotencyKey: cart.ensureSaleIdempotencyKey(),
           sellerId: sellerId,
           pricingSettings: context.read<PricingSettingsService>(),
+          applyDiscounts: cart.applyDiscounts,
           branding: resolvePresupuestoBranding(
             context.read<TenantSessionService>(),
           ),

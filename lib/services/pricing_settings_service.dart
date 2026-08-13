@@ -191,6 +191,21 @@ class PricingSettingsService extends ChangeNotifier {
     return map;
   }
 
+  /// Igual que [toMap] pero sin descuentos: efectivo/transferencia cotizan a
+  /// lista y se quita la promo de munición. Mantiene los recargos de tarjeta.
+  ///
+  /// Lo usa el registro de ventas para que el servidor (que recalcula precios
+  /// desde este map) coincida con el cliente cuando la venta se cobra "sin
+  /// descuento" (World Guns). Debe reflejar lo mismo que
+  /// `PricingService.pricesFor(..., applyDiscounts: false)`.
+  Map<String, dynamic> toMapWithoutDiscounts() {
+    final map = toMap();
+    map['efectivo'] = 0;
+    map['transferencia_como_efectivo'] = false;
+    map.remove('municion');
+    return map;
+  }
+
   void _applyDefaults() {
     descuentoEfectivoPct = 5;
     recargoDebitoPct = 5;

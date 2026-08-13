@@ -81,4 +81,34 @@ void main() {
     expect(mun['transferencia_como_efectivo'], isTrue);
     expect(mun['tarjeta3_solo_arma_larga'], isTrue);
   });
+
+  test('toMapWithoutDiscounts: efectivo 0, sin transfer=efectivo ni munición', () async {
+    final settings = PricingSettingsService();
+    await settings.save(
+      efectivoPct: 5,
+      debitoPct: 5,
+      tarjeta1Pct: 10,
+      tarjeta3Pct: 15,
+      tarjeta6Pct: 20,
+      tarjeta9Pct: 30,
+      tarjeta12Pct: 35,
+      tarjeta18Pct: 45,
+      municionOverrideEnabled: true,
+      municionEfectivoPct: 10,
+      municionTarjeta3Pct: 0,
+      municionTransferenciaComoEfectivo: true,
+      municionTarjeta3SoloArmaLarga: true,
+      transferenciaComoEfectivo: true,
+    );
+
+    final map = settings.toMapWithoutDiscounts();
+    // Descuentos apagados: efectivo a 0 y transferencia a lista.
+    expect(map['efectivo'], 0);
+    expect(map['transferencia_como_efectivo'], isFalse);
+    expect(map.containsKey('municion'), isFalse);
+    // Recargos de tarjeta intactos.
+    expect(map['tarjeta3'], 15);
+    expect(map['tarjeta6'], 20);
+    expect(map['tarjeta12'], 35);
+  });
 }

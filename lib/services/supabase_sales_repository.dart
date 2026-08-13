@@ -72,6 +72,9 @@ class SupabaseSalesRepository {
     String? sellerId,
     PricingSettingsService? pricingSettings,
     required PresupuestoBranding branding,
+    /// World Guns: si la venta se cobra sin descuento, el server debe recalcular
+    /// a lista. `false` manda una config de pricing sin descuentos.
+    bool applyDiscounts = true,
   }) async {
     final quantities = _quantitiesFromBudgetLines(budget.lines);
     if (_catalog != null) {
@@ -84,7 +87,7 @@ class SupabaseSalesRepository {
 
     final items = _itemsPayload(budget);
     // Clave del carrito (checkout attempt): reintentos del usuario reutilizan la misma.
-    final pricing = _pricingPayload(pricingSettings);
+    final pricing = _pricingPayload(pricingSettings, applyDiscounts);
     final rpcParams = {
       'p_items': items,
       'p_metodo_pago': paymentMethods.isNotEmpty ? paymentMethods : 'lista',
@@ -421,9 +424,14 @@ class SupabaseSalesRepository {
         .toList();
   }
 
-  Map<String, dynamic> _pricingPayload(PricingSettingsService? settings) {
+  Map<String, dynamic> _pricingPayload(
+    PricingSettingsService? settings,
+    bool applyDiscounts,
+  ) {
     if (settings == null) return <String, dynamic>{};
-    return settings.toMap();
+    return applyDiscounts
+        ? settings.toMap()
+        : settings.toMapWithoutDiscounts();
   }
 
   Future<Map<String, dynamic>> _registerSaleWithRetry(
