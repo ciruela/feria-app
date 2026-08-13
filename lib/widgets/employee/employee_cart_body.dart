@@ -15,6 +15,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../added_to_cart_sheet.dart';
 import '../cart_checkout_payment_panel.dart';
+import '../cart_discounts_panel.dart';
 import 'catalog_product_list.dart';
 
 /// Cuerpo compartido del carrito (panel desktop, pantalla mobile y web).
@@ -150,6 +151,10 @@ class EmployeeCartBody extends StatelessWidget {
         ],
         Padding(
           padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 16),
+          child: const CartDiscountsPanel(),
+        ),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 16),
           child: const CartCheckoutPaymentPanel(),
         ),
         const SizedBox(height: 8),
@@ -164,6 +169,7 @@ class EmployeeCartBody extends StatelessWidget {
                 item.product,
                 exchangeRate,
                 pricingSettings,
+                applyDiscounts: cart.applyDiscounts,
               );
               final lineUsd = prices.usd * item.quantity;
               final effectiveMethod = item.paymentMethod ?? pricingMethod;

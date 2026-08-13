@@ -7,8 +7,12 @@ class PricingService {
   ProductPrices pricesFor(
     Product product,
     ExchangeRateService exchangeRate,
-    PricingSettingsService settings,
-  ) {
+    PricingSettingsService settings, {
+    /// World Guns: el vendedor puede desactivar los descuentos por venta. Con
+    /// `false` no se aplica el descuento de efectivo/transferencia ni la promo
+    /// de munición (todo cotiza a lista); los recargos de tarjeta se mantienen.
+    bool applyDiscounts = true,
+  }) {
     // Urban Tactical: precios fijos del Excel. No se recalcula nada.
     final fixed = product.fixedPrices;
     if (fixed != null) {
@@ -16,12 +20,17 @@ class PricingService {
     }
 
     final lista = exchangeRate.toArs(product.precioUsd);
-    final efectivoPct = settings.descuentoEfectivoPctFor(product.type);
-    final tarjeta3Pct = settings.recargoTarjeta3PctFor(product);
+    final efectivoPct =
+        applyDiscounts ? settings.descuentoEfectivoPctFor(product.type) : 0;
+    // Sin descuentos, 3 cuotas usa el recargo general (ignora la promo munición).
+    final tarjeta3Pct = applyDiscounts
+        ? settings.recargoTarjeta3PctFor(product)
+        : settings.recargoTarjeta3Pct;
     final efectivo = lista * (1 - efectivoPct / 100);
-    final transferencia = settings.transferenciaComoEfectivoFor(product.type)
-        ? efectivo
-        : lista;
+    final transferencia =
+        applyDiscounts && settings.transferenciaComoEfectivoFor(product.type)
+            ? efectivo
+            : lista;
 
     return ProductPrices(
       usd: product.precioUsd,

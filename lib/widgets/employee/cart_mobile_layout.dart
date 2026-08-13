@@ -15,6 +15,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../added_to_cart_sheet.dart';
 import '../cart_checkout_payment_panel.dart';
+import '../cart_discounts_panel.dart';
 import 'employee_cart_body.dart';
 
 /// Mock 05_Mob — carrito con ítems.
@@ -197,6 +198,7 @@ class _CartMobileContent extends StatelessWidget {
           ),
           const SizedBox(height: 12),
         ],
+        const CartDiscountsPanel(raisedSurface: true),
         const CartCheckoutPaymentPanel(
           budgetHandoff: true,
           raisedSurface: true,
@@ -275,8 +277,12 @@ class _CartMobileContent extends StatelessWidget {
     );
   }
 
-  ProductPrices _prices(CartItem item) =>
-      pricing.pricesFor(item.product, exchangeRate, pricingSettings);
+  ProductPrices _prices(CartItem item) => pricing.pricesFor(
+        item.product,
+        exchangeRate,
+        pricingSettings,
+        applyDiscounts: cart.applyDiscounts,
+      );
 
   double _lineUsd(CartItem item) => _prices(item).usd * item.quantity;
 

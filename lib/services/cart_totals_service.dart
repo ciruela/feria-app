@@ -27,11 +27,13 @@ class CartTotalsService {
     required PaymentMethod method,
     required ExchangeRateService exchangeRate,
     required PricingSettingsService pricingSettings,
+    bool applyDiscounts = true,
   }) {
     final prices = _pricing.pricesFor(
       item.product,
       exchangeRate,
       pricingSettings,
+      applyDiscounts: applyDiscounts,
     );
     return CartLineTotal(
       usd: method.totalUsdFor(prices) * item.quantity,
@@ -54,6 +56,7 @@ class CartTotalsService {
         method: method,
         exchangeRate: exchangeRate,
         pricingSettings: pricingSettings,
+        applyDiscounts: cart.applyDiscounts,
       );
       usd += line.usd;
       ars += line.ars;
@@ -77,6 +80,7 @@ class CartTotalsService {
         method: PaymentMethod.dolarBillete,
         exchangeRate: exchangeRate,
         pricingSettings: pricingSettings,
+        applyDiscounts: cart.applyDiscounts,
       );
       if (line.usd <= 0) return false;
     }
@@ -139,8 +143,12 @@ class CartTotalsService {
 
     for (final item in cart.items) {
       final method = item.paymentMethod ?? fallbackMethod;
-      final prices =
-          _pricing.pricesFor(item.product, exchangeRate, pricingSettings);
+      final prices = _pricing.pricesFor(
+        item.product,
+        exchangeRate,
+        pricingSettings,
+        applyDiscounts: cart.applyDiscounts,
+      );
       if (!order.contains(method)) order.add(method);
       listaByMethod[method] =
           (listaByMethod[method] ?? 0) + prices.lista * item.quantity;

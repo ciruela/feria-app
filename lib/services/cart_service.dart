@@ -77,6 +77,7 @@ class CartService extends ChangeNotifier {
   String? _saleIdempotencyKey;
   String? _tenantScope;
   String? _sellerScope;
+  bool _applyDiscounts = true;
   bool _restoring = false;
 
   List<CartItem> get items => List.unmodifiable(_items);
@@ -85,6 +86,16 @@ class CartService extends ChangeNotifier {
   CartCheckoutPayment? get checkoutPayment => _checkoutPayment;
   bool get hasCheckoutPayment => _checkoutPayment != null;
   String? get sellerScope => _sellerScope;
+
+  /// World Guns: si el vendedor aplica o no los descuentos (efectivo/transfer y
+  /// promo munición) en esta venta. `true` por defecto (comportamiento actual).
+  bool get applyDiscounts => _applyDiscounts;
+
+  void setApplyDiscounts(bool value) {
+    if (_applyDiscounts == value) return;
+    _applyDiscounts = value;
+    _notifyAndPersist();
+  }
 
   /// Datos del cliente tipeados/escaneados en el presupuesto. Se conservan al
   /// volver al carrito para sumar un producto olvidado (AR: no perder el DNI).
@@ -118,6 +129,7 @@ class CartService extends ChangeNotifier {
     _checkoutPayment = null;
     _customerDraft = null;
     _saleIdempotencyKey = null;
+    _applyDiscounts = true;
     notifyListeners();
   }
 
@@ -131,6 +143,7 @@ class CartService extends ChangeNotifier {
     _checkoutPayment = null;
     _customerDraft = null;
     _saleIdempotencyKey = null;
+    _applyDiscounts = true;
     notifyListeners();
   }
 
@@ -423,6 +436,7 @@ class CartService extends ChangeNotifier {
     _checkoutPayment = null;
     _customerDraft = null;
     _saleIdempotencyKey = null;
+    _applyDiscounts = true;
     _notifyAndPersist();
   }
 
@@ -446,6 +460,7 @@ class CartService extends ChangeNotifier {
         _checkoutPayment = null;
         _customerDraft = null;
         _saleIdempotencyKey = null;
+        _applyDiscounts = true;
         return;
       }
 
@@ -474,11 +489,13 @@ class CartService extends ChangeNotifier {
       _checkoutPayment = _checkoutFromJson(data['checkout']);
       _customerDraft = _customerDraftFromJson(data['customer']);
       _saleIdempotencyKey = data['saleIdempotencyKey'] as String?;
+      _applyDiscounts = data['applyDiscounts'] as bool? ?? true;
     } catch (_) {
       _items.clear();
       _checkoutPayment = null;
       _customerDraft = null;
       _saleIdempotencyKey = null;
+      _applyDiscounts = true;
     } finally {
       _restoring = false;
     }
@@ -497,6 +514,7 @@ class CartService extends ChangeNotifier {
       if (_customerDraft != null) 'customer': _customerDraft!.toJson(),
       if (_saleIdempotencyKey != null)
         'saleIdempotencyKey': _saleIdempotencyKey,
+      if (!_applyDiscounts) 'applyDiscounts': false,
     };
     await prefs.setString(_cacheKey, json.encode(payload));
   }

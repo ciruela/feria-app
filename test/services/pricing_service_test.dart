@@ -136,4 +136,40 @@ void main() {
 
     exchange.dispose();
   });
+
+  test('applyDiscounts=false: todo a lista, recargos de tarjeta intactos', () {
+    const munLarga = Product(
+      id: 'ml',
+      type: ProductType.municion,
+      marca: 'CCI',
+      calibre: '.308',
+      codigo: '308',
+      precioUsd: 100,
+    );
+
+    final exchange = ExchangeRateService();
+    // World Guns: descuento efectivo/transferencia + promo munición activos.
+    final settings = PricingSettingsService()
+      ..municionOverrideEnabled = true
+      ..municionDescuentoEfectivoPct = 10
+      ..municionRecargoTarjeta3Pct = 0
+      ..municionTransferenciaComoEfectivo = true
+      ..municionTarjeta3SoloArmaLarga = true
+      ..transferenciaComoEfectivo = true;
+
+    final prices = PricingService()
+        .pricesFor(munLarga, exchange, settings, applyDiscounts: false);
+
+    // Sin descuentos: efectivo y transferencia cotizan a lista.
+    expect(prices.lista, 150000);
+    expect(prices.efectivo, closeTo(150000, 0.01));
+    expect(prices.transferencia, closeTo(150000, 0.01));
+    // La promo 3 cuotas SI se ignora: usa el recargo general (+15%).
+    expect(prices.tarjeta3, closeTo(172500, 0.01));
+    // Los demás recargos de tarjeta no cambian.
+    expect(prices.tarjeta6, closeTo(180000, 0.01)); // +20%
+    expect(prices.tarjeta12, closeTo(202500, 0.01)); // +35%
+
+    exchange.dispose();
+  });
 }

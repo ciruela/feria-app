@@ -49,6 +49,7 @@ class BudgetService {
         item.product,
         exchangeRate,
         pricingSettings,
+        applyDiscounts: cart.applyDiscounts,
       );
       final unitUsd = method.totalUsdFor(prices);
       final unitArs = method.totalArsFor(prices);
