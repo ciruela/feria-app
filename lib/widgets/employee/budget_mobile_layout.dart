@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../cart_checkout_payment_panel.dart';
 import '../presupuesto/budget_serial_panel.dart';
+import 'known_customer_hint.dart';
 
 /// Mock 07_Mob — chrome del presupuesto (sin rediseñar el comprobante).
 class BudgetMobileLayout extends StatelessWidget {
@@ -10,20 +11,26 @@ class BudgetMobileLayout extends StatelessWidget {
     super.key,
     required this.scanning,
     required this.hasCustomerData,
+    required this.knownCustomerSaleCount,
+    required this.lookingUpCustomer,
     required this.checkoutConfigured,
     required this.onBack,
     required this.onScanDni,
     required this.onRescanDni,
+    this.onFindCustomer,
     required this.preview,
     required this.actions,
   });
 
   final bool scanning;
   final bool hasCustomerData;
+  final int? knownCustomerSaleCount;
+  final bool lookingUpCustomer;
   final bool checkoutConfigured;
   final VoidCallback onBack;
   final VoidCallback onScanDni;
   final VoidCallback onRescanDni;
+  final VoidCallback? onFindCustomer;
   final Widget preview;
   final Widget actions;
 
@@ -42,9 +49,12 @@ class BudgetMobileLayout extends StatelessWidget {
                 BudgetMobileChrome(
                   scanning: scanning,
                   hasCustomerData: hasCustomerData,
+                  knownCustomerSaleCount: knownCustomerSaleCount,
+                  lookingUpCustomer: lookingUpCustomer,
                   checkoutConfigured: checkoutConfigured,
                   onScanDni: onScanDni,
                   onRescanDni: onRescanDni,
+                  onFindCustomer: onFindCustomer,
                 ),
                 const SizedBox(height: 16),
                 const BudgetSerialPanel(),
@@ -103,22 +113,41 @@ class BudgetMobileChrome extends StatelessWidget {
     super.key,
     required this.scanning,
     required this.hasCustomerData,
+    required this.knownCustomerSaleCount,
+    required this.lookingUpCustomer,
     required this.checkoutConfigured,
     required this.onScanDni,
     required this.onRescanDni,
+    this.onFindCustomer,
   });
 
   final bool scanning;
   final bool hasCustomerData;
+  final int? knownCustomerSaleCount;
+  final bool lookingUpCustomer;
   final bool checkoutConfigured;
   final VoidCallback onScanDni;
   final VoidCallback onRescanDni;
+  final VoidCallback? onFindCustomer;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (onFindCustomer != null) ...[
+          OutlinedButton.icon(
+            onPressed: onFindCustomer,
+            icon: const Icon(Icons.person_search_outlined),
+            label: const Text('Buscar cliente existente'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              minimumSize: const Size.fromHeight(44),
+              side: BorderSide(color: AppColors.primary.withValues(alpha: 0.45)),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         OutlinedButton.icon(
           onPressed: scanning ? null : (hasCustomerData ? onRescanDni : onScanDni),
           icon: scanning
@@ -134,6 +163,11 @@ class BudgetMobileChrome extends StatelessWidget {
             minimumSize: const Size.fromHeight(44),
             side: const BorderSide(color: AppColors.border),
           ),
+        ),
+        const SizedBox(height: 8),
+        KnownCustomerHint(
+          saleCount: knownCustomerSaleCount,
+          lookingUp: lookingUpCustomer,
         ),
         const SizedBox(height: 8),
         Text(

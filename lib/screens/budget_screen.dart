@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,10 +8,12 @@ import 'package:provider/provider.dart';
 
 import '../models/budget.dart';
 import '../models/budget_customer_controllers.dart';
+import '../models/customer_record.dart';
 import '../models/product_prices.dart';
 import '../config/app_config.dart';
 import '../services/budget_service.dart';
 import '../services/cart_service.dart';
+import '../services/customer_repository.dart';
 import '../services/cart_totals_service.dart';
 import '../services/catalog_service.dart';
 import '../services/dni_ocr_service.dart';
@@ -26,7 +30,9 @@ import '../utils/presupuesto_pdf.dart';
 import '../widgets/cart_checkout_payment_panel.dart';
 import '../widgets/employee/budget_desktop_layout.dart';
 import '../widgets/employee/budget_mobile_layout.dart';
+import '../widgets/employee/customer_intake_sheet.dart';
 import '../widgets/employee/dni_scan_sheet.dart';
+import '../widgets/employee/known_customer_hint.dart';
 import '../widgets/presupuesto/budget_serial_panel.dart';
 import '../widgets/presupuesto_paper.dart';
 import 'comprobante_screen.dart';
@@ -41,12 +47,18 @@ class BudgetScreen extends StatefulWidget {
 class _BudgetScreenState extends State<BudgetScreen> {
   final _controllers = BudgetCustomerControllers();
   final _ocr = DniOcrService();
+  final _customerRepository = CustomerRepository();
+  Timer? _dniLookupTimer;
+  String _lastLookupNorm = '';
+  int? _knownCustomerSaleCount;
+  bool _lookingUpCustomer = false;
   bool _scanning = false;
   bool _finalizing = false;
   /// Gate for sidebar actions. Avoid setState on every keystroke: rebuilding
   /// the A4 FittedBox steals focus from Urban fill-in fields (AR-42).
   bool _customerReady = false;
   bool _draftLoaded = false;
+  bool _intakePrompted = false;
 
   @override
   void didChangeDependencies() {
@@ -59,11 +71,60 @@ class _BudgetScreenState extends State<BudgetScreen> {
     if (draft != null) {
       _controllers.applyCustomer(draft);
       _customerReady = _controllers.fullName.text.trim().length >= 3;
+      _scheduleCustomerLookup();
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _maybePromptCustomerIntake());
     }
+  }
+
+  bool _hasCustomerDraftData() {
+    return _controllers.fullName.text.trim().length >= 3 ||
+        normalizeDni(_controllers.dni.text).length >= 6;
+  }
+
+  Future<void> _maybePromptCustomerIntake() async {
+    if (!mounted || _intakePrompted || !AppConfig.useSupabase) return;
+    if (_hasCustomerDraftData()) return;
+    _intakePrompted = true;
+    await _promptCustomerIntake();
+  }
+
+  Future<void> _promptCustomerIntake() async {
+    if (!mounted || !AppConfig.useSupabase) return;
+
+    final slug = context.read<TenantSessionService>().activeTenantSlug;
+    final isUrban = PresupuestoBranding.forTenant(slug: slug).isUrban;
+
+    await showCustomerIntakeSheet(
+      context,
+      useCuilAsTaxId: isUrban,
+      repository: _customerRepository,
+      onExistingCustomer: _applyExistingCustomerRecord,
+      onNewCustomer: () {
+        if (!mounted) return;
+        _showMessage('Completá los datos del cliente nuevo en el comprobante.');
+      },
+    );
+  }
+
+  void _applyExistingCustomerRecord(CustomerRecord record) {
+    _controllers.applyCustomer(record.customer);
+    _lastLookupNorm = normalizeDni(record.customer.dni);
+    _saveCustomerDraft();
+    setState(() {
+      _knownCustomerSaleCount = record.saleCount;
+      _customerReady = _controllers.fullName.text.trim().length >= 3;
+    });
+    _showMessage(
+      record.saleCount > 0
+          ? 'Cliente cargado · ${record.saleCount} compra${record.saleCount == 1 ? '' : 's'} anterior${record.saleCount == 1 ? '' : 'es'}.'
+          : 'Cliente cargado. Revisá los datos antes de generar.',
+    );
   }
 
   @override
   void dispose() {
+    _dniLookupTimer?.cancel();
     _controllers.dispose();
     super.dispose();
   }
@@ -157,6 +218,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
       _customerReady = _controllers.fullName.text.trim().length >= 3;
     });
     _saveCustomerDraft();
+    _scheduleCustomerLookup();
 
     final missing = <String>[];
     if ((result.fullName?.isEmpty ?? true) &&
@@ -430,8 +492,61 @@ class _BudgetScreenState extends State<BudgetScreen> {
     // conservar los datos si el usuario vuelve al carrito.
     _saveCustomerDraft();
     final ready = _controllers.fullName.text.trim().length >= 3;
-    if (ready == _customerReady) return;
-    setState(() => _customerReady = ready);
+    if (ready != _customerReady) {
+      setState(() => _customerReady = ready);
+    }
+    _scheduleCustomerLookup();
+  }
+
+  void _scheduleCustomerLookup() {
+    _dniLookupTimer?.cancel();
+    if (!AppConfig.useSupabase) return;
+
+    final norm = normalizeDni(_controllers.dni.text);
+    if (norm.length < 6) {
+      if (_knownCustomerSaleCount != null || _lookingUpCustomer) {
+        setState(() {
+          _knownCustomerSaleCount = null;
+          _lookingUpCustomer = false;
+        });
+      }
+      _lastLookupNorm = '';
+      return;
+    }
+    if (norm == _lastLookupNorm) return;
+
+    _dniLookupTimer = Timer(const Duration(milliseconds: 450), () {
+      _lookupCustomer(norm);
+    });
+  }
+
+  Future<void> _lookupCustomer(String normDni) async {
+    if (!mounted) return;
+    setState(() => _lookingUpCustomer = true);
+    try {
+      final record = await _customerRepository.lookupByDni(_controllers.dni.text);
+      if (!mounted) return;
+      if (normalizeDni(_controllers.dni.text) != normDni) return;
+
+      _lastLookupNorm = normDni;
+      if (record != null) {
+        _controllers.applyCustomer(record.customer);
+        _saveCustomerDraft();
+        setState(() {
+          _knownCustomerSaleCount = record.saleCount;
+          _customerReady = _controllers.fullName.text.trim().length >= 3;
+        });
+      } else {
+        setState(() => _knownCustomerSaleCount = null);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _knownCustomerSaleCount = null);
+    } finally {
+      if (mounted) {
+        setState(() => _lookingUpCustomer = false);
+      }
+    }
   }
 
   @override
@@ -539,6 +654,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
             scanning: _scanning,
             checkoutConfigured: checkoutConfigured,
             hasCustomerData: hasCustomerData,
+            knownCustomerSaleCount: _knownCustomerSaleCount,
+            lookingUpCustomer: _lookingUpCustomer,
             displayTotalArs: displayTotalArs,
             displayTotalUsd: displayTotalUsd,
             showTotalInUsd: showTotalInUsd,
@@ -547,6 +664,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
             exchangeRate: exchangeRate.rate,
             onScanDni: _pickScanSource,
             onRescanDni: _pickScanSource,
+            onFindCustomer:
+                AppConfig.useSupabase ? _promptCustomerIntake : null,
             actions: actions,
           ),
           preview: ColoredBox(
@@ -581,10 +700,13 @@ class _BudgetScreenState extends State<BudgetScreen> {
     return BudgetMobileLayout(
       scanning: _scanning,
       hasCustomerData: hasCustomerData,
+      knownCustomerSaleCount: _knownCustomerSaleCount,
+      lookingUpCustomer: _lookingUpCustomer,
       checkoutConfigured: checkoutConfigured,
       onBack: () => Navigator.of(context).pop(),
       onScanDni: _pickScanSource,
       onRescanDni: _pickScanSource,
+      onFindCustomer: AppConfig.useSupabase ? _promptCustomerIntake : null,
       preview: previewWidget,
       actions: actions,
     );
@@ -596,6 +718,8 @@ class _BudgetSidebar extends StatelessWidget {
     required this.scanning,
     required this.checkoutConfigured,
     required this.hasCustomerData,
+    required this.knownCustomerSaleCount,
+    required this.lookingUpCustomer,
     required this.displayTotalArs,
     required this.displayTotalUsd,
     required this.showTotalInUsd,
@@ -604,12 +728,15 @@ class _BudgetSidebar extends StatelessWidget {
     required this.exchangeRate,
     required this.onScanDni,
     required this.onRescanDni,
+    this.onFindCustomer,
     required this.actions,
   });
 
   final bool scanning;
   final bool checkoutConfigured;
   final bool hasCustomerData;
+  final int? knownCustomerSaleCount;
+  final bool lookingUpCustomer;
   final double displayTotalArs;
   final double displayTotalUsd;
   final bool showTotalInUsd;
@@ -618,6 +745,7 @@ class _BudgetSidebar extends StatelessWidget {
   final double? exchangeRate;
   final VoidCallback onScanDni;
   final VoidCallback onRescanDni;
+  final VoidCallback? onFindCustomer;
   final Widget actions;
 
   @override
@@ -632,6 +760,19 @@ class _BudgetSidebar extends StatelessWidget {
       children: [
         Text('DATOS DEL CLIENTE', style: sectionLabel),
         const SizedBox(height: 10),
+        if (onFindCustomer != null) ...[
+          OutlinedButton.icon(
+            onPressed: onFindCustomer,
+            icon: const Icon(Icons.person_search_outlined),
+            label: const Text('Buscar cliente existente'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              minimumSize: const Size.fromHeight(44),
+              side: BorderSide(color: AppColors.primary.withValues(alpha: 0.45)),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         OutlinedButton.icon(
           onPressed:
               scanning ? null : (hasCustomerData ? onRescanDni : onScanDni),
@@ -653,6 +794,11 @@ class _BudgetSidebar extends StatelessWidget {
             minimumSize: const Size.fromHeight(44),
             side: const BorderSide(color: AppColors.border),
           ),
+        ),
+        const SizedBox(height: 8),
+        KnownCustomerHint(
+          saleCount: knownCustomerSaleCount,
+          lookingUp: lookingUpCustomer,
         ),
         const SizedBox(height: 8),
         Text(

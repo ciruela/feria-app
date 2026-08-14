@@ -57,6 +57,9 @@ app.*.map.json
 
 # Local env (Supabase credentials)
 .env
+.env.staging
+.env.prod
+.staging-db-password.local
 
 # Supabase CLI local link/cache
 supabase/.temp/

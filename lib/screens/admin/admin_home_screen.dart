@@ -26,6 +26,7 @@ import 'admin_activity_screen.dart';
 import 'admin_admins_screen.dart';
 import 'admin_change_pin_screen.dart';
 import 'admin_cierre_screen.dart';
+import 'admin_clientes_screen.dart';
 import 'admin_comprobantes_screen.dart';
 import 'admin_excel_screen.dart';
 import 'admin_metrics_screen.dart';
@@ -142,6 +143,22 @@ class AdminHomeScreen extends StatelessWidget {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => const AdminSellersScreen(),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          BigActionButton(
+            label: 'Clientes',
+            subtitle: AppConfig.useSupabase
+                ? 'Perfiles por DNI · autocompletado en checkout'
+                : 'Requiere Supabase configurado',
+            icon: Icons.people_outline_rounded,
+            accentColor: AppColors.primary,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const AdminClientesScreen(),
                 ),
               );
             },
