@@ -29,7 +29,7 @@ class CustomerRepository {
 
   Future<List<CustomerRecord>> list({
     String query = '',
-    int limit = 100,
+    int limit = 1000,
   }) async {
     if (!AppConfig.useSupabase) return const [];
 
