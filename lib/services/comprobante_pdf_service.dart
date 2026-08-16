@@ -47,6 +47,10 @@ class ComprobantePdfService {
     return path;
   }
 
+  /// Ruta del comprobante en Storage: `{tenant_id}/{AÑO}/{MES}/{DÍA}/{venta}.pdf`.
+  ///
+  /// El primer segmento DEBE seguir siendo el `tenant_id`: la RLS del bucket
+  /// (`020_storage_comprobantes_private.sql`) filtra por `foldername[1]`.
   static String storagePath({
     required String saleId,
     required DateTime date,
@@ -54,13 +58,14 @@ class ComprobantePdfService {
   }) {
     final year = date.year;
     final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
     final tenantPrefix = tenantId?.trim();
     if (tenantPrefix == null || tenantPrefix.isEmpty) {
       throw StateError(
         'Falta tenant_id para guardar el comprobante en Storage.',
       );
     }
-    return '$tenantPrefix/$year/$month/$saleId.pdf';
+    return '$tenantPrefix/$year/$month/$day/$saleId.pdf';
   }
 
   Future<Uint8List> fetchPdfBytes(String pdfPath) async {
