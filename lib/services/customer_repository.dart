@@ -4,6 +4,18 @@ import '../models/customer_record.dart';
 import '../utils/app_logger.dart';
 import 'supabase_service.dart';
 
+/// Orden del listado de clientes (mapea a `p_sort` en la RPC list_clientes).
+enum ClientesSort {
+  recent('recent', 'Recientes'),
+  name('name', 'Apellido (A–Z)'),
+  sales('sales', 'Más compras');
+
+  const ClientesSort(this.wireValue, this.label);
+
+  final String wireValue;
+  final String label;
+}
+
 class CustomerRepository {
   /// Busca un cliente por DNI/CUIT en el tenant activo.
   /// Devuelve null si no existe o el DNI es demasiado corto.
@@ -30,6 +42,11 @@ class CustomerRepository {
   Future<List<CustomerRecord>> list({
     String query = '',
     int limit = 1000,
+    ClientesSort sort = ClientesSort.recent,
+    bool onlyWithSales = false,
+    String fiscalCondition = '',
+    DateTime? lastSaleFrom,
+    DateTime? lastSaleTo,
   }) async {
     if (!AppConfig.useSupabase) return const [];
 
@@ -39,6 +56,11 @@ class CustomerRepository {
         params: {
           'p_query': query.trim(),
           'p_limit': limit,
+          'p_sort': sort.wireValue,
+          'p_only_with_sales': onlyWithSales,
+          'p_fiscal': fiscalCondition.trim(),
+          'p_from': lastSaleFrom?.toUtc().toIso8601String(),
+          'p_to': lastSaleTo?.toUtc().toIso8601String(),
         },
       );
       if (raw is! List) return const [];
@@ -53,6 +75,29 @@ class CustomerRepository {
         stackTrace: stackTrace,
       );
       rethrow;
+    }
+  }
+
+  /// Condiciones fiscales presentes en la base del tenant (para el filtro).
+  Future<List<String>> fiscalConditions() async {
+    if (!AppConfig.useSupabase) return const [];
+
+    try {
+      final raw = await SupabaseService.client.rpc(
+        'list_cliente_fiscal_conditions',
+      );
+      if (raw is! List) return const [];
+      return raw
+          .map((e) => e?.toString().trim() ?? '')
+          .where((e) => e.isNotEmpty)
+          .toList();
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        'list_cliente_fiscal_conditions falló',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return const [];
     }
   }
 
