@@ -15,6 +15,7 @@ class PresupuestoItemRow {
     required this.lineTotal,
     required this.isArma,
     this.serialNumber = '',
+    this.showsTarjetaConsumo = true,
   });
 
   const PresupuestoItemRow.empty()
@@ -26,7 +27,8 @@ class PresupuestoItemRow {
         unitPrice = '',
         lineTotal = '',
         isArma = false,
-        serialNumber = '';
+        serialNumber = '',
+        showsTarjetaConsumo = true;
 
   factory PresupuestoItemRow.fromLine(BudgetLine line) {
     return PresupuestoItemRow(
@@ -39,6 +41,8 @@ class PresupuestoItemRow {
       lineTotal: line.formattedLinePlain,
       isArma: line.isArma,
       serialNumber: line.serialNumber,
+      // Accesorios no llevan tarjeta de consumo.
+      showsTarjetaConsumo: line.showsTarjetaConsumo,
     );
   }
 
@@ -51,6 +55,9 @@ class PresupuestoItemRow {
   final String lineTotal;
   final bool isArma;
   final String serialNumber;
+
+  /// Si la fila puede editar tarjeta de consumo (falso para accesorios).
+  final bool showsTarjetaConsumo;
 
   bool get isEmpty => code.isEmpty && detail.isEmpty;
 

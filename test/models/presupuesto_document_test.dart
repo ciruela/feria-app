@@ -169,4 +169,34 @@ void main() {
     );
     expect(row.tc, '1234567');
   });
+
+  test('accesorios no habilitan tarjeta de consumo', () {
+    BudgetLine lineOfType(String productType, {bool isArma = false}) =>
+        BudgetLine(
+          lineKey: 'l',
+          productId: 'p',
+          code: 'C',
+          quantity: 1,
+          detail: 'X',
+          unitArs: 1000,
+          lineArs: 1000,
+          unitUsd: 1,
+          lineUsd: 1,
+          paymentMethod: PaymentMethod.transferencia,
+          isArma: isArma,
+          productType: productType,
+        );
+
+    final accesorio = lineOfType('accesorios');
+    expect(accesorio.isAccesorios, isTrue);
+    expect(accesorio.showsTarjetaConsumo, isFalse);
+    expect(
+      PresupuestoItemRow.fromLine(accesorio).showsTarjetaConsumo,
+      isFalse,
+    );
+
+    // Munición y armas sí llevan TC.
+    expect(lineOfType('municion').showsTarjetaConsumo, isTrue);
+    expect(lineOfType('arma_larga', isArma: true).showsTarjetaConsumo, isTrue);
+  });
 }
