@@ -179,12 +179,15 @@ class _AdminProductCreateScreenState extends State<AdminProductCreateScreen> {
               border: OutlineInputBorder(),
             ),
           ),
-          const SizedBox(height: 12),
-          CalibreField(
-            controller: _calibreController,
-            calibers: calibers,
-            enabled: !_saving,
-          ),
+          // Accesorios no usan calibre.
+          if (!_isAccesorios) ...[
+            const SizedBox(height: 12),
+            CalibreField(
+              controller: _calibreController,
+              calibers: calibers,
+              enabled: !_saving,
+            ),
+          ],
           const SizedBox(height: 12),
           if (_isArma) ...[
             TextField(
@@ -208,6 +211,32 @@ class _AdminProductCreateScreenState extends State<AdminProductCreateScreen> {
                 border: OutlineInputBorder(),
               ),
             ),
+          ] else if (_isAccesorios) ...[
+            // El "modelo" (nombre visible) de un accesorio se guarda en
+            // `descripcion`: es de ahí que las cards y el carrito toman el
+            // título. Por eso el campo escribe en `_descripcionController`.
+            TextField(
+              controller: _descripcionController,
+              textCapitalization: TextCapitalization.characters,
+              inputFormatters: UpperCaseTextFormatter.formatters,
+              enabled: !_saving,
+              decoration: const InputDecoration(
+                labelText: 'Modelo',
+                hintText: 'Ej: FUNDA GLOCK 19 / LINTERNA TÁCTICA',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _codigoController,
+              textCapitalization: TextCapitalization.characters,
+              inputFormatters: UpperCaseTextFormatter.formatters,
+              enabled: !_saving,
+              decoration: const InputDecoration(
+                labelText: 'Código',
+                border: OutlineInputBorder(),
+              ),
+            ),
           ] else
             TextField(
               controller: _codigoController,
@@ -219,19 +248,17 @@ class _AdminProductCreateScreenState extends State<AdminProductCreateScreen> {
                 border: OutlineInputBorder(),
               ),
             ),
-          if (_isMunicion || _isAccesorios) ...[
+          if (_isMunicion) ...[
             const SizedBox(height: 12),
             TextField(
               controller: _descripcionController,
               textCapitalization: TextCapitalization.characters,
               inputFormatters: UpperCaseTextFormatter.formatters,
               enabled: !_saving,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Descripción (opcional)',
-                hintText: _isAccesorios
-                    ? 'Ej: FUNDA GLOCK 19 / LINTERNA TÁCTICA'
-                    : 'Ej: C.22 LR VARMINT V-MAX 30GR',
-                border: const OutlineInputBorder(),
+                hintText: 'Ej: C.22 LR VARMINT V-MAX 30GR',
+                border: OutlineInputBorder(),
               ),
             ),
           ],

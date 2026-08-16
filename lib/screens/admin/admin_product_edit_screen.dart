@@ -310,25 +310,30 @@ class _AdminProductEditScreenState extends State<AdminProductEditScreen> {
                 border: OutlineInputBorder(),
               ),
             ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _calibreController,
-            textCapitalization: TextCapitalization.characters,
-            inputFormatters: UpperCaseTextFormatter.formatters,
-            decoration: const InputDecoration(
-              labelText: 'Calibre',
-              border: OutlineInputBorder(),
+          // Accesorios no usan calibre.
+          if (!product.isAccesorios) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _calibreController,
+              textCapitalization: TextCapitalization.characters,
+              inputFormatters: UpperCaseTextFormatter.formatters,
+              decoration: const InputDecoration(
+                labelText: 'Calibre',
+                border: OutlineInputBorder(),
+              ),
             ),
-          ),
+          ],
           if (product.isMunicion || product.isAccesorios) ...[
             const SizedBox(height: 12),
             TextField(
               controller: _descripcionController,
               textCapitalization: TextCapitalization.characters,
               inputFormatters: UpperCaseTextFormatter.formatters,
-              decoration: const InputDecoration(
-                labelText: 'Descripción',
-                border: OutlineInputBorder(),
+              // Accesorios: el nombre visible se guarda en `descripcion`; se
+              // muestra como "Modelo" para el usuario.
+              decoration: InputDecoration(
+                labelText: product.isAccesorios ? 'Modelo' : 'Descripción',
+                border: const OutlineInputBorder(),
               ),
             ),
           ],
