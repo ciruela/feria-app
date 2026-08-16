@@ -107,7 +107,7 @@ class PresupuestoSummary {
       PaymentCheckItem(label: 'PESOS', checked: usesPesos),
       PaymentCheckItem(
         label: 'U\$s',
-        checked: methods.contains(PaymentMethod.dolarBillete),
+        checked: methods.any((method) => method.isUsdPayment),
       ),
     ];
   }
@@ -136,6 +136,7 @@ class PresupuestoSummary {
       PaymentMethod.efectivo => 'EF',
       PaymentMethod.transferencia => 'TR',
       PaymentMethod.dolarBillete => 'USD',
+      PaymentMethod.dolarTransferencia => 'USD TR',
       PaymentMethod.debito || PaymentMethod.lista => 'OTROS',
       PaymentMethod.tarjeta1 ||
       PaymentMethod.tarjeta3 ||
@@ -174,6 +175,7 @@ class PresupuestoSummary {
       PaymentMethod.transferencia: 'TR',
       PaymentMethod.lista: 'LI',
       PaymentMethod.dolarBillete: 'US',
+      PaymentMethod.dolarTransferencia: 'UST',
       PaymentMethod.tarjeta1: 'T1',
       PaymentMethod.tarjeta3: 'T3',
       PaymentMethod.tarjeta6: 'T6',

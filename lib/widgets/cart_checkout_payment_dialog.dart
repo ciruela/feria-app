@@ -34,7 +34,11 @@ List<PaymentMethod> _checkoutMethodsFor(
         exchangeRate: exchangeRate,
         pricingSettings: pricingSettings,
       );
-  return checkoutPaymentMethods(includeUsd: includeUsd);
+  return checkoutPaymentMethods(
+    includeUsd: includeUsd,
+    // USD transferencia (distinto de USD billete) solo en World Guns.
+    includeUsdTransfer: branding.isWorldGuns,
+  );
 }
 
 Future<CartCheckoutPayment?> showCartCheckoutPaymentDialog(
