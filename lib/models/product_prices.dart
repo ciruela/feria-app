@@ -119,6 +119,9 @@ class ProductPrices {
 
 enum PaymentMethod {
   dolarBillete('USD', 'dolar_billete'),
+  // USD por transferencia bancaria: cotiza igual que el USD billete (mismo
+  // monto), pero se registra aparte para distinguirlo en comprobante/reportes.
+  dolarTransferencia('USD transferencia', 'dolar_transferencia'),
   transferencia('Transferencia', 'transferencia'),
   lista('Lista', 'lista'),
   efectivo('Efectivo', 'efectivo'),
@@ -135,11 +138,14 @@ enum PaymentMethod {
   final String label;
   final String key;
 
-  bool get isUsdPayment => this == PaymentMethod.dolarBillete;
+  bool get isUsdPayment =>
+      this == PaymentMethod.dolarBillete ||
+      this == PaymentMethod.dolarTransferencia;
 
   /// Etiqueta corta para diálogos y chips.
   String get shortLabel => switch (this) {
-        PaymentMethod.dolarBillete => 'USD',
+        PaymentMethod.dolarBillete => 'USD efvo.',
+        PaymentMethod.dolarTransferencia => 'USD transf.',
         PaymentMethod.transferencia => 'Transferencia',
         PaymentMethod.efectivo => 'Efectivo',
         PaymentMethod.lista => 'Lista',
@@ -169,6 +175,7 @@ enum PaymentMethod {
   double totalArsFor(ProductPrices prices) {
     return switch (this) {
       PaymentMethod.dolarBillete => prices.efectivo,
+      PaymentMethod.dolarTransferencia => prices.efectivo,
       PaymentMethod.transferencia => prices.transferencia,
       PaymentMethod.lista => prices.lista,
       PaymentMethod.efectivo => prices.efectivo,
@@ -184,7 +191,7 @@ enum PaymentMethod {
 
   /// Monto en dólares. USD billete aplica el mismo % que efectivo.
   double totalUsdFor(ProductPrices prices) {
-    if (this == PaymentMethod.dolarBillete && prices.lista > 0) {
+    if (isUsdPayment && prices.lista > 0) {
       return prices.usd * (prices.efectivo / prices.lista);
     }
     return prices.usd;
@@ -229,10 +236,15 @@ const checkoutDialogPaymentMethods = [
 ///
 /// Quien llama debe pasar [includeUsd] solo si el carrito tiene precio USD
 /// usable en todos los ítems (ver [CartTotalsService.cartSupportsUsdCheckout]).
-List<PaymentMethod> checkoutPaymentMethods({required bool includeUsd}) {
+List<PaymentMethod> checkoutPaymentMethods({
+  required bool includeUsd,
+  bool includeUsdTransfer = false,
+}) {
   if (!includeUsd) return checkoutDialogPaymentMethods;
   return [
     PaymentMethod.dolarBillete,
+    // USD transferencia solo se ofrece donde el tenant lo habilita (WG).
+    if (includeUsdTransfer) PaymentMethod.dolarTransferencia,
     ...checkoutDialogPaymentMethods,
   ];
 }

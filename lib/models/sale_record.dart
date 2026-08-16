@@ -246,5 +246,7 @@ class SaleLineRecord {
     return isArma ? 'arma_corta' : 'municion';
   }
 
-  bool get paysInUsd => paymentMethod == 'dolar_billete';
+  bool get paysInUsd =>
+      paymentMethod == 'dolar_billete' ||
+      paymentMethod == 'dolar_transferencia';
 }

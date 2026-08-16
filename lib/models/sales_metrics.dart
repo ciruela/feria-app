@@ -183,7 +183,8 @@ class DaySalesMetrics {
 
   static String _paymentLabel(String key) {
     return switch (key) {
-      'dolar_billete' => 'USD',
+      'dolar_billete' => 'USD efectivo',
+      'dolar_transferencia' => 'USD transferencia',
       'transferencia' => 'Transferencia',
       'lista' => 'Lista',
       'efectivo' => 'Efectivo',
