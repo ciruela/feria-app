@@ -382,6 +382,10 @@ class CatalogService extends ChangeNotifier {
       calibre: trimmedCalibre,
       modelo: trimmedModelo,
       codigo: trimmedCodigo,
+      // La descripción también identifica accesorios/munición: sin esto,
+      // un accesorio cargado solo con descripción (sin código) quedaba
+      // bloqueado por `_canCreateFromRow` con un mensaje engañoso.
+      descripcion: trimmedDescripcion,
       precioUsd: precioUsd,
       stock: stock,
     );
