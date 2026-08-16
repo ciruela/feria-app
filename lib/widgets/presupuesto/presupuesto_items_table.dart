@@ -294,13 +294,16 @@ class _DetailedItemsTable extends StatelessWidget {
           height: cellHeight,
           child: Padding(
             padding: const EdgeInsets.all(2),
-            child: _TcInlineField(
-              key: ValueKey('tc-${row.lineKey}'),
-              lineKey: row.lineKey,
-              initialValue: row.tc,
-              readOnly: readOnly,
-              onChanged: onTcChanged,
-            ),
+            // Accesorios: sin tarjeta de consumo (no es un producto regulado).
+            child: row.showsTarjetaConsumo
+                ? _TcInlineField(
+                    key: ValueKey('tc-${row.lineKey}'),
+                    lineKey: row.lineKey,
+                    initialValue: row.tc,
+                    readOnly: readOnly,
+                    onChanged: onTcChanged,
+                  )
+                : const SizedBox.shrink(),
           ),
         ),
         SizedBox(

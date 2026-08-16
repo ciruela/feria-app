@@ -44,6 +44,12 @@ class BudgetLine {
 
   bool get isSplitPart => splitPart != null;
 
+  bool get isAccesorios => productType == ProductType.accesorios.key;
+
+  /// Tarjeta de consumo: aplica a productos regulados (armas / munición), no a
+  /// accesorios. Se usa para no habilitar el campo T.C. en el comprobante.
+  bool get showsTarjetaConsumo => !isAccesorios;
+
   String get paymentLabel => paymentMethod.label;
 
   bool get paysInUsd => paymentMethod.isUsdPayment;

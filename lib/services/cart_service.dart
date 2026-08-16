@@ -393,6 +393,9 @@ class CartService extends ChangeNotifier {
         _items.where((element) => element.lineKey == lineKey).firstOrNull;
     if (item == null) return;
 
+    // Los accesorios no llevan tarjeta de consumo.
+    if (item.product.isAccesorios) return;
+
     final value = tarjetaConsumo.trim();
     item.tarjetaConsumo = value;
 
