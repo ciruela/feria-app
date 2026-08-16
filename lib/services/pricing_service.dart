@@ -22,10 +22,10 @@ class PricingService {
     final lista = exchangeRate.toArs(product.precioUsd);
     final efectivoPct =
         applyDiscounts ? settings.descuentoEfectivoPctFor(product.type) : 0;
-    // Sin descuentos, 3 cuotas usa el recargo general (ignora la promo munición).
-    final tarjeta3Pct = applyDiscounts
-        ? settings.recargoTarjeta3PctFor(product)
-        : settings.recargoTarjeta3Pct;
+    // La promo "3 cuotas sin interés" (munición arma larga) NO es un descuento:
+    // es un plan a precio de lista. Vale siempre, aunque la venta se cobre "sin
+    // descuento" (el toggle solo apaga el descuento de efectivo/transferencia).
+    final tarjeta3Pct = settings.recargoTarjeta3PctFor(product);
     final efectivo = lista * (1 - efectivoPct / 100);
     final transferencia =
         applyDiscounts && settings.transferenciaComoEfectivoFor(product.type)

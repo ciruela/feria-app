@@ -164,8 +164,9 @@ void main() {
     expect(prices.lista, 150000);
     expect(prices.efectivo, closeTo(150000, 0.01));
     expect(prices.transferencia, closeTo(150000, 0.01));
-    // La promo 3 cuotas SI se ignora: usa el recargo general (+15%).
-    expect(prices.tarjeta3, closeTo(172500, 0.01));
+    // La promo 3 cuotas sin interés NO es un descuento: se mantiene a lista
+    // (0% recargo) aunque la venta se cobre "sin descuento".
+    expect(prices.tarjeta3, closeTo(150000, 0.01));
     // Los demás recargos de tarjeta no cambian.
     expect(prices.tarjeta6, closeTo(180000, 0.01)); // +20%
     expect(prices.tarjeta12, closeTo(202500, 0.01)); // +35%

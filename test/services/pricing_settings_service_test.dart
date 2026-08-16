@@ -82,7 +82,7 @@ void main() {
     expect(mun['tarjeta3_solo_arma_larga'], isTrue);
   });
 
-  test('toMapWithoutDiscounts: efectivo 0, sin transfer=efectivo ni munición', () async {
+  test('toMapWithoutDiscounts: efectivo 0, promo cuotas sin interés se mantiene', () async {
     final settings = PricingSettingsService();
     await settings.save(
       efectivoPct: 5,
@@ -105,7 +105,14 @@ void main() {
     // Descuentos apagados: efectivo a 0 y transferencia a lista.
     expect(map['efectivo'], 0);
     expect(map['transferencia_como_efectivo'], isFalse);
-    expect(map.containsKey('municion'), isFalse);
+    // La promo munición se conserva, pero sin su parte de descuento: la promo
+    // de 3 cuotas sin interés (tarjeta3=0) sigue vigente a precio de lista.
+    expect(map['municion'], isA<Map>());
+    final mun = map['municion'] as Map;
+    expect(mun['efectivo'], 0);
+    expect(mun['transferencia_como_efectivo'], isFalse);
+    expect(mun['tarjeta3'], 0);
+    expect(mun['tarjeta3_solo_arma_larga'], isTrue);
     // Recargos de tarjeta intactos.
     expect(map['tarjeta3'], 15);
     expect(map['tarjeta6'], 20);

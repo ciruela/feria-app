@@ -192,7 +192,8 @@ class PricingSettingsService extends ChangeNotifier {
   }
 
   /// Igual que [toMap] pero sin descuentos: efectivo/transferencia cotizan a
-  /// lista y se quita la promo de munición. Mantiene los recargos de tarjeta.
+  /// lista. Mantiene los recargos de tarjeta y la promo de cuotas sin interés
+  /// (que no es un descuento, sino un plan a precio de lista).
   ///
   /// Lo usa el registro de ventas para que el servidor (que recalcula precios
   /// desde este map) coincida con el cliente cuando la venta se cobra "sin
@@ -202,7 +203,15 @@ class PricingSettingsService extends ChangeNotifier {
     final map = toMap();
     map['efectivo'] = 0;
     map['transferencia_como_efectivo'] = false;
-    map.remove('municion');
+    // La promo munición se conserva, pero se apaga solo su parte de descuento
+    // (efectivo/transferencia). El plan de 3 cuotas sin interés se mantiene.
+    final mun = map['municion'];
+    if (mun is Map) {
+      final munWithoutDiscount = Map<String, dynamic>.from(mun);
+      munWithoutDiscount['efectivo'] = 0;
+      munWithoutDiscount['transferencia_como_efectivo'] = false;
+      map['municion'] = munWithoutDiscount;
+    }
     return map;
   }
 
