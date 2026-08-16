@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../config/app_config.dart';
@@ -29,6 +31,7 @@ class _AdminClientesScreenState extends State<AdminClientesScreen> {
   List<String> _fiscalOptions = const [];
   DateTime? _from;
   DateTime? _to;
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -53,8 +56,18 @@ class _AdminClientesScreenState extends State<AdminClientesScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Búsqueda en vivo: recarga con un pequeño debounce mientras se tipea.
+  void _onSearchChanged(String _) {
+    setState(() {});
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) _load();
+    });
   }
 
   Future<void> _load() async {
@@ -123,7 +136,9 @@ class _AdminClientesScreenState extends State<AdminClientesScreen> {
   }
 
   void _clearFilters() {
+    _debounce?.cancel();
     setState(() {
+      _searchController.clear();
       _sort = ClientesSort.recent;
       _onlyWithSales = false;
       _fiscal = '';
@@ -218,12 +233,14 @@ class _AdminClientesScreenState extends State<AdminClientesScreen> {
           label: Text(_to == null ? 'Hasta' : 'Hasta ${_fmtDate(_to!)}'),
           onPressed: () => _pickDate(isFrom: false),
         ),
-        if (_hasActiveFilters)
-          TextButton.icon(
-            icon: const Icon(Icons.clear_all_rounded, size: 16),
-            label: const Text('Limpiar filtros'),
-            onPressed: _clearFilters,
-          ),
+        TextButton.icon(
+          icon: const Icon(Icons.clear_all_rounded, size: 16),
+          label: const Text('Limpiar filtros'),
+          onPressed:
+              (_hasActiveFilters || _searchController.text.trim().isNotEmpty)
+                  ? _clearFilters
+                  : null,
+        ),
       ],
     );
   }
@@ -274,6 +291,7 @@ class _AdminClientesScreenState extends State<AdminClientesScreen> {
                     : IconButton(
                         tooltip: 'Limpiar',
                         onPressed: () {
+                          _debounce?.cancel();
                           _searchController.clear();
                           _load();
                         },
@@ -284,19 +302,10 @@ class _AdminClientesScreenState extends State<AdminClientesScreen> {
                 fillColor: AppColors.surface,
               ),
               onSubmitted: (_) => _load(),
-              onChanged: (_) => setState(() {}),
+              onChanged: _onSearchChanged,
             ),
             const SizedBox(height: 12),
             _buildFilters(context),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton.icon(
-                onPressed: _loading ? null : _load,
-                icon: const Icon(Icons.search_rounded, size: 18),
-                label: const Text('BUSCAR'),
-              ),
-            ),
             const SizedBox(height: 20),
             SectionHeader(
               title: '${_clientes.length} clientes',
